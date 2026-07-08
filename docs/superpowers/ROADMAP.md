@@ -8,13 +8,14 @@
 
 ## 0. 2026-07-07 最新基线(macOS 主平台 · Phase 0 奠基)
 
-- **平台切换**:macOS 成为主开发平台;本目录初始化全新 Git 仓库(分支 `main`,基线 commit `ba01b12` 为 Windows 迁移快照)。**遗留资产迁移待办(仅用户可在 Windows 机上完成)**:① 拷回 `D:\PSA_BESS\.git`(本 ROADMAP 引用的历史 feat/* 分支只存在于那里;拷回后作归档仓库保存即可,无需合并);② 拷回 `D:\ETA_claude\eta-tool\src\data\templates.ts`(「模板/场景库」迁移的前置输入);③ 在 GitHub 创建远程仓库并 push,CI 才会开始运行。
+- **平台切换**:macOS 成为主开发平台;本目录初始化全新 Git 仓库(分支 `main`,基线 commit `ba01b12` 为 Windows 迁移快照)。**遗留资产迁移**:① ✅ 已拷回原仓库(`git-archive repo/`,含全部历史 feat/* 分支,已 gitignore,作归档保存);② ✅ 已拷回前身模板 → `docs/reference-assets/templates-eta-claude.ts`(538 行 EventTree v2,「模板/场景库」迁移的前置输入);③ **仍待办**:在 GitHub 创建远程仓库并 push,CI 才会开始运行。
 - **工具链(全部用户级安装,无 sudo/brew)**:uv → Python 3.12.13 `.venv` + editable install;nvm → Node 20.20.2(原 `frontend/node_modules` 为 Windows 二进制,已 `npm ci` 重建);新增 `Makefile` 为 macOS 日常入口(`make setup/test/benchmark/check/backend/frontend/run/bundle`),`run.ps1` 保留为 Windows 遗留。nvm 安装脚本已按官方默认在 `~/.zshrc` 追加初始化行。
 - **本机验证(2026-07-07)**:Python 156 通过、2 跳过(12.7s;跳过为 CUDD,留待 Linux CI);benchmark 24 通过(25s);前端 vitest 165 通过(2s);`tsc -b && vite build` 通过(仍有 >500kB chunk 警告,已知问题)。
 - **CI(`.github/workflows/ci.yml`,push 后生效)**:四个 job——Python 测试;**benchmark 常态回归门**(从按需运行升级为每次推送必跑的门禁);CUDD parity(Linux 编译 `dd.cudd`,补上 ROADMAP 待办 D 的验证缺口,初期 `continue-on-error`,跑通后收紧);前端测试+构建(Node 20)。
 - **预览**:重建 `.claude/launch.json`(backend :8000 / frontend :5173,uvicorn 走 `.venv`)。
 - **AI 模型策略**:新增 `docs/design/ai-model-strategy.md`——开发面(各 Phase 用模分层:Fable 5 只用于 ADR/引擎数学/安全关键评审,Opus 4.8 为实现主力,Sonnet 5/Haiku 4.5 递降)与产品面(AI 生成 ETA/FTA:Fable 5 起草 + refusal fallback 到 Opus 4.8、Sonnet 5 解释性表面、Haiku 微任务、**确定性校验不走模型**、Batch API 评测门、模型版本/工具调用留痕入分析档案)。Phase 2 的 AI 管线 ADR 在此基础上细化。
-- **下一步**:Phase 1 —— `.claude/` 技能/代理结构(CLAUDE.md、领域技能迁移改写、流程技能、三个 agent 定义)。
+- **Phase 1(2026-07-08 完成)—— `.claude/` 技能/代理结构**:新增根 `CLAUDE.md`(已知约定:架构/命令/硬约束/流程/模型策略);`.claude/skills/` 13 个技能——**领域 4**:`bess-tr-model`(蓝图迁移+指向真实 `bess/` 数据文件)、`psa-engine`(从"如何写引擎"改写为"如何维护已验证引擎":真实架构/既定偏离/验证门,理论 references 保留)、`psa-frontend`(按真实代码全新撰写,蓝图 architecture 弃用)、`eta-reference-data`(合并 4 个 `.agents` 数据技能:当前机制+分级/口径/贝叶斯,原文带迁移横幅入 references);**流程 9**(Thariq“寻找未知”方法论落地):`blindspot-pass`/`interview-me`/`design-directions`/`reference-hunt`/`plan-feature`(沿用 specs+plans 命名)/`verify-psa`(分级验证门)/`change-quiz`(合并前数值抽查)/`riskspectrum-parity`(活对标台账:已达/超越 vs 差距排序)/`regulatory-traceability`(证据链清单)。`.claude/agents/` 3 个:`engine-reviewer`(fable,对抗性数值评审)、`frontend-dev`(sonnet,按规格实现)、`domain-reviewer`(fable,方法论/数据出处评审)。清理:删除空脚手架目录(`skills/ agents/ hooks/ mcp/ memory/`)、三个 `.skill` 蓝图归档至 `docs/skill-blueprints/`、`.agents/` 移除(内容已并入)。
+- **下一步**:Phase 2 —— 三份关键 ADR(经 interview→spec 流程):① 统一 ProjectDocument 规范模式(MEF 对齐,UUID+溯源字段);② 存储/版本化/审计(SQLite 快照+追加审计日志+分析案例);③ AI 生成管线(工具调用接地+校验修复环+ghost-diff 评审+金例评测)。前端结构评审与数据出处校核作为 ADR 输入并行。
 
 ---
 

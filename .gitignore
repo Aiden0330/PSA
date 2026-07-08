@@ -17,3 +17,6 @@ eta.png
 屏幕截图*.png
 .DS_Store
 .claude/settings.local.json
+
+# rescued Windows-side archive (standalone repo, not part of this tree)
+git-archive repo/

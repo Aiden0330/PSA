@@ -123,6 +123,8 @@ npm --prefix frontend run build
 - [使用手册](docs/USER_GUIDE.md)
 - [算法设计说明](docs/ALGORITHM_DESIGN.md)
 - [路线图与交接文档](docs/superpowers/ROADMAP.md)
+- 开发协作约定：根 `CLAUDE.md` + `.claude/skills/`（4 领域 + 9 流程技能）+ `.claude/agents/`（3 评审/实现代理）
+- [AI 模型策略](docs/design/ai-model-strategy.md)；原技能蓝图归档于 `docs/skill-blueprints/`
 
 ## 下一步建议
 
