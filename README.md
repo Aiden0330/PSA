@@ -4,11 +4,11 @@
 
 ## 当前基线
 
-- 规范项目目录为 `D:\PSA_BESS`。
+- 主开发平台为 **macOS**(本目录即 Git 仓库,分支 `main`);Windows 侧 `D:\PSA_BESS` 为历史基线,原 git 历史与 `D:\ETA_claude` 模板资产待迁移(见 ROADMAP)。
 - Python 运行依赖和测试依赖已写入 `pyproject.toml`，本地 `.venv` 可用。
 - 前端项目文件会保存/恢复 ETA、用户自建 FTA、FMEA 行数据和 FMEA 映射配置。
 - 后端 JSON 响应显式声明 `application/json; charset=utf-8`，避免含中文接口在 Windows PowerShell 等客户端显示乱码。
-- 最近一次基线验证：前端 Vitest 143 例通过，Python 非 benchmark 测试 147 例通过、2 例跳过。
+- 最近一次基线验证（2026-07-07，macOS）：前端 Vitest 165 例通过、`vite build` 通过；Python 非 benchmark 测试 156 例通过、2 例跳过（CUDD 留待 Linux CI）；引擎 benchmark 24 例通过。
 
 ## 架构
 
@@ -19,7 +19,31 @@
 | 后端 | `backend/` | FastAPI API、项目存档、MEF 导入、报告导出、前端静态托管 |
 | 前端 | `frontend/` | React + TypeScript 工作台，提供 ETA/FTA/FMEA/参考库/后果/报告等界面 |
 
-## 环境准备
+## 环境准备(macOS,主开发平台)
+
+工具链:[uv](https://docs.astral.sh/uv/)(管理 Python 3.12 与 `.venv`)+ [nvm](https://github.com/nvm-sh/nvm)(Node 20)。首次安装:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+nvm install 20
+
+make setup     # = uv venv(Python 3.12)+ pip install -e ".[test]" + npm ci
+```
+
+日常命令(完整清单见 `Makefile`):
+
+```bash
+make test        # 前后端全部测试(不含 benchmark)
+make benchmark   # 引擎基准对标(SCRAM/OpenFTA 参考值,已入 CI)
+make check       # 提交前完整口径:git diff --check + 测试 + 构建
+make backend     # FastAPI :8000(托管 frontend/dist)
+make frontend    # Vite dev :5173
+make run         # 构建前端并在 :8000 一体运行
+make bundle      # 离线单文件 bess-eta-standalone.html
+```
+
+## 环境准备(Windows,遗留)
 
 ```powershell
 cd D:\PSA_BESS
@@ -40,13 +64,19 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 ## 运行
 
-一键运行构建后的前端和 FastAPI 后端：
+macOS 一键运行（构建前端 + FastAPI 后端）：
+
+```bash
+make run          # 开发模式则分别：make backend + make frontend
+```
+
+Windows（遗留）一键运行：
 
 ```powershell
 .\run.ps1
 ```
 
-开发模式建议前后端分开启动：
+Windows 开发模式建议前后端分开启动：
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn backend.app:app --host 127.0.0.1 --port 8000

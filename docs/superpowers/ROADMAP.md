@@ -1,12 +1,24 @@
 # BESS PSA 工具 — 路线图与交接文档
 
-*更新:2026-06-30 · 分支 `main` · 当前基线为 `D:\PSA_BESS`*
+*更新:2026-07-07 · 分支 `main` · 主平台 macOS(`~/Documents/projects/PSA_BESS`,Git 仓库);Windows `D:\PSA_BESS` 为遗留基线*
 
 一套面向储能(BESS)热失控的 SOTA 概率安全评价(PSA/QRA)工具,三层:**引擎**(`psaengine/`)+ **领域应用**(`bess/`)+ **Web 前端**(`backend/` FastAPI + `frontend/` React)。蓝图来自目录里三个技能:`bess-tr-event-tree`、`fta-eta-quantification-engine`、`etafta-frontend`。
 
 ---
 
-## 0. 2026-06-30 最新基线
+## 0. 2026-07-07 最新基线(macOS 主平台 · Phase 0 奠基)
+
+- **平台切换**:macOS 成为主开发平台;本目录初始化全新 Git 仓库(分支 `main`,基线 commit `ba01b12` 为 Windows 迁移快照)。**遗留资产迁移待办(仅用户可在 Windows 机上完成)**:① 拷回 `D:\PSA_BESS\.git`(本 ROADMAP 引用的历史 feat/* 分支只存在于那里;拷回后作归档仓库保存即可,无需合并);② 拷回 `D:\ETA_claude\eta-tool\src\data\templates.ts`(「模板/场景库」迁移的前置输入);③ 在 GitHub 创建远程仓库并 push,CI 才会开始运行。
+- **工具链(全部用户级安装,无 sudo/brew)**:uv → Python 3.12.13 `.venv` + editable install;nvm → Node 20.20.2(原 `frontend/node_modules` 为 Windows 二进制,已 `npm ci` 重建);新增 `Makefile` 为 macOS 日常入口(`make setup/test/benchmark/check/backend/frontend/run/bundle`),`run.ps1` 保留为 Windows 遗留。nvm 安装脚本已按官方默认在 `~/.zshrc` 追加初始化行。
+- **本机验证(2026-07-07)**:Python 156 通过、2 跳过(12.7s;跳过为 CUDD,留待 Linux CI);benchmark 24 通过(25s);前端 vitest 165 通过(2s);`tsc -b && vite build` 通过(仍有 >500kB chunk 警告,已知问题)。
+- **CI(`.github/workflows/ci.yml`,push 后生效)**:四个 job——Python 测试;**benchmark 常态回归门**(从按需运行升级为每次推送必跑的门禁);CUDD parity(Linux 编译 `dd.cudd`,补上 ROADMAP 待办 D 的验证缺口,初期 `continue-on-error`,跑通后收紧);前端测试+构建(Node 20)。
+- **预览**:重建 `.claude/launch.json`(backend :8000 / frontend :5173,uvicorn 走 `.venv`)。
+- **AI 模型策略**:新增 `docs/design/ai-model-strategy.md`——开发面(各 Phase 用模分层:Fable 5 只用于 ADR/引擎数学/安全关键评审,Opus 4.8 为实现主力,Sonnet 5/Haiku 4.5 递降)与产品面(AI 生成 ETA/FTA:Fable 5 起草 + refusal fallback 到 Opus 4.8、Sonnet 5 解释性表面、Haiku 微任务、**确定性校验不走模型**、Batch API 评测门、模型版本/工具调用留痕入分析档案)。Phase 2 的 AI 管线 ADR 在此基础上细化。
+- **下一步**:Phase 1 —— `.claude/` 技能/代理结构(CLAUDE.md、领域技能迁移改写、流程技能、三个 agent 定义)。
+
+---
+
+### 0.1 上一基线:2026-06-30(Windows,历史记录)
 
 - **目录与环境**:`D:\PSA_BESS` 是唯一有效工作区;`D:\PSA_Opus_Chatgpt` 已做目录联接指向 `D:\PSA_BESS`。Python 运行依赖和测试依赖已写入 `pyproject.toml`;`.venv` 已按 editable install 指向本项目。
 - **项目文件一致性**:项目 payload v2 已覆盖 ETA 页签、活动页、勾选集合、用户自建 FTA、FMEA 行数据和 FMEA 映射配置。保存、另存、导出、打开和导入均走统一 payload 构造/恢复流程。
