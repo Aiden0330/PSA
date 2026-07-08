@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<opsa-mef>
+  <define-fault-tree name="bridge">
+    <define-gate name="TOP"><or>
+      <and><basic-event name="E1"/><basic-event name="E2"/></and>
+      <and><basic-event name="E4"/><basic-event name="E5"/></and>
+      <and><basic-event name="E1"/><basic-event name="E3"/><basic-event name="E5"/></and>
+      <and><basic-event name="E2"/><basic-event name="E3"/><basic-event name="E4"/></and>
+    </or></define-gate>
+  </define-fault-tree>
+  <model-data>
+    <define-basic-event name="E1"><float value="0.1"/></define-basic-event>
+    <define-basic-event name="E2"><float value="0.2"/></define-basic-event>
+    <define-basic-event name="E3"><float value="0.05"/></define-basic-event>
+    <define-basic-event name="E4"><float value="0.15"/></define-basic-event>
+    <define-basic-event name="E5"><float value="0.25"/></define-basic-event>
+  </model-data>
+</opsa-mef>

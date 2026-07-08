@@ -1,0 +1,139 @@
+{
+  "draft_id": "ai-example-coolant-leak-eta",
+  "summary": "生成电池舱液冷泄漏导致外短的标准级联 ETA 草案。",
+  "assumptions": [
+    "所有频率和 PFD 数值均来自 user_context.explicit_values，待人工审核。",
+    "首版示例不生成 FTA，屏障失效概率直接作为 ETA PFD 使用。",
+    "屏障之间按独立近似处理；若存在共因失效，应后续补充 FTA/CCF 建模。"
+  ],
+  "questions": [],
+  "etas": [
+    {
+      "key": "ai_eta_coolant_leak",
+      "name": "液冷泄漏导致外短 ETA 草案",
+      "renamed": false,
+      "model": {
+        "initEvent": "电池舱液冷泄漏导致外短",
+        "initFreq": 0.001,
+        "functionalEvents": [
+          {
+            "id": "B_LEAK_DETECT",
+            "label": "液冷泄漏检测联锁",
+            "failProb": 0.05,
+            "source": "AI 草案,待人工审核; 用户输入示例值",
+            "evidence": "来自 request.user_context.explicit_values.barriers[0]"
+          },
+          {
+            "id": "B_BMS_ISO",
+            "label": "BMS 断开隔离",
+            "failProb": 0.1,
+            "source": "AI 草案,待人工审核; 用户输入示例值",
+            "evidence": "来自 request.user_context.explicit_values.barriers[1]"
+          },
+          {
+            "id": "B_FUSE",
+            "label": "熔断/保护开断",
+            "failProb": 0.02,
+            "source": "AI 草案,待人工审核; 用户输入示例值",
+            "evidence": "来自 request.user_context.explicit_values.barriers[2]"
+          }
+        ],
+        "root": {
+          "kind": "branch",
+          "feId": "B_LEAK_DETECT",
+          "success": {
+            "kind": "leaf",
+            "consequence": "C1"
+          },
+          "failure": {
+            "kind": "branch",
+            "feId": "B_BMS_ISO",
+            "success": {
+              "kind": "leaf",
+              "consequence": "C2"
+            },
+            "failure": {
+              "kind": "branch",
+              "feId": "B_FUSE",
+              "success": {
+                "kind": "leaf",
+                "consequence": "C3"
+              },
+              "failure": {
+                "kind": "leaf",
+                "consequence": "C4"
+              }
+            }
+          }
+        },
+        "consequences": [
+          {
+            "id": "C1",
+            "desc": "检测成功并联锁停机，未形成外短扩展",
+            "level": "C1"
+          },
+          {
+            "id": "C2",
+            "desc": "检测失败但 BMS 隔离成功，局部异常受控",
+            "level": "C2"
+          },
+          {
+            "id": "C3",
+            "desc": "隔离失败但熔断/保护开断成功，Pack 级损伤",
+            "level": "C3"
+          },
+          {
+            "id": "C4",
+            "desc": "检测、隔离和保护均失败，箱级起火蔓延",
+            "level": "C4"
+          }
+        ],
+        "initFreqSource": "manual"
+      },
+      "fts": {
+        "model_data": {
+          "parameters": []
+        },
+        "fault_trees": []
+      },
+      "pfds": {}
+    }
+  ],
+  "fts": {
+    "model_data": {
+      "parameters": []
+    },
+    "fault_trees": []
+  },
+  "traceability": [
+    {
+      "item": "initFreq",
+      "source": "request.user_context.explicit_values.initFreq",
+      "value": 0.001
+    },
+    {
+      "item": "B_LEAK_DETECT",
+      "source": "request.user_context.explicit_values.barriers[0]",
+      "value": 0.05
+    },
+    {
+      "item": "B_BMS_ISO",
+      "source": "request.user_context.explicit_values.barriers[1]",
+      "value": 0.1
+    },
+    {
+      "item": "B_FUSE",
+      "source": "request.user_context.explicit_values.barriers[2]",
+      "value": 0.02
+    }
+  ],
+  "warnings": [
+    "AI 草案不能替代工程审查。",
+    "该示例使用用户输入示例值，仅用于接口契约和端到端冒烟。"
+  ],
+  "validation": {
+    "ok": true,
+    "errors": [],
+    "warnings": []
+  }
+}

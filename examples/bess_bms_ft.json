@@ -1,0 +1,25 @@
+{
+  "model_data": {"parameters": [
+    {"id": "V_SENSOR", "kind": "probability", "value": 0.02},
+    {"id": "T_SENSOR", "kind": "probability", "value": 0.02},
+    {"id": "I_SENSOR", "kind": "probability", "value": 0.02},
+    {"id": "MAIN_CONTACTOR", "kind": "probability", "value": 0.05},
+    {"id": "BACKUP_CONTACTOR", "kind": "probability", "value": 0.05},
+    {"id": "LOGIC_FAIL", "kind": "probability", "value": 0.01}
+  ]},
+  "fault_trees": [
+    {"name": "BMS", "top": "BMS_PROTECTION_FAILURE",
+     "nodes": [
+       {"id": "V_SENSOR", "basic": true, "param_ref": "V_SENSOR"},
+       {"id": "T_SENSOR", "basic": true, "param_ref": "T_SENSOR"},
+       {"id": "I_SENSOR", "basic": true, "param_ref": "I_SENSOR"},
+       {"id": "MAIN_CONTACTOR", "basic": true, "param_ref": "MAIN_CONTACTOR"},
+       {"id": "BACKUP_CONTACTOR", "basic": true, "param_ref": "BACKUP_CONTACTOR"},
+       {"id": "LOGIC_FAIL", "basic": true, "param_ref": "LOGIC_FAIL"},
+       {"id": "SENSOR_2OO3", "op": "atleast", "args": ["V_SENSOR", "T_SENSOR", "I_SENSOR"], "k": 2},
+       {"id": "CONTACTOR_AND", "op": "and", "args": ["MAIN_CONTACTOR", "BACKUP_CONTACTOR"]},
+       {"id": "BMS_PROTECTION_FAILURE", "op": "or", "args": ["SENSOR_2OO3", "CONTACTOR_AND", "LOGIC_FAIL"]}
+     ]}
+  ],
+  "event_trees": [], "ccf_groups": []
+}

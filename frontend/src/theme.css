@@ -1,0 +1,155 @@
+/* BESS PSA design tokens — single source of truth for the professional UI.
+   Hybrid theme: dark slate chrome + light data-dense work area. */
+:root {
+  /* chrome (header, status bar, dark footers, init-event node) */
+  --psa-chrome: #0E1A27;
+  --psa-chrome-2: #142231;
+  --psa-chrome-line: #0A141E;
+  --psa-chrome-ink: #AEBCCB;
+  --psa-chrome-ink-dim: #7C8B9C;
+
+  /* surfaces */
+  --psa-bg: #EEF1F4;
+  --psa-surface: #FFFFFF;
+  --psa-soft: #F8FAFC;
+  --psa-soft-2: #FAFBFC;
+
+  /* lines / borders */
+  --psa-line: #E6ECF2;
+  --psa-line-2: #D7DEE6;
+  --psa-line-strong: #CFD8E1;
+
+  /* ink / text */
+  --psa-ink: #16202B;
+  --psa-ink-2: #33415A;
+  --psa-muted: #64748B;
+  --psa-faint: #94A3B8;
+
+  /* brand / primary action */
+  --psa-primary: #1F6FE0;
+  --psa-primary-strong: #1559B8;
+  --psa-primary-soft: #E6F1FB;
+  --psa-accent: #F0541E;        /* flame orange (logo / init-event accent bar) */
+  --psa-amber: #D97706;
+  --psa-teal: #0F766E;
+  --psa-teal-strong: #0C5D57;
+
+  /* status */
+  --psa-ok: #2EC26A;
+  --psa-danger: #DC2626;
+  --psa-danger-strong: #B91C1C;
+  --psa-danger-soft: #FEF2F2;
+  --psa-warn: #D97706;
+
+  /* consequence severity scale C1..C5 */
+  --psa-c1: #16A34A;
+  --psa-c2: #65A30D;
+  --psa-c3: #D97706;
+  --psa-c4: #EA580C;
+  --psa-c5: #DC2626;
+
+  /* risk-matrix zones */
+  --psa-zone-a: #EF9A9A;
+  --psa-zone-b: #FFCC80;
+  --psa-zone-c: #A5D6A7;
+
+  /* typography */
+  --psa-font-sans: 'IBM Plex Sans', 'Noto Sans SC', system-ui, 'Segoe UI', sans-serif;
+  --psa-font-mono: 'IBM Plex Mono', 'Noto Sans SC', monospace;
+
+  /* radius */
+  --psa-r-sm: 6px;
+  --psa-r: 8px;
+  --psa-r-lg: 10px;
+  --psa-r-xl: 14px;
+
+  /* elevation (subtle only — no heavy shadows) */
+  --psa-shadow: 0 1px 2px rgba(15, 25, 40, .05);
+  --psa-shadow-pop: 0 4px 14px -4px rgba(15, 25, 40, .18);
+
+  /* layout */
+  --psa-header-h: 54px;
+  --psa-statusbar-h: 28px;
+  /* responsive right-column / inspector width: shrinks on small screens, caps on large */
+  --psa-side-w: clamp(248px, 22vw, 320px);
+  --psa-inspector-w: clamp(300px, 24vw, 372px);
+  --psa-ftsidebar-w: clamp(150px, 14vw, 208px);
+}
+
+/* ---- base utility classes (opt-in; inline styles may also use the vars directly) ---- */
+.psa-num { font-family: var(--psa-font-mono); font-variant-numeric: tabular-nums; }
+
+.psa-card { background: var(--psa-surface); border: 1px solid var(--psa-line); border-radius: var(--psa-r-lg); }
+.psa-panel { background: var(--psa-surface); border: 1px solid var(--psa-line-2); border-radius: var(--psa-r-lg);
+  display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--psa-shadow); }
+.psa-panel__head { height: auto; flex-shrink: 0; border-bottom: 1px solid var(--psa-line);
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--psa-soft);
+  font-size: 12px; font-weight: 600; color: var(--psa-ink-2); }
+
+/* 竖向分隔条(事件树画布 ↕ 底部坞,可拖拽改高度)*/
+.psa-vsplit { flex-shrink:0; height:10px; display:flex; align-items:center; justify-content:center;
+  cursor:row-resize; touch-action:none; }
+.psa-vsplit > i { width:48px; height:4px; border-radius:3px; background:var(--psa-line-strong);
+  transition:background .12s, width .12s; display:block; }
+.psa-vsplit:hover > i { background:var(--psa-primary); width:72px; }
+
+/* 横向分隔条(事故序列 ↔ 风险矩阵,左右拖拽改宽度)*/
+.psa-hsplit { flex-shrink:0; width:10px; align-self:stretch; display:flex; align-items:center; justify-content:center;
+  cursor:col-resize; touch-action:none; }
+.psa-hsplit > i { width:4px; height:48px; border-radius:3px; background:var(--psa-line-strong);
+  transition:background .12s, height .12s; display:block; }
+.psa-hsplit:hover > i { background:var(--psa-primary); height:72px; }
+
+.psa-btn { height: 30px; display: inline-flex; align-items: center; gap: 6px; padding: 0 11px;
+  border: 1px solid var(--psa-line-strong); border-radius: 7px; background: var(--psa-surface);
+  color: var(--psa-ink-2); font-size: 12.5px; font-weight: 500; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0; transition: background .12s, border-color .12s; }
+.psa-btn:hover { background: var(--psa-soft); border-color: var(--psa-line-2); }
+.psa-btn:disabled { opacity: .55; cursor: default; }
+.psa-btn--primary { background: var(--psa-primary); border-color: var(--psa-primary); color: #fff; }
+.psa-btn--primary:hover { background: var(--psa-primary-strong); border-color: var(--psa-primary-strong); }
+.psa-btn--dark { background: var(--psa-chrome); border-color: var(--psa-chrome); color: #fff; }
+.psa-btn--danger { color: var(--psa-danger); }
+
+.psa-statusbar { height: var(--psa-statusbar-h); flex-shrink: 0; background: var(--psa-chrome);
+  display: flex; align-items: center; gap: 14px; padding: 0 14px; color: var(--psa-chrome-ink); font-size: 11.5px; }
+.psa-statusbar .psa-num { color: #D7E0EA; }
+
+.psa-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+
+/* ag-grid v32 variable overrides — applied via sibling class .psa-grid on the theme container */
+.psa-grid {
+  --ag-font-family: var(--psa-font-sans);
+  --ag-foreground-color: var(--psa-ink);
+  --ag-background-color: var(--psa-surface);
+  --ag-header-background-color: var(--psa-soft);
+  --ag-header-foreground-color: var(--psa-ink-2);
+  --ag-border-color: var(--psa-line);
+  --ag-row-border-color: var(--psa-line);
+  --ag-row-hover-color: var(--psa-primary-soft);
+  --ag-selected-row-background-color: var(--psa-primary-soft);
+  --ag-input-focus-border-color: var(--psa-primary);
+}
+
+/* ---- mockup-grade composition ---- */
+.psa-ch { display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:8px 12px; border-bottom:1px solid var(--psa-line); background:var(--psa-soft); flex-shrink:0; }
+.psa-ch .t { margin:0; font-size:12px; font-weight:600; color:var(--psa-ink-2); letter-spacing:.2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.psa-ch .meta { font-size:11px; color:var(--psa-faint); font-family:var(--psa-font-mono);
+  font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+.psa-kpi { background:var(--psa-soft); border:1px solid var(--psa-line); border-radius:var(--psa-r);
+  padding:9px 12px; display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
+.psa-kpi .l { font-size:11px; color:var(--psa-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.psa-kpi .v { font-size:20px; font-weight:600; font-family:var(--psa-font-mono);
+  font-variant-numeric:tabular-nums; line-height:1.1; color:var(--psa-ink); }
+.psa-kpi .v small { font-size:11px; font-weight:400; color:var(--psa-faint); margin-left:4px; }
+
+.psa-tag { font-size:10.5px; padding:2px 7px; border-radius:5px; background:var(--psa-soft);
+  color:var(--psa-ink-2); font-family:var(--psa-font-mono); }
+.psa-chip { display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:500; }
+.psa-chip .sq { width:11px; height:11px; border-radius:3px; flex-shrink:0; }
+
+.psa-field { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.psa-field > label, .psa-field > .k { width:auto; min-width:56px; font-size:11.5px; color:var(--psa-muted); }

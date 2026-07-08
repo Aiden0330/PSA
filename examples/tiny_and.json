@@ -1,0 +1,15 @@
+{
+  "model_data": {"parameters": [
+    {"id": "A", "kind": "probability", "value": 0.1},
+    {"id": "B", "kind": "probability", "value": 0.2}
+  ]},
+  "fault_trees": [
+    {"name": "TOP", "top": "TOP",
+     "nodes": [
+       {"id": "A", "basic": true, "param_ref": "A"},
+       {"id": "B", "basic": true, "param_ref": "B"},
+       {"id": "TOP", "op": "and", "args": ["A", "B"]}
+     ]}
+  ],
+  "event_trees": [], "ccf_groups": []
+}

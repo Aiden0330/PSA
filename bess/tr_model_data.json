@@ -1,0 +1,53 @@
+{
+  "meta": {
+    "name": "BESS 热失控事件树领域模型",
+    "version": "0.1",
+    "note": "PFD 与频率均为待替换先验;落地须用现场/测试数据贝叶斯更新并做敏感性分析。",
+    "feeds": ["fta-eta-quantification-engine", "etafta-frontend"]
+  },
+
+  "initiating_events": [
+    {"id": "IE_ISC",        "label": "电芯内短(潜在缺陷/锂枝晶)", "category": "electrical", "freq_prior": 1e-3, "note": "低频高后果,McMicken 范式,可至 C5"},
+    {"id": "IE_COOLANT",    "label": "液冷泄漏→电弧/外短→热滥用", "category": "thermal",    "freq_prior": 1e-3, "note": "Victorian Big Battery 范式"},
+    {"id": "IE_OVERCHARGE", "label": "过充/BMS 失效(SOC>95% 高危)", "category": "electrical", "freq_prior": 1e-3, "note": "韩国范式"},
+    {"id": "IE_EXT_FIRE",   "label": "外部火/邻舱热辐射",          "category": "thermal",    "freq_prior": 5e-4, "note": "多舱蔓延"},
+    {"id": "IE_MECH_WATER", "label": "机械损伤/进水",             "category": "mechanical", "freq_prior": 5e-4, "note": "沿海/山区环境,韩国范式"}
+  ],
+
+  "barriers": [
+    {"id": "B_OFFGAS",   "label": "早期离气探测+联动",   "level": "rack",   "stage": "vent/off-gas",   "type": "pfd",      "pfd_prior": 0.01, "source": "IEEE/CCPS LOPA", "note": "窗口最长(起火前 2–30 分钟),设为事件树首分支"},
+    {"id": "B_BMS",      "label": "BMS 切断/隔离",       "level": "rack",   "stage": "trigger",        "type": "pfd",      "pfd_prior": 0.10, "source": "DNV/Gully 2019", "note": "=传感∧逻辑∧接触器,可挂故障树"},
+    {"id": "B_THERMAL",  "label": "电芯间热障阻断蔓延",  "level": "module", "stage": "propagation",    "type": "pfd",      "pfd_prior": 0.10, "source": "DNV/Gully 2019", "note": "气凝胶/云母/膨胀型"},
+    {"id": "B_DEFLAG",   "label": "舱内泄爆/防爆",       "level": "system", "stage": "deflagration",   "type": "pfd+eff",  "pfd_prior": 0.10, "eff": 0.953, "source": "PFD: LOPA;η: Landucci 2017", "note": "NFPA69 优先于 68;三结果:启动且有效/未启动/启动无效"},
+    {"id": "B_SPACING",  "label": "舱间距阻断多舱蔓延",  "level": "system", "stage": "multi-unit",     "type": "pfd",      "pfd_prior": 0.10, "source": "NFPA 855 默认 ≥3ft/914mm", "note": "可由 UL 9540A 数据缩减"},
+    {"id": "B_RESPONSE", "label": "应急响应(避免开门引气)", "level": "system", "stage": "deflagration", "type": "pfd",  "pfd_prior": 0.10, "source": "LOPA(人因)", "note": "McMicken:开门引气 2–3 分钟内引爆 → 显式人因屏障"}
+  ],
+
+  "consequences": [
+    {"code": "C1", "label": "单体排气/离气,无蔓延,可恢复"},
+    {"code": "C2", "label": "模组内蔓延,局部热损"},
+    {"code": "C3", "label": "电池簇/单舱火灾"},
+    {"code": "C4", "label": "系统/多舱火灾"},
+    {"code": "C5", "label": "爆燃/爆炸+毒气释放,人员伤亡/结构破坏"}
+  ],
+
+  "precursors": [
+    {"stage": "trigger",     "signals": ["电压跌落", "温升速率", "绝缘下降"],          "detection": "BMS(V/T/电流/SOC)",          "window": "最早(电气)"},
+    {"stage": "vent/off-gas","signals": ["电解液 VOC", "CO", "H2", "压力"],            "detection": "离气探测(Li-ion Tamer/Honeywell)", "window": "起火前 2–30 分钟"},
+    {"stage": "smoke",       "signals": ["气溶胶/烟颗粒"],                             "detection": "吸气式烟感(VESDA)",          "window": "次之"},
+    {"stage": "fire",        "signals": ["热", "火焰", "急剧温升"],                    "detection": "热/火焰探测",                 "window": "最晚"}
+  ],
+
+  "domain_anchors": {
+    "temp_thresholds_C": {"electrolyte_degradation": [50, 60], "SEI_decomposition": [80, 120], "separator_melt": [130, 165], "cathode_O2_release": 250},
+    "offgas_species": ["CO2", "CO", "H2", "C2H4", "CH4", "C2H6", "C3H6"],
+    "gas_volume_L_per_Ah": [1, 3],
+    "HF_mg_per_Wh": [20, 200],
+    "POF3_mg_per_Wh": [15, 22],
+    "SOC_self_sustaining_propagation_pct": [75, 95],
+    "LFP_vs_NMC": {"propagation_speed_ratio_NMC_over_LFP": 5, "peak_temp_C": {"NMC811": 899, "LFP": 524}},
+    "note": "LFP 单位电量 HF 产出可能高于 NMC;'LFP 不产 HF' 为被证伪的过度简化"
+  },
+
+  "epri_root_cause_pct": {"integration_assembly_construction": 36, "operation": 29, "design": 21, "manufacturing": 4, "note": "72% 事故发生于头两年;失效率十年降约 98%(第三方解读,待核验)"}
+}

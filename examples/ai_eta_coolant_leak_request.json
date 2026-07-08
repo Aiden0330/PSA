@@ -1,0 +1,64 @@
+{
+  "goal": "电池舱液冷泄漏导致外短",
+  "target": "eta",
+  "current_project": {
+    "v": 2,
+    "etas": [],
+    "activeKey": "",
+    "checkedKeys": {}
+  },
+  "active_eta_key": null,
+  "user_context": {
+    "mode": "new_eta",
+    "instruction": "生成一个标准级联 ETA 草案。成功分支进入较轻后果，失败分支进入下一屏障；所有数值只能使用 explicit_values 中给出的值。",
+    "explicit_values": {
+      "initFreq": {
+        "value": 0.001,
+        "unit": "per year",
+        "source": "用户输入示例值"
+      },
+      "barriers": [
+        {
+          "id": "B_LEAK_DETECT",
+          "label": "液冷泄漏检测联锁",
+          "failProb": 0.05,
+          "source": "用户输入示例值"
+        },
+        {
+          "id": "B_BMS_ISO",
+          "label": "BMS 断开隔离",
+          "failProb": 0.1,
+          "source": "用户输入示例值"
+        },
+        {
+          "id": "B_FUSE",
+          "label": "熔断/保护开断",
+          "failProb": 0.02,
+          "source": "用户输入示例值"
+        }
+      ],
+      "consequences": [
+        {
+          "id": "C1",
+          "desc": "检测成功并联锁停机，未形成外短扩展",
+          "level": "C1"
+        },
+        {
+          "id": "C2",
+          "desc": "检测失败但 BMS 隔离成功，局部异常受控",
+          "level": "C2"
+        },
+        {
+          "id": "C3",
+          "desc": "隔离失败但熔断/保护开断成功，Pack 级损伤",
+          "level": "C3"
+        },
+        {
+          "id": "C4",
+          "desc": "检测、隔离和保护均失败，箱级起火蔓延",
+          "level": "C4"
+        }
+      ]
+    }
+  }
+}

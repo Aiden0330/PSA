@@ -1,0 +1,16 @@
+{
+  "scenarios": [
+    {"id": "SC_ISC", "name": "电芯内短 → 热失控", "init_event": "IE_ISC",
+     "barriers": ["B_OFFGAS", "B_BMS", "B_THERMAL", "B_DEFLAG", "B_SPACING", "B_RESPONSE"],
+     "decompose": {"B_BMS": "bms", "B_OFFGAS": "offgas_shared"}},
+    {"id": "SC_OVERCHARGE", "name": "过充 / BMS 失效", "init_event": "IE_OVERCHARGE",
+     "barriers": ["B_BMS", "B_OFFGAS", "B_THERMAL", "B_DEFLAG"],
+     "decompose": {"B_BMS": "bms"}},
+    {"id": "SC_COOLANT", "name": "液冷泄漏 → 外短", "init_event": "IE_COOLANT",
+     "barriers": ["B_OFFGAS", "B_BMS", "B_THERMAL", "B_DEFLAG", "B_SPACING"]},
+    {"id": "SC_EXT_FIRE", "name": "外部火 / 邻舱热辐射", "init_event": "IE_EXT_FIRE",
+     "barriers": ["B_THERMAL", "B_DEFLAG", "B_SPACING", "B_RESPONSE"]},
+    {"id": "SC_MECH_WATER", "name": "机械损伤 / 进水", "init_event": "IE_MECH_WATER",
+     "barriers": ["B_OFFGAS", "B_BMS", "B_THERMAL", "B_DEFLAG"]}
+  ]
+}

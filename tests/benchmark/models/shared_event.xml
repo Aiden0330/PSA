@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<opsa-mef>
+  <define-fault-tree name="shared_event">
+    <define-gate name="TOP"><and>
+      <gate name="G1"/><gate name="G2"/>
+    </and></define-gate>
+    <define-gate name="G1"><or>
+      <basic-event name="A"/><basic-event name="B"/>
+    </or></define-gate>
+    <define-gate name="G2"><or>
+      <basic-event name="B"/><basic-event name="C"/>
+    </or></define-gate>
+  </define-fault-tree>
+  <model-data>
+    <define-basic-event name="A"><float value="0.1"/></define-basic-event>
+    <define-basic-event name="B"><float value="0.2"/></define-basic-event>
+    <define-basic-event name="C"><float value="0.3"/></define-basic-event>
+  </model-data>
+</opsa-mef>

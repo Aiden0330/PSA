@@ -1,0 +1,234 @@
+[
+  {
+    "id": "voting_2of3",
+    "model": "models/voting_2of3.xml",
+    "tier": 1,
+    "ref_top_prob": 0.098,
+    "ref_mcs_count": 3,
+    "tol_rel": 1e-9,
+    "assignment": "A=0.1, B=0.2, C=0.3 (in MEF file)",
+    "source": {
+      "citation": "Closed form: P(>=2 of 3) = (qa*qb+qa*qc+qb*qc) - 2*qa*qb*qc = 0.11 - 0.012 = 0.098",
+      "url": ""
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "bridge",
+    "model": "models/bridge.xml",
+    "tier": 1,
+    "ref_top_prob": 0.0586125,
+    "ref_mcs_count": 4,
+    "tol_rel": 1e-9,
+    "assignment": "E1=0.1,E2=0.2,E3=0.05,E4=0.15,E5=0.25; TOP=OR(E1E2,E4E5,E1E3E5,E2E3E4)",
+    "source": {
+      "citation": "Closed form via pivotal decomposition on bridge element E3, cross-checked by full inclusion-exclusion = 0.0586125",
+      "url": ""
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "shared_event",
+    "model": "models/shared_event.xml",
+    "tier": 1,
+    "ref_top_prob": 0.224,
+    "ref_mcs_count": 2,
+    "tol_rel": 1e-9,
+    "assignment": "A=0.1,B=0.2,C=0.3; TOP=(A|B)&(B|C), B repeated",
+    "source": {
+      "citation": "Closed form: qB + (1-qB)*qA*qC = 0.2 + 0.8*0.03 = 0.224 (repeated-event handling; rare-event approx would give 0.23)",
+      "url": ""
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "abc",
+    "model": "models/abc.xml",
+    "tier": 2,
+    "ref_top_prob": 0.496,
+    "ref_mcs_count": 3,
+    "tol_rel": 1e-9,
+    "assignment": "TOP = OR(A,B,C); A=0.1, B=0.2, C=0.3. Exact OR: 1-(1-.1)(1-.2)(1-.3)=0.496",
+    "source": {
+      "citation": "SCRAM peer tool, exact (no approximation) assertion EXPECT_DOUBLE_EQ(0.496, p_total) in tests/bench_core_tests.cc (TopEventCase 'abc'), commit b85b789; model tests/input/core/abc.xml. Cross-checked by closed form.",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/tests/bench_core_tests.cc"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "ab_bc",
+    "model": "models/ab_bc.xml",
+    "tier": 2,
+    "ref_top_prob": 0.074,
+    "ref_mcs_count": 2,
+    "tol_rel": 1e-9,
+    "assignment": "SystemFail = (A&B) OR (B&C); A=0.1, B=0.2, C=0.3. B shared between the two trains.",
+    "source": {
+      "citation": "SCRAM peer tool, exact assertion EXPECT_DOUBLE_EQ(0.074, p_total) in tests/bench_core_tests.cc (case 'ab_bc'), commit b85b789; model tests/input/core/ab_bc.xml. Cross-checked by closed form (repeated event B).",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/tests/bench_core_tests.cc"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "xor_abc",
+    "model": "models/xor_abc.xml",
+    "tier": 2,
+    "ref_top_prob": 0.404,
+    "tol_rel": 1e-9,
+    "assignment": "TOP = A XOR (B XOR C); A=0.1, B=0.2, C=0.3. Non-coherent (XOR); probability-only.",
+    "source": {
+      "citation": "SCRAM peer tool, exact assertion EXPECT_DOUBLE_EQ(0.404, p_total) in tests/bench_core_tests.cc (case 'xor'), commit b85b789; model tests/input/core/xor.xml. NON-COHERENT: included for probability cross-check only, outside the spec §2.7 coherent core (no MCS-count assertion).",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/tests/bench_core_tests.cc"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "a_or_not_ab",
+    "model": "models/a_or_not_ab.xml",
+    "tier": 2,
+    "ref_top_prob": 0.28,
+    "tol_rel": 1e-9,
+    "assignment": "TOP = A OR (NOT A AND B); A=0.1, B=0.2. Non-coherent (NOT); probability-only. Exact = qA + (1-qA)*qB = 0.1 + 0.9*0.2 = 0.28",
+    "source": {
+      "citation": "SCRAM peer tool, exact assertion EXPECT_DOUBLE_EQ(0.28, p_total) in tests/bench_core_tests.cc (case 'a_or_not_ab'), commit b85b789; model tests/input/core/a_or_not_ab.xml. NON-COHERENT: included for probability cross-check only, outside the spec §2.7 coherent core (no MCS-count assertion).",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/tests/bench_core_tests.cc"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "theatre",
+    "model": "models/theatre.xml",
+    "tier": 2,
+    "ref_top_prob": 0.00207,
+    "ref_mcs_count": 2,
+    "tol_rel": 1e-9,
+    "assignment": "TOP = Mains_Fail AND (Gen_Fail OR Relay_Fail); Mains_Fail=0.03, Gen_Fail=0.02, Relay_Fail=0.05. Exact = 0.03*(1-(1-.02)(1-.05)) = 0.00207",
+    "source": {
+      "citation": "OpenFTA benchmark; SCRAM peer-tool exact assertion EXPECT_DOUBLE_EQ(0.00207, p_total) in tests/bench_theatre_tests.cc, commit b85b789; model input/Theatre/theatre.xml.",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/tests/bench_theatre_tests.cc"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "trans_test",
+    "model": "models/trans_test.xml",
+    "tier": 2,
+    "ref_top_prob": 2.4e-05,
+    "ref_mcs_count": 1,
+    "tol_rel": 1e-9,
+    "assignment": "TOP = C AND (A AND B); A=0.02, B=0.04, C=0.03. Transfer gates flattened into one tree. Exact = 0.02*0.04*0.03 = 2.4e-5",
+    "source": {
+      "citation": "OpenFTA benchmark (transfer-symbol test); SCRAM model input/TransTest/{trans_one,trans_two,trans_model_data}.xml, commit b85b789. OpenFTA report exact value 2.400000E-005.",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/input/TransTest/OpenFTA_Report.txt"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "three_levels",
+    "model": "models/three_levels.xml",
+    "tier": 2,
+    "ref_top_prob": 0.28,
+    "ref_mcs_count": 2,
+    "tol_rel": 1e-9,
+    "assignment": "TOP=Middle=Bottom=(A OR B); A=0.1, B=0.2. Nested transfer gates flattened. Exact = 1-(1-.1)(1-.2) = 0.28",
+    "source": {
+      "citation": "OpenFTA benchmark (nested transfer symbols); SCRAM model input/ThreeLevels/top.xml, commit b85b789. OpenFTA report exact value 2.800000E-001.",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/input/ThreeLevels/OpenFTA_Report.txt"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "ne574",
+    "model": "models/ne574.xml",
+    "tier": 2,
+    "ref_top_prob": 0.662208,
+    "ref_mcs_count": 7,
+    "tol_rel": 1e-6,
+    "assignment": "System = TrainOne AND TrainTwo (see model); B=0.1,C=0.3,D=0.5,F=0.7,G=0.2,H=0.4,I=0.8. Coherent.",
+    "source": {
+      "citation": "NE574 Risk Analysis course (UW-Madison) example; SCRAM peer-tool exact assertion EXPECT_NEAR(0.662208, p_total, 1e-6) in tests/bench_ne574_tests.cc, commit b85b789; model input/ne574/ne574.xml.",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/tests/bench_ne574_tests.cc"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "two_train",
+    "model": "models/two_train.xml",
+    "tier": 2,
+    "ref_top_prob": 0.7225,
+    "ref_mcs_count": 4,
+    "tol_rel": 1e-9,
+    "assignment": "TOP = (ValveOne OR PumpOne) AND (ValveTwo OR PumpTwo); ValveOne=ValveTwo=0.5, PumpOne=PumpTwo=0.7. Exact = 0.85^2 = 0.7225",
+    "source": {
+      "citation": "SCRAM peer-tool exact assertion EXPECT_DOUBLE_EQ(0.7225, p_total) in tests/bench_two_train_tests.cc (base tree two_train.xml, no CCF/substitution), commit b85b789; model input/TwoTrain/two_train.xml.",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/tests/bench_two_train_tests.cc"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "lift",
+    "model": "models/lift.xml",
+    "tier": 2,
+    "ref_top_prob": 1.199993e-05,
+    "ref_mcs_count": 12,
+    "tol_rel": 1e-5,
+    "assignment": "Lift door fault tree (13 gates); all 12 contributing basic events q=1.0e-6 (LMD_1_1 and W_1 are non-contributing). OpenFTA exact value 1.199993E-005.",
+    "source": {
+      "citation": "OpenFTA benchmark; OpenFTA report 'Exact value : 1.199993E-005', 12 minimal cut sets; corroborated by SCRAM EXPECT_NEAR(1.19999e-5, p_total, 1e-5) in tests/bench_lift_tests.cc, commit b85b789; model input/Lift/lift.xml.",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/input/Lift/OpenFTA_Report.txt"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "chinese",
+    "model": "models/chinese.xml",
+    "tier": 2,
+    "ref_top_prob": 0.0045691,
+    "tol_rel": 1e-3,
+    "assignment": "Chinese fault tree (36 gates, 25 basic events) with per-event probabilities from input/Chinese/chinese-basic-events.xml. Exact (no approximation).",
+    "source": {
+      "citation": "SCRAM peer-tool exact assertion EXPECT_NEAR(0.0045691, p_total, 1e-5) in tests/bench_chinese_tree_tests.cc (exact branch), commit b85b789; structure input/Chinese/chinese.xml + basic events input/Chinese/chinese-basic-events.xml.",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/tests/bench_chinese_tree_tests.cc"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "baobab1",
+    "model": "models/baobab1.xml",
+    "tier": 2,
+    "ref_top_prob": 1.2823e-06,
+    "tol_rel": 1e-3,
+    "assignment": "Baobab1 Aralia/EDF benchmark (84 gates, 61 basic events); per-event probabilities from input/Baobab/baobab1-basic-events.xml. Exact (no approximation).",
+    "source": {
+      "citation": "Aralia/EDF benchmark (Rauzy et al.); SCRAM peer-tool exact assertion EXPECT_NEAR(1.2823e-6, p_total, 1e-8) in tests/bench_baobab1_tests.cc (exact branch, BDD algorithm), commit b85b789; structure input/Baobab/baobab1.xml + basic events input/Baobab/baobab1-basic-events.xml.",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/tests/bench_baobab1_tests.cc"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "auto200",
+    "model": "models/auto200.xml",
+    "tier": 2,
+    "ref_top_prob": 0.55985,
+    "tol_rel": 1e-3,
+    "assignment": "Autogenerated 200-basic-event fault tree (116 gates; SCRAM generator seed 123, q in [0.001,0.1]); literal per-event probabilities embedded in input/Autogenerated/200_event.xml. Exact (no approximation).",
+    "source": {
+      "citation": "SCRAM peer-tool exact assertion EXPECT_NEAR(0.55985, p_total, 1e-5) in tests/bench_200_event_tests.cc (exact branch), commit b85b789; model input/Autogenerated/200_event.xml.",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/tests/bench_200_event_tests.cc"
+    },
+    "engine_feasible": true
+  },
+  {
+    "id": "cea9601",
+    "model": "models/cea9601.xml",
+    "tier": 2,
+    "ref_top_prob": 2.38155e-06,
+    "tol_rel": 1e-3,
+    "assignment": "CEA9601 Aralia benchmark (201 gates, 186 basic events); per-event probabilities from input/CEA9601/CEA9601-basic-events.xml. Reference is SCRAM's order<=4 truncated value 2.38155e-6; engine computes exact (untruncated) BDD value, which agrees because higher-order cut sets are negligible. Engine solve ~23s.",
+    "source": {
+      "citation": "Aralia/CEA benchmark; SCRAM peer-tool assertion EXPECT_NEAR(2.38155e-6, p_total, 1e-10) at limit_order(4) in tests/bench_CEA9601_tests.cc, commit b85b789; structure input/CEA9601/CEA9601.xml + basic events input/CEA9601/CEA9601-basic-events.xml.",
+      "url": "https://github.com/rakhimov/scram/blob/b85b78940de38996eeffec54d946824bd4280a1c/tests/bench_CEA9601_tests.cc"
+    },
+    "engine_feasible": true
+  }
+]
