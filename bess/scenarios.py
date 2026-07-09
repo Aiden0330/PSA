@@ -32,33 +32,28 @@ def _trivial_ft(bid: str) -> FaultTree:
     return FaultTree(bid, g)
 
 
-# ft_kind -> () -> (FaultTree, {param_id: (value, citation)})
-def _ft_bms():
+# 分解树参数一律引用参考库条目(2026-07-08 出处评审 F3:硬编码收编,治理统一)。
+# ft_kind -> (rates) -> (FaultTree, {param_id: (value, citation)})
+def _lib_params(rates: dict[str, dict], cids: list[str]) -> dict[str, tuple[float, str]]:
+    return {cid: (rates[cid]["rate"], rates[cid]["source"]["citation"]) for cid in cids}
+
+
+def _ft_bms(rates: dict[str, dict]):
     g = PDAG()
-    g.basic("BMS_SENSOR_FAIL", param_ref="BMS_SENSOR_FAIL")
-    g.basic("BMS_LOGIC_FAIL", param_ref="BMS_LOGIC_FAIL")
-    g.basic("BMS_CONTACTOR_FAIL", param_ref="BMS_CONTACTOR_FAIL")
-    g.gate("B_BMS", Op.OR, ["BMS_SENSOR_FAIL", "BMS_LOGIC_FAIL", "BMS_CONTACTOR_FAIL"])
+    for cid in ("CFR_BMS_SENSOR", "CFR_BMS_LOGIC", "CFR_CONTACTOR"):
+        g.basic(cid, param_ref=cid)
+    g.gate("B_BMS", Op.OR, ["CFR_BMS_SENSOR", "CFR_BMS_LOGIC", "CFR_CONTACTOR"])
     g.top = "B_BMS"
-    params = {
-        "BMS_SENSOR_FAIL": (0.03, "DNV/Gully 2019 传感失效"),
-        "BMS_LOGIC_FAIL": (0.01, "IEC 61508 SIL 逻辑"),
-        "BMS_CONTACTOR_FAIL": (0.06, "OREDA/exida 接触器拒动"),
-    }
-    return FaultTree("B_BMS", g), params
+    return FaultTree("B_BMS", g), _lib_params(rates, ["CFR_BMS_SENSOR", "CFR_BMS_LOGIC", "CFR_CONTACTOR"])
 
 
-def _ft_offgas_shared():
+def _ft_offgas_shared(rates: dict[str, dict]):
     g = PDAG()
-    g.basic("OFFGAS_DET_FAIL", param_ref="OFFGAS_DET_FAIL")
-    g.basic("BMS_CONTACTOR_FAIL", param_ref="BMS_CONTACTOR_FAIL")  # 与 B_BMS 共享(联动跳闸经同一接触器)
-    g.gate("B_OFFGAS", Op.OR, ["OFFGAS_DET_FAIL", "BMS_CONTACTOR_FAIL"])
+    g.basic("CFR_OFFGAS_DET", param_ref="CFR_OFFGAS_DET")
+    g.basic("CFR_CONTACTOR", param_ref="CFR_CONTACTOR")  # 与 B_BMS 共享(联动跳闸经同一接触器)
+    g.gate("B_OFFGAS", Op.OR, ["CFR_OFFGAS_DET", "CFR_CONTACTOR"])
     g.top = "B_OFFGAS"
-    params = {
-        "OFFGAS_DET_FAIL": (0.008, "Li-ion Tamer/Honeywell 离气探测"),
-        "BMS_CONTACTOR_FAIL": (0.06, "OREDA/exida 接触器拒动"),
-    }
-    return FaultTree("B_OFFGAS", g), params
+    return FaultTree("B_OFFGAS", g), _lib_params(rates, ["CFR_OFFGAS_DET", "CFR_CONTACTOR"])
 
 
 _FT_BUILDERS = {"bms": _ft_bms, "offgas_shared": _ft_offgas_shared}
@@ -71,6 +66,7 @@ def build_scenario_model(scenario_id: str) -> Model:
     lib = load_library()
     barrier_by_id = {b["id"]: b for b in lib["barrier_effectiveness"]}
     ie_by_id = {e["id"]: e for e in lib["initiating_events"]}
+    rates_by_id = {c["id"]: c for c in lib["component_failure_rates"]}
     sc = _scenario(scenario_id)
     bids = sc["barriers"]
     decompose = sc.get("decompose", {})
@@ -89,7 +85,7 @@ def build_scenario_model(scenario_id: str) -> Model:
 
     for bid in bids:
         if bid in decompose:
-            ft, params = _FT_BUILDERS[decompose[bid]]()
+            ft, params = _FT_BUILDERS[decompose[bid]](rates_by_id)
             fts[bid] = ft
             for pid, (val, src) in params.items():
                 add_param(pid, val, src)

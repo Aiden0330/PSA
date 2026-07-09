@@ -168,3 +168,28 @@
 5. **C 级复核批次**(F5/F6):B_SPACING、B_SUPPRESS、sys-bms-overcharge、cell-tr-typical、cell-lfp-fresh(及 cell-tr-premium 归属)降 D 或补可定位统计源;η=0.953 移回主动灭火条目;B_DEFLAG 三结果分支实现或在模型假设中声明省略方向。
 
 修正后 C 级占比会下降、D 级上升——这是诚实化,不是退步:配合免责声明、贝叶斯升级通道(D/C→A)与本报告的核验记录,降级后的库反而更可辩护。次一级整改(F8 匿名 FMEA 批次出处、F11 预警口径批量补 note、F12 D 级空 note、F13 陈旧引用)建议随 Phase 2 存储/审计 ADR 的数据 pedigree 附录一并落实。
+
+---
+
+## 六、修正后(2026-07-08 执行 Top-5,同日落地)
+
+**数值/结构变化(前→后):**
+
+| 对象 | 前 | 后 | 依据 |
+|---|---|---|---|
+| IE_ISC/IE_COOLANT/IE_OVERCHARGE/IE_EXT_FIRE/IE_MECH_WATER | 无 unit、无 grade、无推导 | +`unit:/unit·yr`、+`grade:D`、note 写全推导链与 F9 家族互引(**值不变**) | F1/F9 |
+| B_OFFGAS | pfd **0.01** / C | pfd **0.05** / D,citation 换 Sandia JES 2024(DOI),note 记移植链弃用与事件级口径 | F2 |
+| scenarios.py 硬编码 ×4 | BMS_SENSOR 0.03 / LOGIC 0.01 / **CONTACTOR 0.06** / OFFGAS_DET 0.008(裸字符串) | 删除;分解树引用库条目 CFR_BMS_SENSOR 0.03 / **CFR_BMS_LOGIC 0.07** / **CFR_CONTACTOR 1e-3**(60× 矛盾解除,余量显式归逻辑/软件档)/ CFR_OFFGAS_DET 0.049;B_BMS 分解 ≈0.099、offgas 分解 ≈0.05,跨场景与库值一致 | F3 |
+| B_DEFLAG | 0.1 + **eff 0.953** / C | 0.1 / D;η 移至 B_SUPPRESS note 备三结果建模;'启动无效未建模,方向非保守'显式声明 | F5 |
+| B_SUPPRESS / B_SPACING | 0.1 / C ×2 | 0.1 / D ×2(LOPA/工程假设 note 写全) | F5/F6 |
+| pas-immersion-pack | 0.02 / C(厂商页首引) | 0.02 / D(n=1 只佐证机理;Jeffreys 后验≈0.25 说明写入) | F4 |
+| sys-bms-overcharge | 0.01 / C | 0.01 / D(折算链写全:0.2 次/GW·yr×46%→(2.8–4.6)e-4,包络保守 ~20–30×) | F6 |
+| cell-tr-typical / cell-lfp-fresh / cell-tr-premium / CFR_CELL_TR | C ×4(归属缺陷) | D ×4(Moa&Go DOI 补齐;EPRI /cell·yr 归属移除;ACP 2012 错位移除) | F6 |
+| warn-offgas-voc / warn-imd / act-main-relay / act-liquid-cooling-max | 厂商首引 ×4 | Honeywell→Sandia JES 2024;ABB/eInfochips/EticaAG 引用移除并注明(**值/级不变**,warn-offgas-voc 补事件级口径) | F7 |
+| B_RESPONSE | 双源无声明 | note 声明以本库 0.3 为准(tr_model_data 0.1 陈旧) | F9 |
+
+**统计变化**:条目 97→**100**(+3 分解参数);C 32→22、D 60→73、IE 无级 5→0(全 D)。C 占比下降属诚实化(见结论)。
+
+**守护测试**:+3(IE 治理强制 unit/grade/推导 note;分解参数必须在库;B_OFFGAS≥0.05 且 D、B_DEFLAG 无 eff);`test_scenarios_api` 断言改库条目 id。**验证**:py 168 passed / 2 skipped;`make bundle` 已重建(离线包内嵌新库)。
+
+**量化影响(预期且正确)**:SC_* 序列频率随 B_OFFGAS 5×↑ 与分解树重锚变化;守恒与结构测试全绿。**遗留**:F8/F11/F12/F13/F15(次级整改,随 ADR-2 数据 pedigree 附录落实);F10(act-overcharge-protect CCF 注记)与 F14/F16 未动。

@@ -25,7 +25,8 @@ def test_event_tree_scenario_includes_serialized_fts():
     assert "fault_trees" in d and "parameters" in d
     assert len(d["fault_trees"]["B_BMS"]["nodes"]) > 2     # 真故障树(非平凡)
     pids = {p["id"] for p in d["parameters"]}
-    assert "BMS_CONTACTOR_FAIL" in pids
+    # 2026-07-08 出处评审 F3:分解树参数收编入参考库,id 改为库条目 id
+    assert "CFR_CONTACTOR" in pids
 
 
 def test_event_tree_default_unchanged():
