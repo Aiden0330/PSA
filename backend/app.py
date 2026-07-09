@@ -32,7 +32,12 @@ def api_model(eid: str):
 @app.post("/api/quantify", response_model=schemas.QuantifyResponse)
 def api_quantify(req: schemas.QuantifyRequest):
     model = load_model_from_dict(req.model)
-    an = Analysis(model, fault_tree=req.fault_tree)
+    try:
+        an = Analysis(model, fault_tree=req.fault_tree,
+                      house_states=req.house_states or None,
+                      boundary_condition_set=req.boundary_condition_set)
+    except ValueError as e:                          # 未知 house/边界集等建模错误 → 400 而非 500
+        raise HTTPException(400, str(e))
     cs = an.cutsets(cutoff=req.cutoff, limit_order=req.limit_order)
     return schemas.QuantifyResponse(
         probability=an.probability(method=req.method), method=req.method,
@@ -46,7 +51,11 @@ def api_event_tree_quantify(req: schemas.EtQuantifyRequest):
     from backend.et_builder import build_model_from_request
     from psaengine.eta.sequence import quantify_event_tree
     model = build_model_from_request(req.model_dump())
-    res = quantify_event_tree(model, "TR")
+    try:
+        res = quantify_event_tree(model, "TR", house_states=req.house_states or None,
+                                  boundary_condition_set=req.boundary_condition_set)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     return schemas.EtQuantifyResponse(sequences=res["sequences"], consequences=res["consequences"])
 
 @app.post("/api/report")
@@ -125,8 +134,10 @@ def api_import_mef(req: schemas.MefImportRequest):
     fts = [fault_tree_to_dict(name, ft) for name, ft in model.fault_trees.items()]
     if not fts:
         raise HTTPException(400, "MEF 中无故障树")
+    ccfs = [{"id": c.id, "members": c.members, "model": c.model, "factors": c.factors,
+             **({"staggered": True} if c.staggered else {})} for c in model.ccf_groups]
     return {"model": {"model_data": {"parameters": parameters_to_json(model.parameters)},
-                      "fault_trees": fts, "event_trees": [], "ccf_groups": []},
+                      "fault_trees": fts, "event_trees": [], "ccf_groups": ccfs},
             "fault_tree": fts[0]["name"]}
 
 @app.get("/api/saved")
@@ -172,7 +183,9 @@ def api_event_tree_uncertainty(req: schemas.EtUncertaintyRequest):
     from backend.et_builder import build_model_from_request
     from psaengine.eta.uncertainty import event_tree_uncertainty
     model = build_model_from_request(req.model_dump())
-    return event_tree_uncertainty(model, "TR", samples=req.samples, seed=req.seed, error_factor=req.error_factor)
+    return event_tree_uncertainty(model, "TR", samples=req.samples, seed=req.seed, error_factor=req.error_factor,
+                                  house_states=req.house_states or None,
+                                  boundary_condition_set=req.boundary_condition_set)
 
 @app.post("/api/event-tree/importance")
 def api_event_tree_importance(req: schemas.EtQuantifyRequest):
@@ -180,7 +193,8 @@ def api_event_tree_importance(req: schemas.EtQuantifyRequest):
     from backend.et_builder import build_model_from_request
     from psaengine.eta.uncertainty import barrier_importance_exact
     model = build_model_from_request(req.model_dump())
-    return {"importance": barrier_importance_exact(model, "TR")}
+    return {"importance": barrier_importance_exact(model, "TR", house_states=req.house_states or None,
+                                                   boundary_condition_set=req.boundary_condition_set)}
 
 @app.get("/api/bess/library")
 def api_bess_library():

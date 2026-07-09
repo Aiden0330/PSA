@@ -35,6 +35,7 @@ def build_model_from_request(req: dict) -> Model:
             "name": "TR", "init_event": req["init_event"],
             "init_frequency": req["init_frequency"], "functional_events": fes,
             "sequences": req["sequences"], "consequence_bins": req["consequence_bins"]}],
-        "ccf_groups": [],
+        "ccf_groups": req.get("ccf_groups", []) or [],
+        "boundary_condition_sets": req.get("boundary_condition_sets", []) or [],
     }
     return load_model_from_dict(model_dict)

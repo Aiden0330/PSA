@@ -13,11 +13,16 @@ class EtBuild:
     m: BddManager
     all_basics: list
     fe_bdd: dict
+    params: object                      # CCF 展开后的参数库(未展开时 = model.parameters)
 
 
-def _build_event_tree(model: Model, et_name: str) -> EtBuild:
+def _build_event_tree(model: Model, et_name: str,
+                      house_states: dict[str, bool] | None = None,
+                      boundary_condition_set: str | None = None) -> EtBuild:
     """合并各功能事件链接的故障树到一个 PDAG + 同一 BddManager + 各 FE 顶 BDD(建一次)。
-    跨序列共享基本事件因合并到同一 PDAG/管理器而自动正确(成功分支精确否定)。"""
+    跨序列共享基本事件因合并到同一 PDAG/管理器而自动正确(成功分支精确否定)。
+    边界条件(house 状态)在合并副本上生效;CCF 组在合并后的 PDAG 上展开一次:
+    跨屏障共享的共因事件同样精确否定。"""
     et = model.event_trees[et_name]
     big = PDAG()
     fe_top: dict[str, str] = {}
@@ -27,23 +32,34 @@ def _build_event_tree(model: Model, et_name: str) -> EtBuild:
             if nid not in big.nodes:
                 big.nodes[nid] = n
         fe_top[fe.id] = ft.top
+    from psaengine.preprocess.boundary import resolve_house_states, apply_house_states
+    states = resolve_house_states(model, house_states, boundary_condition_set)
+    if states:
+        big = apply_house_states(big, states)        # 副本;合并图与模型共享节点对象,不可原位改
+    params = model.parameters
+    if model.ccf_groups:
+        from psaengine.preprocess.ccf_expand import apply_ccf
+        big, params = apply_ccf(big, model.ccf_groups, params)
     all_basics = sorted(big.basic_events())
     m = BddManager(all_basics)
     fe_bdd = {fid: build_from_pdag(m, big, top) for fid, top in fe_top.items()}
-    return EtBuild(et, big, m, all_basics, fe_bdd)
+    return EtBuild(et, big, m, all_basics, fe_bdd, params)
 
 
-def quantify_event_tree(model: Model, et_name: str, fe_overrides: dict | None = None) -> dict:
+def quantify_event_tree(model: Model, et_name: str, fe_overrides: dict | None = None,
+                        house_states: dict[str, bool] | None = None,
+                        boundary_condition_set: str | None = None) -> dict:
     """事件树逐序列/逐后果精确定量。
     fe_overrides={fe_id:"fail"|"work"} 把该功能事件顶 BDD 强制为常量(必失效/必有效),
-    用于扰动法重要度;默认 None = 原行为(强制的是 FE 顶, 不动其底事件 → 共享事件安全)。"""
-    b = _build_event_tree(model, et_name)
+    用于扰动法重要度;默认 None = 原行为(强制的是 FE 顶, 不动其底事件 → 共享事件安全)。
+    house_states/boundary_condition_set:4a2 边界条件,见 preprocess/boundary。"""
+    b = _build_event_tree(model, et_name, house_states, boundary_condition_set)
     et, big, m, all_basics = b.et, b.big, b.m, b.all_basics
     fe_bdd = dict(b.fe_bdd)
     if fe_overrides:
         for fid, mode in fe_overrides.items():
             fe_bdd[fid] = m.one if mode == "fail" else m.zero
-    q = {bb: model.parameters.get(big.nodes[bb].param_ref).unavailability() for bb in all_basics}
+    q = {bb: b.params.get(big.nodes[bb].param_ref).unavailability() for bb in all_basics}
 
     seq_freq: dict[str, float] = {}
     cons_freq: dict[str, float] = {}
@@ -60,18 +76,20 @@ def quantify_event_tree(model: Model, et_name: str, fe_overrides: dict | None = 
     return {"sequences": seq_freq, "consequences": cons_freq}
 
 
-def event_tree_sequences(model: Model, et_name: str, fe_overrides: dict | None = None) -> list[dict]:
+def event_tree_sequences(model: Model, et_name: str, fe_overrides: dict | None = None,
+                         house_states: dict[str, bool] | None = None,
+                         boundary_condition_set: str | None = None) -> list[dict]:
     """逐序列明细(非聚合), 按 frequency 降序。复用 _build_event_tree / exact_probability。
     每项: {"end_state","path":{fe_id:"success|failure"},"consequence","frequency"}。
     fe_overrides={fe_id:"fail"|"work"} 把该 FE 顶 BDD 强制为常量(同 quantify_event_tree);
     非 "fail" 一律按 "work" 处理。"""
-    b = _build_event_tree(model, et_name)
+    b = _build_event_tree(model, et_name, house_states, boundary_condition_set)
     et, big, m, all_basics = b.et, b.big, b.m, b.all_basics
     fe_bdd = dict(b.fe_bdd)
     if fe_overrides:
         for fid, mode in fe_overrides.items():
             fe_bdd[fid] = m.one if mode == "fail" else m.zero
-    q = {bb: model.parameters.get(big.nodes[bb].param_ref).unavailability() for bb in all_basics}
+    q = {bb: b.params.get(big.nodes[bb].param_ref).unavailability() for bb in all_basics}
 
     out: list[dict] = []
     for seq in et.sequences:

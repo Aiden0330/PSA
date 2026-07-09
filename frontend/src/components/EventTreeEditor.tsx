@@ -19,7 +19,7 @@ import { EtKpiStrip } from './eta/EtKpiStrip'
 import { EtaSummaryList } from './eta/EtaSummaryList'
 import type { SeqRow } from './eta/types'
 
-interface Linked { fault_trees: any[]; parameters: any[] }
+interface Linked { fault_trees: any[]; parameters: any[]; ccf_groups?: any[] }
 interface Api { set: (m: any) => void; undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean }
 export interface EtaSummary { key: string; name: string; leafCount: number; worstC: string; worstFreq: number; active: boolean; checked: boolean }
 

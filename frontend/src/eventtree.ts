@@ -375,13 +375,14 @@ export interface EtQuantifyRequest {
   parameters: Record<string, any>
   sequences: { path: Record<string, string>; end_state: string }[]
   consequence_bins: Record<string, string>
+  ccf_groups?: any[]
 }
 
 /** 叶按 DFS(成功优先, 与 layout 同序)枚举为 end_state L0,L1,...;path 仅含各分支显式 feId(子集路径)。
  *  功能事件默认带前端 PFD; 若 linked 提供非平凡故障树则改用 link_ft(共享事件精确)。 */
 export function toEngineRequest(
   m: EventTreeModel,
-  linked?: { fault_trees: any[]; parameters: any[] },
+  linked?: { fault_trees: any[]; parameters: any[]; ccf_groups?: any[] },
 ): EtQuantifyRequest {
   const sequences: { path: Record<string, string>; end_state: string }[] = []
   const consequence_bins: Record<string, string> = {}
@@ -410,5 +411,9 @@ export function toEngineRequest(
     if (fe.linkFt && ftByName.has(fe.linkFt)) fault_trees[fe.id] = ftByName.get(fe.linkFt)
   }
   for (const p of linked?.parameters ?? []) parameters[p.id] = { value: p.value }
-  return { init_event: m.initEvent, init_frequency: m.initFreq, functional_events, fault_trees, parameters, sequences, consequence_bins }
+  return {
+    init_event: m.initEvent, init_frequency: m.initFreq, functional_events, fault_trees, parameters, sequences, consequence_bins,
+    // 4a1:挂载工作区带 CCF 组时透传(合并 PDAG 上展开;空缺省略保持既有请求形状)
+    ...(linked?.ccf_groups?.length ? { ccf_groups: linked.ccf_groups } : {}),
+  }
 }

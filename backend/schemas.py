@@ -8,6 +8,9 @@ class QuantifyRequest(BaseModel):
     method: str = "exact"
     cutoff: float = 0.0
     limit_order: Optional[int] = None
+    # 4a2 边界条件:house 事件状态覆盖 / 模型内命名边界条件集(boundary_condition_sets)
+    house_states: dict[str, bool] = {}
+    boundary_condition_set: Optional[str] = None
 
 class CutSetOut(BaseModel):
     events: list[str]
@@ -33,6 +36,10 @@ class EtQuantifyRequest(BaseModel):
     parameters: dict[str, Any] = {}
     sequences: list[dict]
     consequence_bins: dict[str, str]
+    ccf_groups: list[dict[str, Any]] = []            # 4a1:CCF 在合并 PDAG 上展开(跨屏障共享共因)
+    house_states: dict[str, bool] = {}               # 4a2 边界条件(直接覆盖)
+    boundary_condition_sets: list[dict[str, Any]] = []   # 4a2 命名集定义(随模型)
+    boundary_condition_set: Optional[str] = None     # 4a2 按名引用
 
 class EtQuantifyResponse(BaseModel):
     sequences: dict[str, float]

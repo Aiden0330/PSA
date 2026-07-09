@@ -13,7 +13,7 @@ export interface FtNodeJson {
 }
 export interface ParamJson { id: string; kind: string; value: number; [k: string]: any }
 export interface FaultTreeJson { name: string; top: string; nodes: FtNodeJson[] }
-export interface CcfGroupJson { id: string; members: string[]; model: string; factors: Record<string, number> }
+export interface CcfGroupJson { id: string; members: string[]; model: string; factors: Record<string, number>; staggered?: boolean }
 export interface ModelJson {
   model_data: { parameters: ParamJson[] }
   fault_trees: FaultTreeJson[]

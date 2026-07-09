@@ -48,8 +48,11 @@ def load_model_from_dict(d: dict) -> Model:
             [FunctionalEvent(fe["id"], fe.get("link_ft"), fe.get("link_basic"))
              for fe in et["functional_events"]],
             et["sequences"], et["consequence_bins"])
-    ccfs = [CCFGroup(c["id"], c["members"], c["model"], c["factors"]) for c in d.get("ccf_groups", [])]
-    return Model(parameters=lib, fault_trees=fts, event_trees=ets, ccf_groups=ccfs)
+    ccfs = [CCFGroup(c["id"], c["members"], c["model"], c["factors"], staggered=bool(c.get("staggered", False)))
+            for c in d.get("ccf_groups", [])]
+    bc_sets = {b["name"]: {k: bool(v) for k, v in b.get("house_states", {}).items()}
+               for b in d.get("boundary_condition_sets", [])}
+    return Model(parameters=lib, fault_trees=fts, event_trees=ets, ccf_groups=ccfs, bc_sets=bc_sets)
 
 def node_to_json(n) -> dict:
     if n.is_basic: return {"id": n.id, "basic": True, "param_ref": n.param_ref}
@@ -68,9 +71,13 @@ def parameters_to_json(plib) -> list[dict]:
                          if k not in ("id", "distribution") and v is not None}}
             for p in plib.ids()]
 
+def ccf_groups_to_json(groups) -> list[dict]:
+    return [{"id": c.id, "members": c.members, "model": c.model, "factors": c.factors,
+             **({"staggered": True} if getattr(c, "staggered", False) else {})} for c in groups or []]
+
 def save_model(m: Model, path: str) -> None:
     d = {"model_data": {"parameters": parameters_to_json(m.parameters)},
          "fault_trees": [fault_tree_to_dict(name, ft) for name, ft in m.fault_trees.items()],
-         "event_trees": [], "ccf_groups": []}
+         "event_trees": [], "ccf_groups": ccf_groups_to_json(m.ccf_groups)}
     with open(path, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
