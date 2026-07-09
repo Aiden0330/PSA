@@ -11,9 +11,10 @@ import type { EtaSummary } from './components/EventTreeEditor'
 import { ReferenceLibrary } from './components/ReferenceLibrary'
 import { FmeaWorkbench } from './components/FmeaWorkbench'
 import { ConsequencesTab } from './components/ConsequencesTab'
-import { newBlankEta, setLinkFt, addFe, branchLeaf, setConsequence, consequenceTotals, layout, CONSEQUENCES, consLevel } from './eventtree'
+import { newBlankEta, addFe, branchLeaf, setConsequence, consequenceTotals, layout, CONSEQUENCES, consLevel } from './eventtree'
 import type { EventTreeModel } from './eventtree'
 import { serializeProject, duplicateProjectEta } from './project'
+import type { ProjectEta } from './project'
 import { buildScenarioTab } from './features/persistence/scenarioLoader'
 import { loadProjectArchive, importProjectText } from './features/persistence/projectIo'
 import type { FmeaRow, MappingConfig } from './fmea'
@@ -22,7 +23,7 @@ import { loadMapping, saveMapping } from './mappingStore'
 import { Palette } from './components/Palette'
 import { Inspector } from './components/Inspector'
 import { ParamLibrary } from './components/ParamLibrary'
-import { useModel, useHistory } from './useModel'
+import { useModel } from './useModel'
 import type { ModelJson } from './model'
 import { addGate, addBasic, connect, deleteNode, updateNode, updateParam, setTop, setCcf, getFt, activatedNodes, attachStarterFt, addBasicFromLib, renameNode, addFaultTree, deleteFaultTree } from './model'
 import { BarrierFtModal } from './components/BarrierFtModal'
@@ -35,6 +36,7 @@ import { applyAiDraftToProject } from './aiDraft'
 import type { AiApplyMode, AiDraftResponse, AiDraftTarget } from './aiDraft'
 import { useViewStore } from './stores/viewStore'
 import type { FtEditTarget } from './stores/viewStore'
+import { useProjectStore } from './stores/projectStore'
 
 function buildHeat(importance: Record<string, { fv: number }>): Record<string, number> {
   const max = Math.max(...Object.values(importance).map((v) => v.fv), 1e-12)
@@ -46,7 +48,6 @@ function buildHeat(importance: Record<string, { fv: number }>): Record<string, n
 const C_COLOR: Record<string, string> = { C1: '#16a34a', C2: '#65a30d', C3: '#d97706', C4: '#ea580c', C5: '#dc2626' }
 const EMPTY_FTS: ModelJson = { model_data: { parameters: [] }, fault_trees: [] }
 
-interface EtaTab { key: string; name: string; renamed?: boolean; model: EventTreeModel; fts: ModelJson; pfds: Record<string, number> }
 type AiAppliedResult =
   | { kind: 'eta'; mode: 'new_eta' | 'complete_eta'; etaKey: string; etaName: string; at: number }
   | { kind: 'fta'; etaKey: string; etaName: string; treeName: string; barrierId: string; barrierLabel: string; at: number }
@@ -59,8 +60,8 @@ type AiDraftContext = {
   targetFeLabel?: string
 }
 
-/** 页签显示名:未手动改名则跟随初始事件名(实时), 否则用手动名。 */
-function etaDisplayName(t: EtaTab, m: EventTreeModel | null): string {
+/** 页签显示名:未手动改名则跟随初始事件名, 否则用手动名。 */
+function etaDisplayName(t: ProjectEta, m: EventTreeModel | null): string {
   return t.renamed ? t.name : (m?.initEvent?.trim() || t.name)
 }
 
@@ -87,16 +88,25 @@ export default function App() {
   const [examples, setExamples] = useState<ExampleItem[]>([])
   const [current, setCurrent] = useState('bms_ft')
   const [ftName, setFtName] = useState('BMS')
-  const { model, set, reset, undo, redo, canUndo, canRedo } = useModel(null)
-  const etFts = useModel(null)                       // 活动 ETA 各屏障故障树 (ModelJson)
-  const userFts = useModel(EMPTY_FTS)             // 自建独立故障树工作区(一份模型多棵树)
+  const { model, set, reset, undo, redo, canUndo, canRedo } = useModel(null)   // 示例模型(非项目文档,独立历史)
   const selected = useViewStore((s) => s.selected)
   const setSelected = useViewStore((s) => s.setSelected)
   const [result, setResult] = useState<QuantifyResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const etHist = useHistory<EventTreeModel>(null)    // 活动 ETA 模型 + 撤销/重做
-  const etModel = etHist.model
-  const [pfds, setPfds] = useState<Record<string, number>>({})
+  // ── 项目文档单一来源:全部 ETA + 自建 FTA,文档级单历史(双真相已消解)──
+  const etaTabs = useProjectStore((s) => s.present.etas)
+  const userFtsModel = useProjectStore((s) => s.present.userFts)
+  const activeKey = useProjectStore((s) => s.activeKey)
+  const checkedKeys = useProjectStore((s) => s.checkedKeys)
+  const docUndo = useProjectStore((s) => s.undo)
+  const docRedo = useProjectStore((s) => s.redo)
+  const docCanUndo = useProjectStore((s) => s.past.length > 0)
+  const docCanRedo = useProjectStore((s) => s.future.length > 0)
+  const P = useProjectStore.getState                 // 动作入口(动作引用稳定,处理器内即取即用)
+  const activeEta = etaTabs.find((t) => t.key === activeKey) ?? null
+  const etModel = activeEta?.model ?? null
+  const etFtsModel = activeEta?.fts ?? EMPTY_FTS
+  const pfds = activeEta?.pfds ?? {}
   const tab = useViewStore((s) => s.tab)
   const setTab = useViewStore((s) => s.setTab)
   const [busy, setBusy] = useState(false)
@@ -118,10 +128,6 @@ export default function App() {
   const ftEditTarget: FtEditTarget = useViewStore((s) => s.ftEditTarget)
   const setFtEditTarget = useViewStore((s) => s.setFtEditTarget)
 
-  // ── 多 ETA 页签 ──
-  const [etaTabs, setEtaTabs] = useState<EtaTab[]>([])
-  const [activeKey, setActiveKey] = useState('')
-  const [checkedKeys, setCheckedKeys] = useState<Record<string, boolean>>({})
   const [aiOpen, setAiOpen] = useState(false)
   const [aiGoal, setAiGoal] = useState('电池舱液冷泄漏导致外短')
   const [aiMode, setAiMode] = useState<AiApplyMode>('new_eta')
@@ -142,7 +148,7 @@ export default function App() {
     try { saveMapping(next) } catch (e: any) { setError(String(e?.message ?? e)) }
   }
   const buildPayload = () =>
-    serializeProject(snapshotActive(etaTabs), activeKey, checkedKeys, userFts.model ?? EMPTY_FTS, fmeaRows, fmeaMapping)
+    serializeProject(etaTabs, activeKey, checkedKeys, userFtsModel, fmeaRows, fmeaMapping)
   const applyProjectFmea = (proj: { fmeaRows?: FmeaRow[]; fmeaMapping?: MappingConfig }) => {
     if (proj.fmeaRows) persistFmeaRows(proj.fmeaRows)
     if (proj.fmeaMapping) persistFmeaMapping(proj.fmeaMapping)
@@ -169,51 +175,29 @@ export default function App() {
     }
   }, [etModel, aiTargetFeId])
 
-  // 把当前活动编辑态写回其页签快照(切换/新增前调用)
-  const snapshotActive = (list: EtaTab[]): EtaTab[] =>
-    list.map((t) => (t.key === activeKey && etModel ? { ...t, model: etModel, fts: etFts.model ?? EMPTY_FTS, pfds } : t))
-  const loadIntoActive = (t: EtaTab) => { etHist.reset(t.model); etFts.reset(t.fts); setPfds(t.pfds); setActiveKey(t.key) }
-
   const selectEta = (key: string) => {
     if (key === activeKey) return
-    const tgt = etaTabs.find((t) => t.key === key); if (!tgt) return
-    setEtaTabs((list) => snapshotActive(list)); loadIntoActive(tgt)
+    if (etaTabs.some((t) => t.key === key)) P().setActive(key)
   }
-  const onToggleEta = (key: string) => setCheckedKeys((c) => ({ ...c, [key]: !c[key] }))
+  const onToggleEta = (key: string) => P().toggleChecked(key)
   const onAddEta = () => {
     const key = 'c' + Date.now().toString(36)
     const name = '自定义 ETA ' + (etaTabs.length + 1)
-    const m = newBlankEta(name)
-    const tab: EtaTab = { key, name, renamed: false, model: m, fts: EMPTY_FTS, pfds: {} }
-    setEtaTabs((list) => [...snapshotActive(list), tab])
-    loadIntoActive(tab)
-    setCheckedKeys((c) => ({ ...c, [key]: true }))
+    P().addTab({ key, name, renamed: false, model: newBlankEta(name), fts: EMPTY_FTS, pfds: {} })
   }
   const onCopyEta = (key: string) => {
     const source = etaTabs.find((x) => x.key === key)
     if (!source) return
-    const snap = snapshotActive(etaTabs)
-    const displayName = etaDisplayName(source, key === activeKey ? etModel : source.model)
     const nextKey = 'cp' + Date.now().toString(36)
-    const duplicated = duplicateProjectEta(snap, key, nextKey, displayName)
+    const duplicated = duplicateProjectEta(etaTabs, key, nextKey, etaDisplayName(source, source.model))
     if (!duplicated) return
-    setEtaTabs(duplicated.etas)
-    loadIntoActive(duplicated.eta)
-    setCheckedKeys((c) => ({ ...c, [nextKey]: true }))
+    P().applyProject({ etas: duplicated.etas, checkedKeys: { ...checkedKeys, [nextKey]: true }, activeKey: nextKey })
   }
   const onDeleteEta = (key: string) => {
     if (etaTabs.length <= 1) return                       // 仅剩 1 个不允许删
     const t = etaTabs.find((x) => x.key === key); if (!t) return
-    const nm = etaDisplayName(t, t.key === activeKey ? etModel : t.model)
-    if (!window.confirm(`删除 ETA「${nm}」?此操作不可撤销。`)) return
-    const snap = snapshotActive(etaTabs)                  // 先固化活动页实时编辑
-    const remaining = snap.filter((x) => x.key !== key)
-    setEtaTabs(remaining)
-    setCheckedKeys((c) => { const n = { ...c }; delete n[key]; return n })
-    if (key === activeKey) {
-      const idx = snap.findIndex((x) => x.key === key)
-      loadIntoActive(remaining[Math.min(idx, remaining.length - 1)])
-    }
+    if (!window.confirm(`删除 ETA「${etaDisplayName(t, t.model)}」?(可撤销)`)) return
+    P().removeTab(key)
   }
   // 添加屏障 = 延长级联:追加功能事件,把"全失败"末态分支到它(成功维持原后果、失败升一级);画布即刻变化
   const onAddBarrier = () => {
@@ -227,19 +211,17 @@ export default function App() {
     let m3 = branchLeaf(m2, path, newId)
     const worse = CONSEQUENCES[Math.min(CONSEQUENCES.indexOf(consLevel(m2, oldCons)) + 1, CONSEQUENCES.length - 1)]
     m3 = setConsequence(m3, [...path, 'failure'], worse)
-    etHist.set(m3)
+    P().setEtaModel(activeKey, m3)
   }
   // 打开内置场景为新页签(已打开则切换)
   const openEta = async (val: string) => {
     if (!val) return
-    const exist = etaTabs.find((t) => t.key === val)
-    if (exist) { selectEta(val); return }
+    if (etaTabs.some((t) => t.key === val)) { selectEta(val); return }
     try {
       const sid = val.slice(3)
       const t = await buildScenarioTab(sid, scenarios.find((s) => s.id === sid)?.name ?? '场景')
-      if (etaTabs.some((x) => x.key === t.key)) { selectEta(t.key); return }
-      setEtaTabs((list) => [...snapshotActive(list), t]); loadIntoActive(t)
-      setCheckedKeys((c) => ({ ...c, [t.key]: true }))
+      if (P().present.etas.some((x) => x.key === t.key)) { selectEta(t.key); return }
+      P().addTab(t)
     } catch (e: any) { setError(String(e?.message ?? e)) }
   }
   // 保存项目:已载入存档(savedId 命中)→ 原地更新(沿用原名, 不再追问);否则新建并记住其 id
@@ -275,10 +257,7 @@ export default function App() {
     try {
       const proj = await loadProjectArchive(id); setArchiveLocal(wasSavedOffline())
       if (!proj.tabs.length) return
-      setEtaTabs(proj.tabs)
-      setCheckedKeys(proj.checkedKeys)
-      loadIntoActive(proj.tabs.find((t) => t.key === proj.activeKey) ?? proj.tabs[0])
-      userFts.reset(proj.userFts ?? EMPTY_FTS)
+      P().load(proj.tabs, proj.activeKey, proj.checkedKeys, proj.userFts ?? EMPTY_FTS)
       applyProjectFmea(proj)
     } catch (e: any) { setError(String(e?.message ?? e)) }
   }
@@ -296,9 +275,8 @@ export default function App() {
       const proj = importProjectText(await file.text(), file.name.replace(/\.[^.]+$/, ''))
       if (!proj.tabs.length) return
       if (proj.libraryOverlay) { mergeOverlay(proj.libraryOverlay as any); setLibVersion((n) => n + 1) }
-      setEtaTabs(proj.tabs); setCheckedKeys(proj.checkedKeys); setSavedId('')
-      loadIntoActive(proj.tabs.find((t) => t.key === proj.activeKey) ?? proj.tabs[0])
-      userFts.reset(proj.userFts ?? EMPTY_FTS)
+      setSavedId('')
+      P().load(proj.tabs, proj.activeKey, proj.checkedKeys, proj.userFts ?? EMPTY_FTS)
       applyProjectFmea(proj)
     } catch (e: any) { setError(String(e?.message ?? e)) }
   }
@@ -307,75 +285,70 @@ export default function App() {
     await deleteSaved(savedId); setSavedId(''); setSaved(await listSaved()); setArchiveLocal(wasSavedOffline())
   }
   const onAddFt = () => {
-    const n = (userFts.model?.fault_trees.length ?? 0) + 1
+    const n = userFtsModel.fault_trees.length + 1
     const name = window.prompt('新建 FTA 名称', '我的故障树 ' + n)
     if (!name || !name.trim()) return
-    const m2 = addFaultTree(userFts.model ?? EMPTY_FTS, name.trim())
-    userFts.set(m2)
+    const m2 = addFaultTree(userFtsModel, name.trim())
+    P().setUserFts(m2)
     const created = m2.fault_trees[m2.fault_trees.length - 1].name
     setFtEditTarget({ src: 'standalone', name: created }); setSelected(null); setResult(null); setError(null)
   }
   const onDeleteFt = (name: string) => {
     if (!window.confirm(`删除自建 FTA「${name}」?`)) return
-    userFts.set(deleteFaultTree(userFts.model ?? EMPTY_FTS, name))
+    P().setUserFts(deleteFaultTree(userFtsModel, name))
     if (ftEditTarget.src === 'standalone' && ftEditTarget.name === name) { setFtEditTarget({ src: 'model' }); setSelected(null); setResult(null); setError(null) }
   }
   // ── 初始事件 FTA (`__init__`) ──
   const [initFtOpen, setInitFtOpen] = useState(false)
   const onEditInitFt = () => {
     if (!etModel) return
-    const fts = etFts.model ?? EMPTY_FTS
-    const hasFt = (fts.fault_trees ?? []).some((f: any) => f.name === '__init__')
-    if (!hasFt) etFts.set(attachStarterFt(fts, '__init__', etModel.initFreq))
+    const hasFt = (etFtsModel.fault_trees ?? []).some((f: any) => f.name === '__init__')
+    if (!hasFt) P().setEtaFts(activeKey, attachStarterFt(etFtsModel, '__init__', etModel.initFreq))
     setInitFtOpen(true)
   }
   const onInitFtClose = async () => {
     setInitFtOpen(false)
-    if (!etFts.model || etModel?.initFreqSource !== 'ft') return
+    const active = P().present.etas.find((e) => e.key === P().activeKey)
+    if (!active || active.model.initFreqSource !== 'ft') return
     try {
-      const top = (await quantify(etFts.model, '__init__')).probability
-      etHist.set((m) => (m ? { ...m, initFreq: top } : m))
+      const top = (await quantify(active.fts, '__init__')).probability
+      P().setEtaModel(active.key, (m) => ({ ...m, initFreq: top }))
     } catch {}
   }
 
-  const onAttachFt = (idx: number) => {
-    if (!etModel) return
-    const fe = etModel.functionalEvents[idx]
-    etFts.set(attachStarterFt(etFts.model ?? EMPTY_FTS, fe.id, fe.failProb))
-    etHist.set(setLinkFt(etModel, idx, fe.id))
-  }
-  const onDetachFt = (idx: number) => { if (etModel) etHist.set(setLinkFt(etModel, idx, undefined)) }
+  const onAttachFt = (idx: number) => { if (etModel) P().attachFt(activeKey, idx) }
+  const onDetachFt = (idx: number) => { if (etModel) P().detachFt(activeKey, idx) }
   const onFtEdited = async (feId: string) => {
-    if (!etFts.model) return
+    const active = P().present.etas.find((e) => e.key === P().activeKey)
+    if (!active) return
     try {
-      const prob = (await quantify(etFts.model, feId)).probability
-      setPfds((x) => ({ ...x, [feId]: prob }))
-      etHist.set((m) => (m ? { ...m, functionalEvents: m.functionalEvents.map((f) => (f.id === feId ? { ...f, failProb: prob } : f)) } : m))
+      const prob = (await quantify(active.fts, feId)).probability
+      P().setEtaPfd(active.key, feId, prob)
+      P().setEtaModel(active.key, (m) => ({ ...m, functionalEvents: m.functionalEvents.map((f) => (f.id === feId ? { ...f, failProb: prob } : f)) }))
     } catch {}
   }
 
-  // 初次进入:默认级联作为第一个页签
+  // 初次进入:默认级联作为第一个页签(store 已有内容则不重复载入)
   useEffect(() => { (async () => {
     try {
+      if (useProjectStore.getState().present.etas.length) return
       const t = await buildScenarioTab('', '默认热失控级联')
-      setEtaTabs([t]); setCheckedKeys({ [t.key]: true }); loadIntoActive(t)
+      useProjectStore.getState().load([t], t.key, { [t.key]: true })
     } catch {}
   })() }, [])
 
-  // 页签摘要 + 多 ETA 汇总(活动页签用实时模型,其余用快照)
+  // 页签摘要 + 多 ETA 汇总(单一来源:所有页签同源于 projectStore)
   const summaries: EtaSummary[] = etaTabs.map((t) => {
-    const m = t.key === activeKey && etModel ? etModel : t.model
-    const totals = consequenceTotals(m)
-    const leafCount = layout(m, 1, 0).leafCount
+    const totals = consequenceTotals(t.model)
+    const leafCount = layout(t.model, 1, 0).leafCount
     let worstC = '—', worstFreq = 0
     for (let i = CONSEQUENCES.length - 1; i >= 0; i--) { const c = CONSEQUENCES[i]; if ((totals[c] ?? 0) > 0) { worstC = c; worstFreq = totals[c]; break } }
-    return { key: t.key, name: etaDisplayName(t, m), leafCount, worstC, worstFreq, active: t.key === activeKey, checked: !!checkedKeys[t.key] }
+    return { key: t.key, name: etaDisplayName(t, t.model), leafCount, worstC, worstFreq, active: t.key === activeKey, checked: !!checkedKeys[t.key] }
   })
   const aggregateTotals: Record<string, number> = {}
   for (const t of etaTabs) {
     if (!checkedKeys[t.key]) continue
-    const m = t.key === activeKey && etModel ? etModel : t.model
-    const tt = consequenceTotals(m)
+    const tt = consequenceTotals(t.model)
     for (const c of Object.keys(tt)) aggregateTotals[c] = (aggregateTotals[c] ?? 0) + tt[c]
   }
   const activeName = summaries.find((s) => s.active)?.name ?? 'ETA'
@@ -387,50 +360,45 @@ export default function App() {
   const ftEtaName = ftIsEta ? (ftEditTarget as { src: 'eta'; etaKey: string; name: string }).name : ''
   const ftStandaloneName = ftIsStandalone ? (ftEditTarget as { src: 'standalone'; name: string }).name : ''
   const ftEtaTab = ftIsEta ? etaTabs.find((t) => t.key === ftEtaKey) : undefined
-  const cvModel  = ftIsStandalone ? (userFts.model ?? EMPTY_FTS) : ftIsEta ? (ftEtaKey === activeKey ? (etFts.model ?? EMPTY_FTS) : (ftEtaTab?.fts ?? EMPTY_FTS)) : model
+  const cvModel  = ftIsStandalone ? userFtsModel : ftIsEta ? (ftEtaTab?.fts ?? EMPTY_FTS) : model
   const cvFtName = ftIsStandalone ? ftStandaloneName : ftIsEta ? ftEtaName : ftName
-  // etaSet: 写入 etFts 并用新模型直接量化同步 PFD/initFreq(避免 React 异步 state 读旧值)。
-  // 设计说明:结构性 FT 编辑写入 etFts 历史;派生的 PFD/initFreq 回写写入 etHist(投影派生),
-  // 与 onFtEdited/onInitFtClose 保持一致。撤销结构编辑可能暂时留下过期派生 PFD,
-  // 下次量化时自动更新。
+  // etaSet: 结构性 FT 编辑写入文档(单历史);派生 PFD/initFreq 用新模型即时量化回写
+  // (与 onFtEdited/onInitFtClose 一致)。目标可为任意页签(单一来源,无活动页限制)。
   const etaSet = async (m: ModelJson) => {
-    if (ftEtaKey && ftEtaKey !== activeKey) return
-    etFts.set(m)
+    if (!ftEtaKey) return
+    P().setEtaFts(ftEtaKey, m)
     if (!ftEtaName) return
+    const target = P().present.etas.find((e) => e.key === ftEtaKey)
+    if (!target) return
     try {
       if (ftEtaName === '__init__') {
-        if (etModel?.initFreqSource === 'ft') {
+        if (target.model.initFreqSource === 'ft') {
           const top = (await quantify(m, '__init__')).probability
-          etHist.set((em) => (em ? { ...em, initFreq: top } : em))
+          P().setEtaModel(ftEtaKey, (em) => ({ ...em, initFreq: top }))
         }
       } else {
         // C1 守护:若该屏障已 detach(linkFt 已清空),不覆盖用户手动填写的 PFD
-        const fe = etModel?.functionalEvents.find((f) => f.id === ftEtaName)
+        const fe = target.model.functionalEvents.find((f) => f.id === ftEtaName)
         if (!fe?.linkFt) return
         const prob = (await quantify(m, ftEtaName)).probability
-        setPfds((x) => ({ ...x, [ftEtaName]: prob }))
-        etHist.set((em) => (em ? { ...em, functionalEvents: em.functionalEvents.map((f) => (f.id === ftEtaName ? { ...f, failProb: prob } : f)) } : em))
+        P().setEtaPfd(ftEtaKey, ftEtaName, prob)
+        P().setEtaModel(ftEtaKey, (em) => ({ ...em, functionalEvents: em.functionalEvents.map((f) => (f.id === ftEtaName ? { ...f, failProb: prob } : f)) }))
       }
     } catch {}
   }
-  const cvSet     = ftIsStandalone ? userFts.set : ftIsEta ? etaSet : set
-  const cvUndo    = ftIsStandalone ? userFts.undo : ftIsEta ? etFts.undo : undo
-  const cvRedo    = ftIsStandalone ? userFts.redo : ftIsEta ? etFts.redo : redo
-  const cvCanUndo = ftIsStandalone ? userFts.canUndo : ftIsEta ? etFts.canUndo : canUndo
-  const cvCanRedo = ftIsStandalone ? userFts.canRedo : ftIsEta ? etFts.canRedo : canRedo
-  // ETA 挂载的故障树行(侧边栏用)
-  // 跨所有 ETA 页签列出挂载的故障树;活动 ETA 用实时 etModel/etFts, 其余用页签快照
+  const cvSet     = ftIsStandalone ? (m: ModelJson) => P().setUserFts(m) : ftIsEta ? etaSet : set
+  const cvUndo    = (ftIsStandalone || ftIsEta) ? docUndo : undo
+  const cvRedo    = (ftIsStandalone || ftIsEta) ? docRedo : redo
+  const cvCanUndo = (ftIsStandalone || ftIsEta) ? docCanUndo : canUndo
+  const cvCanRedo = (ftIsStandalone || ftIsEta) ? docCanRedo : canRedo
+  // ETA 挂载的故障树行(侧边栏用):所有页签同源,无实时/快照之分
   const etaFtRows: { etaKey: string; etaName: string; name: string; label: string }[] = []
   for (const t of etaTabs) {
-    const isActive = t.key === activeKey
-    const m = isActive && etModel ? etModel : t.model
-    const fts = isActive ? etFts.model : t.fts
-    if (!m) continue
-    if (fts?.fault_trees?.some((f: any) => f.name === '__init__')) {
-      etaFtRows.push({ etaKey: t.key, etaName: etaDisplayName(t, m), name: '__init__', label: '初始事件' })
+    if (t.fts?.fault_trees?.some((f: any) => f.name === '__init__')) {
+      etaFtRows.push({ etaKey: t.key, etaName: etaDisplayName(t, t.model), name: '__init__', label: '初始事件' })
     }
-    for (const fe of m.functionalEvents) {
-      if (fe.linkFt) etaFtRows.push({ etaKey: t.key, etaName: etaDisplayName(t, m), name: fe.id, label: fe.label || fe.id })
+    for (const fe of t.model.functionalEvents) {
+      if (fe.linkFt) etaFtRows.push({ etaKey: t.key, etaName: etaDisplayName(t, t.model), name: fe.id, label: fe.label || fe.id })
     }
   }
   // I2:当已选 ETA 行不再存在时(屏障被删除/detach,或活动 ETA 切换),重置为独立目标
@@ -504,21 +472,24 @@ export default function App() {
         ? (aiDraftContext?.targetFeId ?? aiTargetFeId)
         : aiTargetFeId
       const result = applyAiDraftToProject({
-        etaTabs: snapshotActive(etaTabs),
+        etaTabs,
         activeKey: applyEtaKey,
         checkedKeys,
-        userFts: userFts.model ?? EMPTY_FTS,
+        userFts: userFtsModel,
         draft: aiDraft,
         mode: aiMode,
         targetFeId: applyTargetFeId,
         makeKey: () => `ai${Date.now().toString(36)}${(seq++).toString(36)}`,
       })
-      const tabs = result.etaTabs as EtaTab[]
-      setEtaTabs(tabs)
-      setCheckedKeys(result.checkedKeys)
-      if (aiMode === 'standalone_fta') userFts.reset(result.userFts)
+      const tabs = result.etaTabs as ProjectEta[]
       const active = tabs.find((t) => t.key === result.activeKey) ?? tabs[0]
-      if (active) loadIntoActive(active)
+      // AI 应用 = 一条文档历史(整体替换,可一键撤销)
+      P().applyProject({
+        etas: tabs,
+        checkedKeys: result.checkedKeys,
+        activeKey: active?.key ?? result.activeKey,
+        userFts: aiMode === 'standalone_fta' ? result.userFts : undefined,
+      })
       if (aiMode === 'fta_for_barrier' && applyTargetFeId) {
         setFtEditTarget({ src: 'eta', etaKey: result.activeKey, name: applyTargetFeId })
         setTab('ft')
@@ -653,7 +624,7 @@ export default function App() {
             ))}
             <div style={{ ...ftSidebarGroup, marginTop: 10 }}>自建 FTA</div>
             <button onClick={onAddFt} className="psa-btn" style={{ margin: '4px 10px', width: 'calc(100% - 20px)', justifyContent: 'center', fontSize: 12 }}><Icon name="plus" size={13} />新增 FTA</button>
-            {(userFts.model?.fault_trees ?? []).map((ft) => (
+            {userFtsModel.fault_trees.map((ft) => (
               <div key={'u:' + ft.name}
                 style={{ ...ftSidebarRow(ftIsStandalone && ftStandaloneName === ft.name, aiAppliedResult?.kind === 'standalone_fta' && aiAppliedResult.treeName === ft.name), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
                 onClick={() => { setFtEditTarget({ src: 'standalone', name: ft.name }); setSelected(null); setResult(null); setError(null) }}
@@ -676,19 +647,19 @@ export default function App() {
               )}
               {ftIsEta && (
                 <span style={{ fontSize: 12, color: 'var(--psa-ink-2)', fontWeight: 500, padding: '0 4px' }}>
-                  ETA 故障树: <strong>{ftEtaName === '__init__' ? '初始事件' : (etModel?.functionalEvents.find((f) => f.id === ftEtaName)?.label ?? ftEtaName)}</strong>
+                  ETA 故障树: <strong>{ftEtaName === '__init__' ? '初始事件' : (ftEtaTab?.model.functionalEvents.find((f) => f.id === ftEtaName)?.label ?? ftEtaName)}</strong>
                   {ftEtaName !== '__init__' && (
                     <span style={{ marginLeft: 8, color: 'var(--psa-faint)' }}>
-                      PFD = {formatEtaNumber(pfds[ftEtaName])}
+                      PFD = {formatEtaNumber(ftEtaTab?.pfds?.[ftEtaName])}
                     </span>
                   )}
-                  {ftEtaName === '__init__' && etModel && (
+                  {ftEtaName === '__init__' && ftEtaTab && (
                     <span style={{ marginLeft: 8, color: 'var(--psa-faint)' }}>
-                      freq = {formatEtaNumber(etModel.initFreq)}
+                      freq = {formatEtaNumber(ftEtaTab.model.initFreq)}
                     </span>
                   )}
                   {/* M2:来源非 FTA 时提示编辑无效 */}
-                  {ftEtaName === '__init__' && etModel?.initFreqSource !== 'ft' && (
+                  {ftEtaName === '__init__' && ftEtaTab?.model.initFreqSource !== 'ft' && (
                     <span style={{ marginLeft: 10, color: 'var(--psa-amber)', fontSize: 11, fontStyle: 'italic' }}>
                       初始事件来源非「FTA」,此处编辑不影响初始频率(切到 ETA 页改来源)
                     </span>
@@ -787,7 +758,7 @@ export default function App() {
         </div>
       ) : tab === 'cons' ? (
         <div style={{ flex: 1, minHeight: 0, background: '#fff' }}>
-          {etModel ? <ConsequencesTab model={etModel} onChange={etHist.set} /> : <p style={{ padding: 16 }}>加载中…</p>}
+          {etModel ? <ConsequencesTab model={etModel} onChange={(m) => P().setEtaModel(activeKey, m)} /> : <p style={{ padding: 16 }}>加载中…</p>}
         </div>
       ) : tab === 'fmea' ? (
         <FmeaWorkbench
@@ -808,8 +779,8 @@ export default function App() {
             <button onClick={onAddBarrier} disabled={!etModel} className="psa-btn psa-btn--primary"><Icon name="plus" size={14} />添加屏障</button>
             <button onClick={() => setAiOpen((v) => !v)} disabled={!etModel} className="psa-btn" title="打开 AI 建模助手"><Icon name="bolt" size={14} />AI 建模助手</button>
             {aiAppliedNotice}
-            <button onClick={etHist.undo} disabled={!etHist.canUndo} title="撤销" className="psa-btn" style={{ width: 30, padding: 0, justifyContent: 'center' }}><Icon name="undo" size={15} /></button>
-            <button onClick={etHist.redo} disabled={!etHist.canRedo} title="重做" className="psa-btn" style={{ width: 30, padding: 0, justifyContent: 'center' }}><Icon name="redo" size={15} /></button>
+            <button onClick={docUndo} disabled={!docCanUndo} title="撤销" className="psa-btn" style={{ width: 30, padding: 0, justifyContent: 'center' }}><Icon name="undo" size={15} /></button>
+            <button onClick={docRedo} disabled={!docCanRedo} title="重做" className="psa-btn" style={{ width: 30, padding: 0, justifyContent: 'center' }}><Icon name="redo" size={15} /></button>
             <div style={ribbonDiv} />
             <button onClick={onSaveWorkspace} disabled={!etModel} className="psa-btn psa-btn--dark" title={savedId ? '更新当前项目存档(原地保存, 不新建副本)' : '保存为新项目存档'}><Icon name="save" size={14} />保存项目</button>
             <button onClick={onSaveAs} disabled={!etModel} className="psa-btn" title="另存为一份新的项目存档(副本)"><Icon name="download" size={14} />另存为</button>
@@ -862,9 +833,8 @@ export default function App() {
                 <div key={s.key} onClick={() => selectEta(s.key)}
                   onDoubleClick={() => {
                     const t = etaTabs.find((x) => x.key === s.key); if (!t) return
-                    const cur = etaDisplayName(t, s.key === activeKey ? etModel : t.model)
-                    const name = window.prompt('ETA 名称', cur)
-                    if (name && name.trim()) setEtaTabs((list) => list.map((x) => x.key === s.key ? { ...x, name: name.trim(), renamed: true } : x))
+                    const name = window.prompt('ETA 名称', etaDisplayName(t, t.model))
+                    if (name && name.trim()) P().renameTab(s.key, name.trim())
                   }}
                   title={s.name} style={etaTabStyle(s.active)}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: C_COLOR[s.worstC] ?? '#94a3b8', flexShrink: 0 }} />
@@ -896,9 +866,9 @@ export default function App() {
           {/* ETA 主体 */}
           <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: 12, display: 'flex' }}>
             {!etModel ? <p style={{ padding: 12 }}>加载中…</p> : (
-              <EventTreeEditor model={etModel} onChange={etHist.set}
-                linked={{ fault_trees: etFts.model?.fault_trees ?? [], parameters: etFts.model?.model_data.parameters ?? [] }}
-                fts={etFts.model} ftsApi={{ set: etFts.set, undo: etFts.undo, redo: etFts.redo, canUndo: etFts.canUndo, canRedo: etFts.canRedo }}
+              <EventTreeEditor model={etModel} onChange={(m) => P().setEtaModel(activeKey, m)}
+                linked={{ fault_trees: etFtsModel.fault_trees ?? [], parameters: etFtsModel.model_data.parameters ?? [] }}
+                fts={etFtsModel} ftsApi={{ set: (m) => P().setEtaFts(activeKey, m), undo: docUndo, redo: docRedo, canUndo: docCanUndo, canRedo: docCanRedo }}
                 pfds={pfds} onAttachFt={onAttachFt} onDetachFt={onDetachFt} onFtEdited={onFtEdited}
                 libBarriers={lib?.barrier_effectiveness ?? []} libComponents={lib?.component_failure_rates ?? []}
                 etaSummaries={summaries} aggregateTotals={aggregateTotals}
@@ -910,11 +880,11 @@ export default function App() {
       )}
       <footer className="psa-statusbar"><span className="psa-dot" style={{ background: 'var(--psa-ok)' }} />引擎就绪<span>·</span><span>{tab === 'bess' ? '事件树（ETA）' : tab === 'ft' ? '故障树（FTA）' : tab === 'params' ? '参数库 / CCF' : tab === 'library' ? '参考库' : tab === 'fmea' ? 'FMEA / RPN 工作台' : '后果'}</span><span style={{ marginLeft: 'auto' }} className="psa-num">v2.0</span></footer>
       {/* 初始事件 FTA 模态 */}
-      {initFtOpen && etFts.model && (
+      {initFtOpen && activeEta && (
         <BarrierFtModal
-          model={etFts.model}
+          model={etFtsModel}
           ftName="__init__"
-          api={{ set: etFts.set, undo: etFts.undo, redo: etFts.redo, canUndo: etFts.canUndo, canRedo: etFts.canRedo }}
+          api={{ set: (m) => P().setEtaFts(activeKey, m), undo: docUndo, redo: docRedo, canUndo: docCanUndo, canRedo: docCanRedo }}
           pfd={etModel?.initFreq}
           libComponents={lib?.component_failure_rates ?? []}
           onClose={onInitFtClose}

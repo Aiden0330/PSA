@@ -8,6 +8,7 @@ import App from './App'
 import { draftAiModel } from './api'
 import type { AiDraftResponse } from './aiDraft'
 import { resetViewStore } from './stores/viewStore'
+import { resetProjectStore } from './stores/projectStore'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 ;(globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver = class {
@@ -165,9 +166,10 @@ afterEach(() => {
   root = null
   host = null
   vi.mocked(draftAiModel).mockReset()
-  // viewStore 是模块级单例:跨用例重置,避免上个用例遗留的主页签/编辑目标泄漏
+  // store 是模块级单例:跨用例重置,避免上个用例遗留的主页签/编辑目标/项目内容泄漏
   localStorage.clear()
   resetViewStore()
+  resetProjectStore()
 })
 
 describe('App AI draft visibility', () => {
