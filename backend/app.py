@@ -207,6 +207,13 @@ def api_bess_event_tree(scenario: str | None = None):
         "parameters": params_json,
     }
 
+@app.get("/api/schema/project-document/1.0")
+def api_project_document_schema():
+    """ADR-1: 规范 ProjectDocument 的 JSON Schema(严格,additionalProperties:false)。
+    ADR-3 的 AI 结构化输出直接引用本模式。"""
+    from backend.canonical import ProjectDocument
+    return ProjectDocument.model_json_schema()
+
 @app.post("/api/ai/draft-model", response_model=schemas.AiDraftResponse)
 def api_ai_draft_model(req: schemas.AiDraftRequest):
     """LLM 生成 ETA/FTA 草案。只返回待审核草案;不直接写入项目。"""
