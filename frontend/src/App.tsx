@@ -31,6 +31,8 @@ import { formatEtaNumber } from './etaNumberFormat'
 import { AiDraftPanel } from './components/AiDraftPanel'
 import { applyAiDraftToProject } from './aiDraft'
 import type { AiApplyMode, AiDraftResponse, AiDraftTarget } from './aiDraft'
+import { useViewStore } from './stores/viewStore'
+import type { FtEditTarget } from './stores/viewStore'
 
 function buildHeat(importance: Record<string, { fv: number }>): Record<string, number> {
   const max = Math.max(...Object.values(importance).map((v) => v.fv), 1e-12)
@@ -43,10 +45,6 @@ const C_COLOR: Record<string, string> = { C1: '#16a34a', C2: '#65a30d', C3: '#d9
 const EMPTY_FTS: ModelJson = { model_data: { parameters: [] }, fault_trees: [] }
 
 interface EtaTab { key: string; name: string; renamed?: boolean; model: EventTreeModel; fts: ModelJson; pfds: Record<string, number> }
-type FtEditTarget =
-  | { src: 'model' }
-  | { src: 'eta'; etaKey: string; name: string }
-  | { src: 'standalone'; name: string }
 type AiAppliedResult =
   | { kind: 'eta'; mode: 'new_eta' | 'complete_eta'; etaKey: string; etaName: string; at: number }
   | { kind: 'fta'; etaKey: string; etaName: string; treeName: string; barrierId: string; barrierLabel: string; at: number }
@@ -90,13 +88,15 @@ export default function App() {
   const { model, set, reset, undo, redo, canUndo, canRedo } = useModel(null)
   const etFts = useModel(null)                       // 活动 ETA 各屏障故障树 (ModelJson)
   const userFts = useModel(EMPTY_FTS)             // 自建独立故障树工作区(一份模型多棵树)
-  const [selected, setSelected] = useState<string | null>(null)
+  const selected = useViewStore((s) => s.selected)
+  const setSelected = useViewStore((s) => s.setSelected)
   const [result, setResult] = useState<QuantifyResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const etHist = useHistory<EventTreeModel>(null)    // 活动 ETA 模型 + 撤销/重做
   const etModel = etHist.model
   const [pfds, setPfds] = useState<Record<string, number>>({})
-  const [tab, setTab] = useState<'ft' | 'bess' | 'params' | 'library' | 'cons' | 'fmea'>('bess')
+  const tab = useViewStore((s) => s.tab)
+  const setTab = useViewStore((s) => s.setTab)
   const [busy, setBusy] = useState(false)
   const [highlight, setHighlight] = useState<Set<string>>(new Set())
   const [scenarios, setScenarios] = useState<ScenarioItem[]>([])
@@ -106,13 +106,15 @@ export default function App() {
   const [libBase, setLibBase] = useState<LibraryData | null>(null)
   const [lib, setLib] = useState<LibraryData | null>(null)
   const [libVersion, setLibVersion] = useState(0)
-  const [heatOn, setHeatOn] = useState(false)
+  const heatOn = useViewStore((s) => s.heatOn)
+  const setHeatOn = useViewStore((s) => s.setHeatOn)
   const [ftPos, setFtPos] = useState<Record<string, Record<string, { x: number; y: number }>>>({})
   const [fmeaRows, setFmeaRows] = useState<FmeaRow[]>(() => loadRows())
   const [fmeaMapping, setFmeaMapping] = useState<MappingConfig>(() => loadMapping())
 
   // ── FTA 页编辑目标:'model' = 独立示例; 'eta' = ETA 挂载的屏障故障树 ──
-  const [ftEditTarget, setFtEditTarget] = useState<FtEditTarget>({ src: 'model' })
+  const ftEditTarget: FtEditTarget = useViewStore((s) => s.ftEditTarget)
+  const setFtEditTarget = useViewStore((s) => s.setFtEditTarget)
 
   // ── 多 ETA 页签 ──
   const [etaTabs, setEtaTabs] = useState<EtaTab[]>([])

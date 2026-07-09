@@ -21,6 +21,7 @@ import { svgToPng } from '../util/svgToPng'
 import { C_COLOR } from '../riskmatrix'
 import { Icon } from './icons'
 import { formatEtaNumber, formatEtaRate } from '../etaNumberFormat'
+import { useViewStore } from '../stores/viewStore'
 const cell: CSSProperties = { border: '1px solid var(--psa-line)', padding: '2px 6px' }
 const moveBtn: CSSProperties = { width: 20, height: 22, border: '1px solid var(--psa-line-strong)', borderRadius: 5, background: 'var(--psa-surface)', color: 'var(--psa-muted)', cursor: 'pointer', fontSize: 11, lineHeight: 1, padding: 0, flexShrink: 0 }
 const h4s: CSSProperties = { margin: '16px 0 8px', fontSize: 12, fontWeight: 600, color: 'var(--psa-ink-2)', paddingLeft: 8, borderLeft: '2px solid var(--psa-primary)' }
@@ -63,7 +64,8 @@ export function EventTreeEditor(
   // 竖向分隔条:拖拽改变事件树画布高度,底部坞(事故序列/风险矩阵等)相应变矮;双击复位为自适应
   const treeRef = useRef<HTMLElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const [treeH, setTreeH] = useState<number | null>(null)
+  const treeH = useViewStore((s) => s.treeH)
+  const setTreeH = useViewStore((s) => s.setTreeH)
   const onSplitDrag = (e: ReactPointerEvent) => {
     const tree = treeRef.current, bottom = bottomRef.current
     if (!tree || !bottom) return
@@ -92,7 +94,8 @@ export function EventTreeEditor(
   // 横向分隔条:鼠标左右拖拽改变风险矩阵区域宽度(固定事故序列列宽,矩阵列自适应填充);双击复位为比例
   const seqRef = useRef<HTMLElement>(null)
   const matrixRef = useRef<HTMLElement>(null)
-  const [seqW, setSeqW] = useState<number | null>(null)
+  const seqW = useViewStore((s) => s.seqW)
+  const setSeqW = useViewStore((s) => s.setSeqW)
   const onColDrag = (e: ReactPointerEvent) => {
     const seq = seqRef.current, matrix = matrixRef.current
     if (!seq || !matrix) return

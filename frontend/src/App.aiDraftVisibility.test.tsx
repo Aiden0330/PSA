@@ -7,6 +7,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import App from './App'
 import { draftAiModel } from './api'
 import type { AiDraftResponse } from './aiDraft'
+import { resetViewStore } from './stores/viewStore'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 ;(globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver = class {
@@ -164,6 +165,9 @@ afterEach(() => {
   root = null
   host = null
   vi.mocked(draftAiModel).mockReset()
+  // viewStore 是模块级单例:跨用例重置,避免上个用例遗留的主页签/编辑目标泄漏
+  localStorage.clear()
+  resetViewStore()
 })
 
 describe('App AI draft visibility', () => {
