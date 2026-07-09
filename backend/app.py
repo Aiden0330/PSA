@@ -148,11 +148,14 @@ def api_saved_create(req: schemas.SaveWorkspaceRequest):
 
 @app.get("/api/saved/{sid}")
 def api_saved_get(sid: str):
-    from backend import storage
+    from backend import storage, store
     try:
-        return storage.load_workspace(sid)
+        rec = storage.load_workspace(sid)
     except KeyError:
         raise HTTPException(404, f"no saved workspace {sid}")
+    # ADR-2:附带该存档对应的稳定项目 UUID(前端报告钉扎/案例查询用)
+    rec["project_uuid"] = store.legacy_project_uuid(sid)
+    return rec
 
 @app.delete("/api/saved/{sid}")
 def api_saved_delete(sid: str):

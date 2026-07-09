@@ -43,10 +43,11 @@ function toLoaded(proj: ProjectPayload): LoadedProject {
   }
 }
 
-/** 读取后端/离线存档并还原为项目状态(兼容旧版单 ETA 存档)。 */
-export async function loadProjectArchive(id: string): Promise<LoadedProject & { name: string }> {
+/** 读取后端/离线存档并还原为项目状态(兼容旧版单 ETA 存档);后端在线时附带稳定项目 UUID。 */
+export async function loadProjectArchive(id: string): Promise<LoadedProject & { name: string; projectUuid?: string }> {
   const rec = await loadSaved(id)
-  return { name: rec.name, ...toLoaded(deserializeProject(rec.payload, rec.name)) }
+  const projectUuid = (rec as { project_uuid?: string }).project_uuid
+  return { name: rec.name, projectUuid, ...toLoaded(deserializeProject(rec.payload, rec.name)) }
 }
 
 /** 解析 .psaproj.json 文件文本并还原为项目状态;携带参考库覆盖层时一并返回。 */

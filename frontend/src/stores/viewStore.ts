@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
-export type MainTab = 'ft' | 'bess' | 'params' | 'library' | 'cons' | 'fmea'
+export type MainTab = 'home' | 'ft' | 'bess' | 'params' | 'library' | 'cons' | 'fmea' | 'report'
 export type FtEditTarget =
   | { src: 'model' }
   | { src: 'eta'; etaKey: string; name: string }
@@ -16,21 +16,27 @@ export interface ViewState {
   heatOn: boolean
   treeH: number | null
   seqW: number | null
+  drawerOpen: boolean
+  paletteOpen: boolean
   setTab: (t: MainTab) => void
   setFtEditTarget: (t: FtEditTarget) => void
   setSelected: (id: string | null) => void
   setHeatOn: (v: boolean) => void
   setTreeH: (h: number | null) => void
   setSeqW: (w: number | null) => void
+  setDrawerOpen: (v: boolean) => void
+  setPaletteOpen: (v: boolean) => void
 }
 
 const initial = {
-  tab: 'bess' as MainTab,
+  tab: 'home' as MainTab,               // B 驾驶舱 = 项目落地页(外壳决策记录)
   ftEditTarget: { src: 'model' } as FtEditTarget,
   selected: null,
   heatOn: false,
   treeH: null,
   seqW: null,
+  drawerOpen: false,
+  paletteOpen: false,
 }
 
 export const useViewStore = create<ViewState>()(
@@ -43,11 +49,13 @@ export const useViewStore = create<ViewState>()(
       setHeatOn: (heatOn) => set({ heatOn }),
       setTreeH: (treeH) => set({ treeH }),
       setSeqW: (seqW) => set({ seqW }),
+      setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
+      setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
     }),
     {
       name: 'psa.view',
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ tab: s.tab, treeH: s.treeH, seqW: s.seqW }),
+      partialize: (s) => ({ tab: s.tab, treeH: s.treeH, seqW: s.seqW, drawerOpen: s.drawerOpen }),
     },
   ),
 )

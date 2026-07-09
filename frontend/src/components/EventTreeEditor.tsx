@@ -29,7 +29,7 @@ export interface EtaSummary { key: string; name: string; leafCount: number; wors
  */
 export function EventTreeEditor(
   { model, onChange, linked, fts, ftsApi, pfds, onAttachFt, onDetachFt, onFtEdited, libBarriers, libComponents,
-    etaSummaries = [], aggregateTotals, onSelectEta, onToggleEta, onAddBarrier, onEditInitFt }: {
+    etaSummaries = [], aggregateTotals, onSelectEta, onToggleEta, onAddBarrier, onEditInitFt, reportContext }: {
     model: EventTreeModel; onChange: (m: EventTreeModel) => void; linked?: Linked
     fts?: any; ftsApi?: Api; pfds?: Record<string, number>
     onAttachFt?: (idx: number) => void; onDetachFt?: (idx: number) => void; onFtEdited?: (feId: string) => void
@@ -38,6 +38,8 @@ export function EventTreeEditor(
     etaSummaries?: EtaSummary[]; aggregateTotals?: Record<string, number>
     onSelectEta?: (key: string) => void; onToggleEta?: (key: string) => void; onAddBarrier?: () => void
     onEditInitFt?: () => void
+    /** ADR-2 报告钉扎:随导出请求提交项目上下文 → 后端 auto-pin 版本 + 案例 + 证据页脚 */
+    reportContext?: { project_uuid: string; project_payload: unknown }
   },
 ) {
   const [sel, setSel] = useState<string[] | null>(null)
@@ -138,6 +140,7 @@ export function EventTreeEditor(
         ...req, samples: 1000,
         consequence_defs: Object.fromEntries(CONSEQUENCES.map((c) => [c, consDef(model, c)])),
         labels: Object.fromEntries(model.functionalEvents.map((f) => [f.id, f.label])),
+        ...(reportContext ?? {}),                            // ADR-2:钉扎版本 + 案例 + 证据页脚
       }, model.initEvent, png)
     } catch (e: any) { setQErr(String(e?.message ?? e)) }
     finally { setExpBusy(false) }

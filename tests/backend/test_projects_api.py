@@ -50,6 +50,15 @@ def test_saved_dual_write_creates_idempotent_versions(tmp_path, monkeypatch):
     assert {"project.create", "version.create"} <= {a["action"] for a in audit}
 
 
+def test_saved_get_carries_stable_project_uuid(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "_DIR", str(tmp_path / "saved"))
+    r = client.post("/api/saved", json={"name": "P", "payload": _payload()}).json()
+    rec = client.get(f"/api/saved/{r['id']}").json()
+    # 前端报告钉扎/案例查询依赖:读档响应附带与双写一致的项目 UUID
+    assert rec["project_uuid"] == store.legacy_project_uuid(r["id"])
+    assert rec["project_uuid"] == r["version"]["project_uuid"]
+
+
 def test_saved_non_v2_payload_keeps_legacy_behavior(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "_DIR", str(tmp_path / "saved"))
     r = client.post("/api/saved", json={"name": "旧", "payload": {"etModel": {"a": 1}, "fts": {}}})

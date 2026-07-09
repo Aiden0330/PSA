@@ -7,14 +7,16 @@ describe('viewStore', () => {
     resetViewStore()
   })
 
-  it('默认视图态:bess 主页签、独立 FTA 目标、无选中', () => {
+  it('默认视图态:home 落地页(驾驶舱)、独立 FTA 目标、无选中、抽屉/命令板关闭', () => {
     const s = useViewStore.getState()
-    expect(s.tab).toBe('bess')
+    expect(s.tab).toBe('home')
     expect(s.ftEditTarget).toEqual({ src: 'model' })
     expect(s.selected).toBeNull()
     expect(s.heatOn).toBe(false)
     expect(s.treeH).toBeNull()
     expect(s.seqW).toBeNull()
+    expect(s.drawerOpen).toBe(false)
+    expect(s.paletteOpen).toBe(false)
   })
 
   it('setter 逐项生效', () => {
@@ -34,17 +36,19 @@ describe('viewStore', () => {
     expect(t.seqW).toBe(260)
   })
 
-  it('persist 只持久化布局子集(tab/treeH/seqW),不含运行期引用', () => {
+  it('persist 只持久化布局子集(tab/treeH/seqW/drawerOpen),不含运行期引用', () => {
     const s = useViewStore.getState()
     s.setTab('library')
     s.setTreeH(300)
     s.setSelected('node-x')
     s.setFtEditTarget({ src: 'standalone', name: '我的树' })
+    s.setPaletteOpen(true)
     const raw = localStorage.getItem('psa.view')
     expect(raw).toBeTruthy()
     const persisted = JSON.parse(raw!).state
-    expect(persisted).toEqual({ tab: 'library', treeH: 300, seqW: null })
+    expect(persisted).toEqual({ tab: 'library', treeH: 300, seqW: null, drawerOpen: false })
     expect(persisted.selected).toBeUndefined()
     expect(persisted.ftEditTarget).toBeUndefined()
+    expect(persisted.paletteOpen).toBeUndefined()
   })
 })

@@ -7,7 +7,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import App from './App'
 import { draftAiModel } from './api'
 import type { AiDraftResponse } from './aiDraft'
-import { resetViewStore } from './stores/viewStore'
+import { resetViewStore, useViewStore } from './stores/viewStore'
 import { resetProjectStore } from './stores/projectStore'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -126,6 +126,8 @@ function ftaDraft(): AiDraftResponse {
 }
 
 function renderApp(): HTMLDivElement {
+  // 外壳默认落地页为「总览」(驾驶舱);本组测试针对 ETA 工作台,直接落到 bess 页签
+  useViewStore.setState({ tab: 'bess' })
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)

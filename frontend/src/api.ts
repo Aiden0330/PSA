@@ -180,6 +180,14 @@ export async function deleteSaved(id: string): Promise<void> {
   }
 }
 
+// ── ADR-2 版本库读端(证据链:报告数字 → 案例 → 版本 → 文档)──
+export interface ProjectInfo { uuid: string; name: string; created_at: string; modified_at: string; versions: number }
+export interface VersionInfo { id: number; content_hash: string; parent_version_id: number | null; created_at: string; actor: string; origin: 'save' | 'auto_pin' | 'import'; message: string | null }
+export interface CaseInfo { id: number; version_id: number; kind: string; engine_version: string; created_at: string; settings_json?: string; results_json?: string; artifacts_json?: string }
+export const listProjects = () => jget<ProjectInfo[]>('/projects')
+export const listProjectVersions = (uuid: string) => jget<VersionInfo[]>(`/projects/${uuid}/versions`)
+export const listProjectCases = (uuid: string) => jget<CaseInfo[]>(`/projects/${uuid}/cases`)
+
 export async function importMef(xml: string): Promise<{ model: any; fault_tree: string }> {
   const r = await fetch(`${BASE}/import/mef`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ xml }) })
   if (!r.ok) throw new Error(`mef import → ${r.status}`)

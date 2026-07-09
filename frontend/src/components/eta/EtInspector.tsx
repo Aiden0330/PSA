@@ -5,7 +5,7 @@ import {
   branchLeaf, collapseNode, setConsequence, setFailProb, renameFe, addBarrierFromLib,
   branchesUsingFe, delFe, nodeAt, subsequentFes, CONSEQUENCES,
   setInitEvent, setInitFreq, setInitFreqSource, setProduct, computeProductFreq,
-  consEntries, consLevel, consText, consDef, branchFeOptions, setBranchFe,
+  consEntries, consLevel, consText, branchFeOptions, setBranchFe,
   gradeLabel, consGrade, applyFieldUpdate,
 } from '../../eventtree'
 import { posteriorPfd } from '../../bayes'
