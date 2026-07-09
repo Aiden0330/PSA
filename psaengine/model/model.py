@@ -11,6 +11,9 @@ class Model:
     fault_trees: dict[str, FaultTree] = field(default_factory=dict)
     event_trees: dict[str, EventTree] = field(default_factory=dict)
     ccf_groups: list[CCFGroup] = field(default_factory=list)
+    # 边界条件集(RiskSpectrum boundary condition sets):命名的 house 事件状态组,
+    # 分析时按名引用 → 维修/配置态一键切换(4a2)
+    bc_sets: dict[str, dict[str, bool]] = field(default_factory=dict)
 
     @classmethod
     def from_json(cls, path: str) -> "Model":

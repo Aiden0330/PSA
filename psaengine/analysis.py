@@ -8,12 +8,19 @@ from psaengine.quantify.cutsets import minimal_cutsets
 from psaengine.importance.measures import importance as _imp
 
 class Analysis:
-    def __init__(self, model: Model, fault_tree: str | None = None):
+    def __init__(self, model: Model, fault_tree: str | None = None,
+                 house_states: dict[str, bool] | None = None,
+                 boundary_condition_set: str | None = None):
         self.model = model
         self.ft_name = fault_tree or next(iter(model.fault_trees))
         ft = model.fault_trees[self.ft_name]
         pdag, params = ft.pdag, model.parameters
-        if model.ccf_groups:                       # Beta 因子 CCF 展开(影响割集与概率)
+        # 4a2 边界条件:命名集 + 显式覆盖 → house 状态(在副本上生效,模型本体不变)
+        from psaengine.preprocess.boundary import resolve_house_states, apply_house_states
+        states = resolve_house_states(model, house_states, boundary_condition_set)
+        if states:
+            pdag = apply_house_states(pdag, states)
+        if model.ccf_groups:                       # CCF 展开(beta 集总 / mgl·alpha·phi 多层)
             from psaengine.preprocess.ccf_expand import apply_ccf
             pdag, params = apply_ccf(pdag, model.ccf_groups, params)
         self.params = params
