@@ -83,7 +83,13 @@ def build_report_data(model, et_name: str = "TR", *, consequence_defs: dict | No
             "importance": imp, "consequence_defs": consequence_out, "sequences": sequences, "fta": fta}
 
 
-def report_csv(data: dict) -> bytes:
+def _evidence_line(ev: dict) -> str:
+    """ADR-2 证据链页脚:报告数字 → 分析案例 → 版本哈希 → 引擎版本。"""
+    return (f"评价依据:分析案例 #{ev['case_id']} · 模型版本 {ev['version_hash'][:8]}"
+            f" · 引擎 bess-psa {ev['engine_version']} · {ev['created_at']}")
+
+
+def report_csv(data: dict, evidence: dict | None = None) -> bytes:
     buf = io.StringIO()
     w = csv.writer(buf)
     cdefs = data.get("consequence_defs", {})
@@ -111,6 +117,9 @@ def report_csv(data: dict) -> bytes:
         w.writerow(["基本事件", "FV"])
         for bsc in f["basics"]:
             w.writerow([bsc["event"], f"{bsc['fv']:.4f}"])
+    if evidence:
+        w.writerow([])
+        w.writerow([_evidence_line(evidence)])
     return ("﻿" + buf.getvalue()).encode("utf-8")   # BOM 便于 Excel 读中文
 
 
@@ -121,7 +130,8 @@ def _shade(cell, hex_color: str) -> None:
     cell._tc.get_or_add_tcPr().append(shd)
 
 
-def report_docx(data: dict, scenario_name: str, tree_png: bytes | None) -> bytes:
+def report_docx(data: dict, scenario_name: str, tree_png: bytes | None,
+                evidence: dict | None = None) -> bytes:
     from docx import Document
     from docx.shared import Inches
     doc = Document()
@@ -197,6 +207,8 @@ def report_docx(data: dict, scenario_name: str, tree_png: bytes | None) -> bytes
         doc.add_heading("事件树", level=1)
         doc.add_picture(io.BytesIO(tree_png), width=Inches(6.2))
     doc.add_paragraph(); doc.add_paragraph("⚠ " + _DISCLAIMER)
+    if evidence:
+        doc.add_paragraph(_evidence_line(evidence))
     out = io.BytesIO(); doc.save(out); return out.getvalue()
 
 
@@ -211,7 +223,8 @@ def _pdf_font() -> str:
         return "Helvetica"
 
 
-def report_pdf(data: dict, scenario_name: str, tree_png: bytes | None) -> bytes:
+def report_pdf(data: dict, scenario_name: str, tree_png: bytes | None,
+               evidence: dict | None = None) -> bytes:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
     from reportlab.lib.units import cm
@@ -288,5 +301,7 @@ def report_pdf(data: dict, scenario_name: str, tree_png: bytes | None) -> bytes:
         story += [Paragraph("事件树" if cn else "Event tree", h2), img, Spacer(1, 8)]
     story += [Spacer(1, 8), Paragraph(_DISCLAIMER if cn else
               "Built-in failure/PFD values are public reference magnitudes; calibrate to project data & regulations.", nm)]
+    if evidence:
+        story += [Spacer(1, 4), Paragraph(_evidence_line(evidence), nm)]
     doc.build(story)
     return buf.getvalue()

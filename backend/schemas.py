@@ -56,6 +56,10 @@ class ReportRequest(EtUncertaintyRequest):
     tree_png: Optional[str] = None    # 'data:image/png;base64,...'
     consequence_defs: dict[str, str] = {}   # C1..C5 自定义内涵(空则回退内置)
     labels: dict[str, str] = {}             # fe_id → 人类可读屏障名
+    # ADR-2 证据链钉扎(可选,两者同给才生效):项目 uuid + 完整 v2 payload。
+    # dirty 时自动建版本(origin=auto_pin)+ 分析案例,报告页脚带 案例#/版本哈希/引擎版本。
+    project_uuid: Optional[str] = None
+    project_payload: Optional[dict[str, Any]] = None
 
 class AiDraftRequest(BaseModel):
     goal: str

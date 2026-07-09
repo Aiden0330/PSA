@@ -63,6 +63,28 @@ def api_report(req: schemas.ReportRequest, format: str = "docx"):
     data = rx.build_report_data(model, "TR", consequence_defs=req.consequence_defs, labels=req.labels,
                                 linked_fe_ids=linked_ids, samples=req.samples, seed=req.seed,
                                 error_factor=req.error_factor)
+    # ADR-2 自动钉扎:携带项目上下文的报告 → 版本(幂等)+ 分析案例 + 页脚证据链。
+    evidence, case_id = None, None
+    if req.project_uuid and req.project_payload is not None:
+        from datetime import datetime, timezone
+        from backend import store
+        from backend.canonical import to_canonical
+        try:
+            doc, sidecar = to_canonical(req.project_payload, req.project_uuid)
+        except Exception as e:
+            raise HTTPException(400, f"project_payload 无法规范化: {e}")
+        store.ensure_project(req.project_uuid, req.scenario_name or "项目")
+        ver = store.create_version(req.project_uuid, doc, sidecar, origin="auto_pin",
+                                   message=f"auto: report {format}")
+        case_id = store.create_case(
+            req.project_uuid, ver["id"], "report",
+            settings={"format": format, "samples": req.samples, "seed": req.seed,
+                      "error_factor": req.error_factor, "scenario_name": req.scenario_name},
+            results={"consequences": data["consequences"], "bands": data["bands"]},
+            audit_action="report.export")
+        evidence = {"case_id": case_id, "version_hash": ver["content_hash"],
+                    "engine_version": store.engine_version(),
+                    "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     png = None
     if req.tree_png and "," in req.tree_png:
         try:
@@ -70,12 +92,17 @@ def api_report(req: schemas.ReportRequest, format: str = "docx"):
         except Exception:
             png = None
     if format == "csv":
-        body, media, ext = rx.report_csv(data), "text/csv; charset=utf-8", "csv"
+        body, media, ext = rx.report_csv(data, evidence=evidence), "text/csv; charset=utf-8", "csv"
     elif format == "docx":
-        body = rx.report_docx(data, req.scenario_name, png)
+        body = rx.report_docx(data, req.scenario_name, png, evidence=evidence)
         media, ext = "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"
     else:
-        body, media, ext = rx.report_pdf(data, req.scenario_name, png), "application/pdf", "pdf"
+        body, media, ext = rx.report_pdf(data, req.scenario_name, png, evidence=evidence), "application/pdf", "pdf"
+    if case_id is not None:
+        import hashlib
+        from backend import store
+        store.update_case_artifacts(case_id, {"format": ext, "filename": f"qra_report.{ext}",
+                                              "sha256": hashlib.sha256(body).hexdigest()})
     return Response(content=body, media_type=media,
                     headers={"Content-Disposition": f'attachment; filename="qra_report.{ext}"'})
 
@@ -110,7 +137,14 @@ def api_saved_list():
 @app.post("/api/saved")
 def api_saved_create(req: schemas.SaveWorkspaceRequest):
     from backend import storage
-    return storage.save_workspace(req.name, req.payload, sid=req.id)
+    rec = storage.save_workspace(req.name, req.payload, sid=req.id)
+    # ADR-2 绞杀者双写:v2 载荷 → canonical 版本(幂等);失败不影响旧行为(非 v2 载荷等)。
+    try:
+        from backend import store
+        rec["version"] = store.save_workspace_version(rec["id"], req.name, req.payload)
+    except Exception:
+        pass
+    return rec
 
 @app.get("/api/saved/{sid}")
 def api_saved_get(sid: str):
@@ -206,6 +240,43 @@ def api_bess_event_tree(scenario: str | None = None):
         "fault_trees": ft_json,
         "parameters": params_json,
     }
+
+# ---- ADR-2 只读面:项目 / 版本 / 审计 / 分析案例(证据链查询) ----
+@app.get("/api/projects")
+def api_projects_list():
+    from backend import store
+    return store.list_projects()
+
+@app.get("/api/projects/{puuid}")
+def api_project_get(puuid: str):
+    from backend import store
+    p = store.get_project(puuid)
+    if p is None:
+        raise HTTPException(404, f"no project {puuid}")
+    return p
+
+@app.get("/api/projects/{puuid}/versions")
+def api_project_versions(puuid: str):
+    from backend import store
+    return store.list_versions(puuid)
+
+@app.get("/api/projects/{puuid}/versions/{vid}")
+def api_project_version(puuid: str, vid: int, include_doc: bool = False):
+    from backend import store
+    v = store.get_version(puuid, vid, include_doc=include_doc)
+    if v is None:
+        raise HTTPException(404, f"no version {vid} in project {puuid}")
+    return v
+
+@app.get("/api/projects/{puuid}/audit")
+def api_project_audit(puuid: str, limit: int = 200):
+    from backend import store
+    return store.list_audit(puuid, limit=limit)
+
+@app.get("/api/projects/{puuid}/cases")
+def api_project_cases(puuid: str):
+    from backend import store
+    return store.list_cases(puuid)
 
 @app.get("/api/schema/project-document/1.0")
 def api_project_document_schema():
