@@ -39,11 +39,23 @@ def api_quantify(req: schemas.QuantifyRequest):
     except ValueError as e:                          # 未知 house/边界集等建模错误 → 400 而非 500
         raise HTTPException(400, str(e))
     cs = an.cutsets(cutoff=req.cutoff, limit_order=req.limit_order)
+    post = None
+    if req.post_rules:                               # 4a3:后处理只动 MCS 列表;精确概率通道不变
+        from psaengine.quantify.postprocess import PostRule, apply_post_rules
+        from psaengine.quantify.probability import rea, mcub
+        try:
+            rules = [PostRule.from_dict(r) for r in req.post_rules]
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        cs, stats = apply_post_rules(cs, rules)
+        probs = [c.probability for c in cs]
+        post = {**stats, "probability_rea": rea(probs), "probability_mcub": mcub(probs)}
     return schemas.QuantifyResponse(
         probability=an.probability(method=req.method), method=req.method,
         cutsets=[schemas.CutSetOut(events=c.events, order=c.order, probability=c.probability)
                  for c in cs],
-        importance=an.importance(measures=["fv", "raw", "birnbaum"]))
+        importance=an.importance(measures=["fv", "raw", "birnbaum"]),
+        post=post)
 
 @app.post("/api/event-tree/quantify", response_model=schemas.EtQuantifyResponse)
 def api_event_tree_quantify(req: schemas.EtQuantifyRequest):

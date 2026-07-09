@@ -11,6 +11,8 @@ class QuantifyRequest(BaseModel):
     # 4a2 边界条件:house 事件状态覆盖 / 模型内命名边界条件集(boundary_condition_sets)
     house_states: dict[str, bool] = {}
     boundary_condition_set: Optional[str] = None
+    # 4a3 割集后处理规则(互斥组/删除/恢复);只作用于 MCS 列表,精确概率不受影响
+    post_rules: list[dict[str, Any]] = []
 
 class CutSetOut(BaseModel):
     events: list[str]
@@ -22,6 +24,8 @@ class QuantifyResponse(BaseModel):
     method: str
     cutsets: list[CutSetOut]
     importance: dict[str, dict[str, float]]
+    # 4a3:应用了 post_rules 时的统计与后处理列表 REA/MCUB 估计(未用规则时缺省 None,旧契约不变)
+    post: Optional[dict[str, Any]] = None
 
 class FuncEventIn(BaseModel):
     id: str
