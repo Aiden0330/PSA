@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>方向D · 证据文档(Dossier)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--c1:#16a34a;--c2:#65a30d;--c3:#d97706;--c4:#ea580c;--c5:#dc2626;--acc:#0f766e}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:13px/1.6 -apple-system,'PingFang SC',sans-serif;height:100vh;display:flex;overflow:hidden}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.outline{width:230px;background:#fff;border-right:1px solid var(--line);padding:14px 10px;overflow:auto}
+.outline h3{font-size:12px;color:var(--ink2);padding:0 8px 8px}
+.outline .it{display:flex;gap:7px;align-items:center;padding:5px 8px;border-radius:6px;font-size:12px;color:var(--ink2)}
+.outline .it.on{background:#e6f2f0;color:var(--acc);font-weight:600}
+.outline .it i{font-style:normal;font-size:11px;width:15px;text-align:center}
+.outline .ok{color:var(--c1)}.outline .todo{color:var(--faint)}
+.outline .sub{padding-left:26px;font-size:11.5px;color:var(--muted)}
+.doc{flex:1;overflow:auto;padding:26px 40px}
+.page{max-width:760px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:14px;padding:44px 52px;box-shadow:0 10px 30px rgba(15,23,42,.05)}
+.page h1{font-size:21px;margin-bottom:4px}
+.page .sub{color:var(--muted);font-size:12px;margin-bottom:22px}
+.page h2{font-size:15px;margin:26px 0 10px;padding-top:14px;border-top:1px solid var(--line)}
+.page p{color:var(--ink2);margin:8px 0}
+.n{font-family:var(--mono);font-variant-numeric:tabular-nums;background:#f0fdf9;border-bottom:1.5px solid #99e5d8;padding:0 3px;border-radius:3px;cursor:default;white-space:nowrap}
+.n.sel{background:#e6f2f0;outline:1.5px solid var(--acc)}
+.n sup{font-size:9px;color:var(--acc)}
+.fig{border:1px solid var(--line);border-radius:10px;margin:12px 0;overflow:hidden}
+.fig .cap{display:flex;justify-content:space-between;padding:7px 12px;background:var(--soft);border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.fig .cap .tag{font-family:var(--mono);font-size:10px;background:#fff;border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th{font-size:10.5px;color:var(--faint);text-align:left;padding:6px 12px;border-bottom:1px solid var(--line);background:var(--soft)}
+td{padding:5px 12px;border-bottom:1px solid #f1f5f9;color:var(--ink2)}
+.mx{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;padding:12px}
+.mx div{height:22px;border-radius:3px}
+.evi{width:300px;background:#fff;border-left:1px solid var(--line);overflow:auto}
+.evi .hd{padding:12px 14px;border-bottom:1px solid var(--line);background:var(--soft)}
+.evi .hd b{font-size:12.5px}
+.evi .sec{padding:10px 14px;border-bottom:1px dashed #eef2f7}
+.evi .row{display:flex;justify-content:space-between;font-size:12px;padding:2.5px 0;color:var(--ink2)}
+.evi .row b{color:var(--muted);font-weight:500}
+.gr{display:inline-block;min-width:16px;height:16px;border-radius:4px;color:#fff;font-size:10px;font-weight:700;text-align:center;line-height:16px;padding:0 2px}
+.ped{font-size:11.5px;color:var(--ink2);display:grid;gap:4px}
+.ped span{display:flex;gap:6px;align-items:baseline}
+.btn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 10px;font-size:11.5px;color:var(--ink2)}
+.note{position:fixed;right:12px;bottom:10px;font-size:10.5px;color:var(--faint);background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:2px 8px;z-index:9}
+.bar{display:flex;gap:8px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:2}
+.docwrap{flex:1;display:flex;flex-direction:column;min-width:0}
+.tag{font-size:10.5px;padding:2px 7px;border-radius:5px;background:var(--soft);color:var(--ink2);font-family:var(--mono)}
+</style></head><body>
+<div class="note">方向D:证据文档 — 报告即产品 · 每个数字挂版本/案例徽章 · 右栏证据链检视器</div>
+<nav class="outline">
+  <h3>QRA 报告 · 活文档</h3>
+  <div class="it"><i class="ok">●</i>1 摘要与结论</div>
+  <div class="it"><i class="ok">●</i>2 系统与场景定义</div>
+  <div class="it sub"><i class="ok">●</i>2.1 初始事件谱(5)</div>
+  <div class="it on"><i class="ok">●</i>3 风险量化结果</div>
+  <div class="it sub"><i class="ok">●</i>3.1 后果频率与矩阵</div>
+  <div class="it sub"><i class="ok">●</i>3.2 事故序列(7)</div>
+  <div class="it"><i class="ok">●</i>4 不确定性与敏感性</div>
+  <div class="it"><i class="todo">○</i>5 屏障重要度与建议</div>
+  <div class="it"><i class="todo">○</i>6 数据出处附录(97 条)</div>
+  <div class="it"><i class="todo">○</i>7 假设与保守性声明</div>
+  <div style="margin-top:14px;padding:0 8px"><span class="btn" style="display:block;text-align:center">↥ 导出 docx / pdf(钉扎 v14)</span></div>
+</nav>
+<div class="docwrap">
+  <div class="bar"><b style="font-size:13px">华东 200MWh 储能电站 QRA</b>
+    <span class="tag">v14 · 7c1a29</span><span class="tag">案例 #23</span><span class="tag">引擎 0.1.0</span>
+    <span style="margin-left:auto;font-size:11px;color:var(--faint)">所有数字实时绑定模型 · 改模型即改文档</span></div>
+  <main class="doc"><article class="page">
+    <h1>3 风险量化结果</h1>
+    <div class="sub">分析案例 #23 · 模型 v14(7c1a29)· 精确 BDD(成功分支精确否定)· MC 5000 样本 seed 42</div>
+    <p>全站(5 类初始事件汇总)事故总频率为 <span class="n">2.40×10⁻²/yr<sup>#23</sup></span>,其中 IV 级(爆炸+毒气)
+      合计 <span class="n sel">4.2×10⁻⁶/yr<sup>#23</sup></span>(90% 置信区间
+      <span class="n">6.1×10⁻⁷<sup>#22</sup></span> — <span class="n">1.8×10⁻⁵<sup>#22</sup></span>),
+      落于中电联矩阵 <b>B 区(风险缓解·需控制)</b>。主导贡献来自电芯内短路
+      (<span class="n">50.2%<sup>#23</sup></span>)与液冷泄漏→外短(<span class="n">33.4%<sup>#23</sup></span>)。</p>
+    <div class="fig">
+      <div class="mx">
+        <div style="background:#fecaca"></div><div style="background:#fecaca"></div><div style="background:#fde68a"></div><div style="background:#fde68a"></div><div style="background:#fde68a"></div>
+        <div style="background:#fecaca"></div><div style="background:#fde68a"></div><div style="background:#fde68a;outline:2px solid var(--c3)"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0"></div>
+        <div style="background:#fde68a"></div><div style="background:#fde68a"></div><div style="background:#bbf7d0;outline:2px solid var(--c4)"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0"></div>
+        <div style="background:#fde68a"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0;outline:2px solid var(--c5)"></div><div style="background:#bbf7d0"></div>
+      </div>
+      <div class="cap"><span>图 3-1 全站风险矩阵(6×5,中电联)— 综合评价 B</span><span><span class="tag">v14</span> <span class="tag">#23</span></span></div>
+    </div>
+    <h2>3.2 事故序列(电芯内短路)</h2>
+    <div class="fig"><table>
+      <tr><th>#</th><th>序列</th><th>末态(级)</th><th style="text-align:right">频率 /yr</th><th style="text-align:right">p95</th></tr>
+      <tr><td class="num">L0</td><td>离气✓</td><td>单体安全排气(0)</td><td class="num" style="text-align:right">1.140e-2</td><td class="num" style="text-align:right">1.9e-2</td></tr>
+      <tr><td class="num">L1</td><td>离气✗ BMS✓</td><td>模组内蔓延(I)</td><td class="num" style="text-align:right">5.400e-4</td><td class="num" style="text-align:right">1.6e-3</td></tr>
+      <tr><td class="num">L2</td><td>离气✗ BMS✗ 热障✓</td><td>Pack/簇级起火(II)</td><td class="num" style="text-align:right">5.700e-5</td><td class="num" style="text-align:right">2.1e-4</td></tr>
+      <tr><td class="num">L6</td><td>全失败</td><td>爆炸+毒气(IV)</td><td class="num" style="text-align:right">3.600e-8</td><td class="num" style="text-align:right">2.9e-7</td></tr>
+    </table><div class="cap"><span>表 3-2 事故序列频率(节选;共享事件经引擎精确否定,非独立积式)</span><span><span class="tag">v14</span> <span class="tag">#21</span></span></div></div>
+    <p>注:序列 L2 的精确值较独立积式高 <span class="n">6.3%<sup>#21</sup></span>,源于 BMS 与离气联动共享的
+      「接触器拒动」基本事件 —— 本工具对成功分支做精确否定,优于删除项近似。</p>
+  </article></main>
+</div>
+<aside class="evi">
+  <div class="hd"><b>证据链 — 选中数字</b></div>
+  <div class="sec">
+    <div class="row"><b>数字</b><span class="num" style="font-weight:650">4.2×10⁻⁶ /yr</span></div>
+    <div class="row"><b>含义</b><span>IV 级后果年频率(全站)</span></div>
+    <div class="row"><b>分析案例</b><span class="num">#23 · 2026-07-08 14:32</span></div>
+    <div class="row"><b>模型版本</b><span class="num">v14 · 7c1a29</span></div>
+    <div class="row"><b>引擎/设置</b><span class="num">0.1.0 · exact · 5000 · s42</span></div>
+  </div>
+  <div class="sec"><div style="font-size:11px;color:var(--faint);margin-bottom:6px">数据谱系(该数字依赖 11 条,示 4)</div>
+    <div class="ped">
+      <span><span class="gr" style="background:#6b7280">D</span> B_OFFGAS PFD 0.050 · Sandia 现场族 2024</span>
+      <span><span class="gr" style="background:#d97706">C</span> B_BMS 0.100 · IEC 61508 SIL2 类比</span>
+      <span><span class="gr" style="background:#d97706">C</span> B_DEFLAG 0.100 · NFPA 68/69</span>
+      <span><span class="gr" style="background:#16a34a">A</span> IE_ISC 1.2e-2/yr · 现场 22 舱·年 贝叶斯更新</span>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="row"><b>AI 参与</b><span>无(全人工建模)</span></div>
+    <div class="row"><b>审计事件</b><span class="num">14 条 → 查看</span></div>
+  </div>
+  <div class="sec" style="display:flex;gap:6px;border:0">
+    <span class="btn">跳到模型</span><span class="btn">对比 v13</span><span class="btn">导出谱系</span>
+  </div>
+</aside>
+</body></html>

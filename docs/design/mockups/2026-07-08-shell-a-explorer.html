@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>方向A · 工程座舱(Explorer-classic)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--c1:#16a34a;--c2:#65a30d;--c3:#d97706;--c4:#ea580c;--c5:#dc2626;
+--gA:#16a34a;--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.menu{display:flex;gap:2px;padding:4px 10px;background:#fff;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink2)}
+.menu span{padding:3px 9px;border-radius:6px;cursor:default}.menu span:hover{background:var(--soft)}
+.ribbon{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#fff;border-bottom:1px solid var(--line)}
+.btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 9px;font-size:12px;color:var(--ink2);cursor:default}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+.tag{font-size:10.5px;padding:2px 7px;border-radius:5px;background:var(--soft);color:var(--ink2);font-family:var(--mono)}
+main{flex:1;display:flex;min-height:0}
+.tree{width:238px;background:#fff;border-right:1px solid var(--line);overflow:auto;padding:8px 6px;font-size:12px}
+.tree .grp{font-size:10.5px;font-weight:600;letter-spacing:.4px;color:var(--faint);padding:8px 8px 3px}
+.tree .it{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;color:var(--ink2);white-space:nowrap}
+.tree .it:hover{background:var(--soft)}.tree .it.on{background:#e6f2f0;color:var(--acc);font-weight:600}
+.tree .it .n{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.dot{width:8px;height:8px;border-radius:3px;flex-shrink:0}
+.center{flex:1;display:flex;flex-direction:column;min-width:0}
+.ch{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid var(--line);background:var(--soft)}
+.ch b{font-size:12px;color:var(--ink2)}.ch .meta{font-size:11px;color:var(--faint);font-family:var(--mono)}
+.panel{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.body{flex:1;display:grid;grid-template-columns:1fr 300px;grid-template-rows:minmax(0,1.15fr) minmax(0,1fr);gap:8px;padding:8px;min-height:0}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th{font-size:10.5px;color:var(--faint);text-align:left;font-weight:600;letter-spacing:.3px;padding:5px 10px;border-bottom:1px solid var(--line);background:var(--soft);position:sticky;top:0}
+td{padding:4.5px 10px;border-bottom:1px solid #f1f5f9;color:var(--ink2)}
+tr:hover td{background:#fafcff}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600}
+.chip .sq{width:10px;height:10px;border-radius:3px}
+.gr{display:inline-block;width:16px;height:16px;border-radius:4px;color:#fff;font-size:10px;font-weight:700;text-align:center;line-height:16px}
+.scroll{overflow:auto;min-height:0}
+.insp{padding:10px 12px;overflow:auto}
+.insp .f{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #eef2f7;font-size:12px}
+.insp .f b{color:var(--muted);font-weight:500}
+.status{display:flex;gap:16px;align-items:center;padding:4px 12px;background:#fff;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.status .num{color:var(--ink2)}
+.note{position:fixed;right:10px;top:8px;font-size:10.5px;color:var(--faint);background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:2px 8px}
+.mx{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;padding:10px}
+.mx div{height:22px;border-radius:3px;opacity:.9}
+</style></head><body>
+<div class="note">方向A:工程座舱 — RiskSpectrum 用户零迁移 · 项目树 + 密排表 + 坞式检视器</div>
+<div class="menu"><span>文件</span><span>编辑</span><span>模型</span><span>分析</span><span>数据</span><span>报告</span><span>帮助</span>
+  <span style="margin-left:auto;color:var(--faint)">华东 200MWh 储能电站 QRA · <span class="num">v14</span> · 已保存</span></div>
+<div class="ribbon">
+  <span class="btn pri">▶ 精确量化</span><span class="btn">σ 不确定性</span><span class="btn">↥ 导出报告</span>
+  <span class="sep"></span><span class="btn">＋ 屏障</span><span class="btn">⌁ 挂载 FTA</span><span class="btn">✎ AI 草案</span>
+  <span class="sep"></span><span class="tag">引擎 0.1.0</span><span class="tag">精确 BDD</span>
+</div>
+<main>
+  <nav class="tree">
+    <div class="grp">事件树(ETA)</div>
+    <div class="it on"><span class="dot" style="background:var(--c3)"></span>电芯内短路<span class="n">1.2e-2</span></div>
+    <div class="it"><span class="dot" style="background:var(--c2)"></span>过充 / BMS 失效<span class="n">3.4e-3</span></div>
+    <div class="it"><span class="dot" style="background:var(--c3)"></span>液冷泄漏 → 外短<span class="n">8.0e-3</span></div>
+    <div class="it"><span class="dot" style="background:var(--c1)"></span>外部火源 / 邻舱辐射<span class="n">2.0e-4</span></div>
+    <div class="it"><span class="dot" style="background:var(--c1)"></span>机械损伤 / 进水<span class="n">5.0e-4</span></div>
+    <div class="grp">故障树(FTA)</div>
+    <div class="it">└ BMS 切断/隔离(挂载)<span class="n">3 BE</span></div>
+    <div class="it">└ 离气联动(挂载)<span class="n">5 BE</span></div>
+    <div class="it">我的接触器失效树<span class="n">自建</span></div>
+    <div class="grp">分析案例</div>
+    <div class="it">#23 报告导出 <span class="n">v14</span></div>
+    <div class="it">#22 不确定性 5000 样本<span class="n">v14</span></div>
+    <div class="it">#21 精确量化<span class="n">v13</span></div>
+    <div class="grp">数据与报告</div>
+    <div class="it">参考库(41 器件 / 51 屏障)</div>
+    <div class="it">FMEA / RPN(36 行)</div>
+    <div class="it">QRA 报告(docx · #23)</div>
+  </nav>
+  <section class="center">
+    <div class="body">
+      <div class="panel" style="grid-row:span 2">
+        <div class="ch"><b>事故序列 — 电芯内短路</b><span class="meta">IE 1.200e-2 /yr · 7 序列 · Σ=IE ✓</span></div>
+        <div class="scroll"><table>
+          <tr><th>#</th><th>路径(✓成功 ✗失败)</th><th>末态</th><th>级</th><th style="text-align:right">频率 /yr</th><th style="text-align:right">占比</th></tr>
+          <tr><td class="num">L0</td><td>离气✓</td><td><span class="chip"><span class="sq" style="background:var(--c1)"></span>单体安全排气</span></td><td>0</td><td class="num" style="text-align:right">1.140e-2</td><td class="num" style="text-align:right">95.0%</td></tr>
+          <tr><td class="num">L1</td><td>离气✗ BMS✓</td><td><span class="chip"><span class="sq" style="background:var(--c2)"></span>模组内蔓延</span></td><td>I</td><td class="num" style="text-align:right">5.400e-4</td><td class="num" style="text-align:right">4.5%</td></tr>
+          <tr><td class="num">L2</td><td>离气✗ BMS✗ 热障✓</td><td><span class="chip"><span class="sq" style="background:var(--c3)"></span>Pack/簇级起火</span></td><td>II</td><td class="num" style="text-align:right">5.700e-5</td><td class="num" style="text-align:right">0.48%</td></tr>
+          <tr style="background:#fff7ed"><td class="num">L3</td><td>… 泄爆✓</td><td><span class="chip"><span class="sq" style="background:var(--c4)"></span>箱级起火</span></td><td>III</td><td class="num" style="text-align:right">5.400e-6</td><td class="num" style="text-align:right">0.05%</td></tr>
+          <tr><td class="num">L4</td><td>… 泄爆✗ 间距✓</td><td><span class="chip"><span class="sq" style="background:var(--c4)"></span>箱级起火+超压</span></td><td>III</td><td class="num" style="text-align:right">2.700e-7</td><td class="num" style="text-align:right">—</td></tr>
+          <tr><td class="num">L5</td><td>… 间距✗ 应急✓</td><td><span class="chip"><span class="sq" style="background:var(--c5)"></span>多舱蔓延</span></td><td>IV</td><td class="num" style="text-align:right">8.700e-8</td><td class="num" style="text-align:right">—</td></tr>
+          <tr><td class="num">L6</td><td>全失败</td><td><span class="chip"><span class="sq" style="background:var(--c5)"></span>爆炸+毒气</span></td><td>IV</td><td class="num" style="text-align:right">3.600e-8</td><td class="num" style="text-align:right">—</td></tr>
+        </table>
+        <div class="ch" style="border-top:1px solid var(--line)"><b>屏障(功能事件)</b><span class="meta">6 项 · 2 挂 FTA</span></div>
+        <table>
+          <tr><th>ref</th><th>屏障</th><th style="text-align:right">PFD</th><th>级</th><th>来源</th><th>FTA</th></tr>
+          <tr><td class="num">B_OFFGAS</td><td>早期离气探测+联动</td><td class="num" style="text-align:right">0.050</td><td><span class="gr" style="background:var(--gD)">D</span></td><td>Sandia 现场族 2024</td><td>✓ 5BE</td></tr>
+          <tr style="background:#e6f2f0"><td class="num">B_BMS</td><td>BMS 切断/隔离</td><td class="num" style="text-align:right">0.100</td><td><span class="gr" style="background:var(--gC)">C</span></td><td>IEC 61508 SIL2 类比</td><td>✓ 3BE</td></tr>
+          <tr><td class="num">B_THERMAL</td><td>电芯间热障阻断蔓延</td><td class="num" style="text-align:right">0.100</td><td><span class="gr" style="background:var(--gD)">D</span></td><td>UL 9540A 单元级</td><td>—</td></tr>
+          <tr><td class="num">B_DEFLAG</td><td>舱内泄爆/防爆</td><td class="num" style="text-align:right">0.100</td><td><span class="gr" style="background:var(--gC)">C</span></td><td>NFPA 68/69</td><td>—</td></tr>
+          <tr><td class="num">B_SPACING</td><td>舱间距阻断多舱</td><td class="num" style="text-align:right">0.050</td><td><span class="gr" style="background:var(--gD)">D</span></td><td>NFPA 855 间距条款</td><td>—</td></tr>
+          <tr><td class="num">B_RESPONSE</td><td>应急响应(避免开门引气)</td><td class="num" style="text-align:right">0.300</td><td><span class="gr" style="background:var(--gD)">D</span></td><td>LOPA 人因典型值</td><td>—</td></tr>
+        </table></div>
+      </div>
+      <div class="panel">
+        <div class="ch"><b>检视器 — B_BMS</b><span class="meta">uuid …8f2c</span></div>
+        <div class="insp">
+          <div class="f"><b>名称</b><span>BMS 切断/隔离</span></div>
+          <div class="f"><b>PFD(引擎)</b><span class="num">0.100</span></div>
+          <div class="f"><b>有效性</b><span class="num">0.900</span></div>
+          <div class="f"><b>置信分级</b><span><span class="gr" style="background:var(--gC)">C</span> 行业统计</span></div>
+          <div class="f"><b>来源</b><span>IEC 61508 SIL2 类比</span></div>
+          <div class="f"><b>挂载 FTA</b><span>传感 2oo3 ∨ 逻辑 ∨ 接触器</span></div>
+          <div class="f"><b>现场证据</b><span class="num">N=22 · k=0</span></div>
+          <div style="display:flex;gap:6px;margin-top:10px"><span class="btn">编辑 FTA</span><span class="btn">现场更新(贝叶斯)</span></div>
+          <div style="margin-top:12px;font-size:10.5px;color:var(--faint)">重要度(对 C5):FV <span class="num">0.31</span> · RAW <span class="num">6.2</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ch"><b>全站风险矩阵(6×5 中电联)</b><span class="meta">5/5 ETA 参与 · 评级 B</span></div>
+        <div class="mx">
+          <div style="background:#fecaca"></div><div style="background:#fecaca"></div><div style="background:#fde68a"></div><div style="background:#fde68a"></div><div style="background:#fde68a"></div>
+          <div style="background:#fecaca"></div><div style="background:#fde68a"></div><div style="background:#fde68a;outline:2px solid var(--c3)"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0"></div>
+          <div style="background:#fde68a"></div><div style="background:#fde68a"></div><div style="background:#bbf7d0;outline:2px solid var(--c4)"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0"></div>
+          <div style="background:#fde68a"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0;outline:2px solid var(--c5)"></div><div style="background:#bbf7d0"></div>
+        </div>
+        <div style="padding:0 12px 10px;font-size:11px;color:var(--muted)">综合评价 <b style="color:#b45309">B 区 · 风险缓解需控制</b> · C5 合计 <span class="num">4.2e-6 /yr</span>(p95 <span class="num">1.8e-5</span>)</div>
+      </div>
+    </div>
+    <div class="status"><span>◉ 引擎在线</span><span>py <span class="num">156✓</span></span><span>上次量化 <span class="num">96 ms</span></span><span>版本 <span class="num">v14 · 7c1a29</span></span><span style="margin-left:auto">分析案例 <span class="num">#23</span> 已钉扎</span></div>
+  </section>
+</main>
+</body></html>

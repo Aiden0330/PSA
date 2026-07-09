@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>方向B · 分析驾驶舱(Mission-control)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--c1:#16a34a;--c2:#65a30d;--c3:#d97706;--c4:#ea580c;--c5:#dc2626;--acc:#0f766e}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:13px/1.5 -apple-system,'PingFang SC',sans-serif;padding:14px 18px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.hd{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.hd h1{font-size:16px;font-weight:700}
+.tag{font-size:10.5px;padding:2px 8px;border-radius:6px;background:#fff;border:1px solid var(--line);color:var(--ink2);font-family:var(--mono)}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 11px;font-size:12px;color:var(--ink2)}
+.btn.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 14px}
+.kpi .l{font-size:11px;color:var(--muted)}
+.kpi .v{font-size:21px;font-weight:650;font-family:var(--mono);font-variant-numeric:tabular-nums;margin-top:2px}
+.kpi .s{font-size:10.5px;color:var(--faint);margin-top:2px}
+.grid{display:grid;grid-template-columns:1.15fr 1fr 1fr;grid-template-rows:auto auto;gap:10px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ch{display:flex;justify-content:space-between;align-items:center;padding:9px 13px;border-bottom:1px solid var(--line);background:var(--soft)}
+.ch b{font-size:12px;color:var(--ink2)}.ch span{font-size:11px;color:var(--faint);font-family:var(--mono)}
+.bar{display:flex;align-items:center;gap:9px;padding:5px 13px;font-size:12px;color:var(--ink2)}
+.bar .lb{width:118px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .tr{flex:1;height:9px;background:var(--soft);border-radius:5px;overflow:hidden}
+.bar .fl{height:100%;border-radius:5px}
+.bar .vv{width:70px;text-align:right}
+.mx{display:grid;grid-template-columns:repeat(5,1fr);gap:2.5px;padding:12px 13px 4px}
+.mx div{height:26px;border-radius:4px}
+.eta{display:flex;align-items:center;gap:8px;padding:7px 13px;border-bottom:1px solid #f1f5f9;font-size:12.5px}
+.eta:hover{background:#fafcff}
+.eta .dot{width:9px;height:9px;border-radius:3px}
+.eta .nm{flex:1}
+.gr{display:inline-block;min-width:17px;height:17px;border-radius:4px;color:#fff;font-size:10.5px;font-weight:700;text-align:center;line-height:17px;padding:0 3px}
+.note{position:fixed;right:12px;bottom:10px;font-size:10.5px;color:var(--faint);background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:2px 8px}
+.don{display:flex;gap:14px;align-items:center;padding:13px}
+.ring{width:92px;height:92px;border-radius:50%;background:conic-gradient(#16a34a 0 14%, #2563eb 14% 33%, #d97706 33% 62%, #6b7280 62% 100%);display:grid;place-items:center}
+.ring i{width:58px;height:58px;border-radius:50%;background:#fff;display:grid;place-items:center;font-style:normal;font-size:11px;color:var(--muted);text-align:center;line-height:1.2}
+</style></head><body>
+<div class="note">方向B:分析驾驶舱 — 洞察先行,一屏回答"风险在哪、多大、靠什么压住"</div>
+<div class="hd">
+  <h1>华东 200MWh 储能电站 QRA</h1>
+  <span class="tag">v14 · 7c1a29</span><span class="tag">引擎 0.1.0 · 精确 BDD</span><span class="tag">案例 #23 已钉扎</span>
+  <span style="flex:1"></span>
+  <button class="btn">建模工作台 →</button><button class="btn">σ 不确定性</button><button class="btn pri">↥ 导出报告</button>
+</div>
+<div class="kpis">
+  <div class="kpi"><div class="l">全站事故频率(Σ C1–C5)</div><div class="v">2.40e-2<span style="font-size:11px;color:var(--faint)"> /yr</span></div><div class="s">较 v13 <span style="color:var(--c1)">▼ 8.2%</span></div></div>
+  <div class="kpi"><div class="l">最严重后果(IV 级)</div><div class="v" style="color:var(--c5)">4.2e-6</div><div class="s">p05 6.1e-7 · p95 1.8e-5</div></div>
+  <div class="kpi"><div class="l">综合风险评级</div><div class="v" style="color:#b45309">B 区</div><div class="s">风险缓解 · 需控制(中电联 6×5)</div></div>
+  <div class="kpi"><div class="l">主导屏障(RAW,对 IV)</div><div class="v">6.2×</div><div class="s">早期离气探测+联动</div></div>
+  <div class="kpi"><div class="l">数据可辩护度</div><div class="v">67%</div><div class="s">C 级以上条目占比 · 5 项待修正</div></div>
+</div>
+<div class="grid">
+  <div class="card" style="grid-row:span 2">
+    <div class="ch"><b>初始事件 × 风险贡献</b><span>5 ETA · 全部参与汇总</span></div>
+    <div class="eta"><span class="dot" style="background:var(--c3)"></span><span class="nm">电芯内短路</span><span class="num" style="color:var(--muted)">IE 1.2e-2</span><span class="num"><b>50.2%</b></span></div>
+    <div class="eta"><span class="dot" style="background:var(--c3)"></span><span class="nm">液冷泄漏 → 外短</span><span class="num" style="color:var(--muted)">IE 8.0e-3</span><span class="num"><b>33.4%</b></span></div>
+    <div class="eta"><span class="dot" style="background:var(--c2)"></span><span class="nm">过充 / BMS 失效</span><span class="num" style="color:var(--muted)">IE 3.4e-3</span><span class="num"><b>14.1%</b></span></div>
+    <div class="eta"><span class="dot" style="background:var(--c1)"></span><span class="nm">机械损伤 / 进水</span><span class="num" style="color:var(--muted)">IE 5.0e-4</span><span class="num"><b>1.6%</b></span></div>
+    <div class="eta"><span class="dot" style="background:var(--c1)"></span><span class="nm">外部火源 / 邻舱辐射</span><span class="num" style="color:var(--muted)">IE 2.0e-4</span><span class="num"><b>0.7%</b></span></div>
+    <div class="ch" style="border-top:1px solid var(--line)"><b>后果频率(点值 + p95)</b><span>MC 5000 样本 · seed 42</span></div>
+    <div style="padding:6px 0 12px">
+      <div class="bar"><span class="lb">0 · 单体排气</span><div class="tr"><div class="fl" style="width:96%;background:var(--c1)"></div></div><span class="vv num">2.14e-2</span></div>
+      <div class="bar"><span class="lb">I · 模组蔓延</span><div class="tr"><div class="fl" style="width:64%;background:var(--c2)"></div></div><span class="vv num">2.31e-3</span></div>
+      <div class="bar"><span class="lb">II · 单舱火</span><div class="tr"><div class="fl" style="width:42%;background:var(--c3)"></div></div><span class="vv num">2.62e-4</span></div>
+      <div class="bar"><span class="lb">III · 多舱火</span><div class="tr"><div class="fl" style="width:23%;background:var(--c4)"></div></div><span class="vv num">3.05e-5</span></div>
+      <div class="bar"><span class="lb">IV · 爆炸+毒气</span><div class="tr"><div class="fl" style="width:9%;background:var(--c5)"></div></div><span class="vv num">4.20e-6</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><b>全站风险矩阵</b><span>6 频率档 × 5 严重度</span></div>
+    <div class="mx">
+      <div style="background:#fecaca"></div><div style="background:#fecaca"></div><div style="background:#fde68a"></div><div style="background:#fde68a"></div><div style="background:#fde68a"></div>
+      <div style="background:#fecaca"></div><div style="background:#fde68a"></div><div style="background:#fde68a;outline:2.5px solid var(--c3)"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0"></div>
+      <div style="background:#fde68a"></div><div style="background:#fde68a"></div><div style="background:#bbf7d0;outline:2.5px solid var(--c4)"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0"></div>
+      <div style="background:#fde68a"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0;outline:2.5px solid var(--c5)"></div><div style="background:#bbf7d0"></div>
+    </div>
+    <div style="padding:8px 13px 12px;font-size:11.5px;color:var(--muted)">A 区 0 项 · B 区 <b style="color:#b45309">2 项</b> · C 区 3 项 → 综合 <b style="color:#b45309">B</b></div>
+  </div>
+  <div class="card">
+    <div class="ch"><b>屏障重要度(对 IV 级)</b><span>FV / RAW · 扰动法</span></div>
+    <div style="padding:6px 0 10px">
+      <div class="bar"><span class="lb">应急响应(人因)</span><div class="tr"><div class="fl" style="width:84%;background:#7c3aed"></div></div><span class="vv num">FV .42</span></div>
+      <div class="bar"><span class="lb">离气探测+联动</span><div class="tr"><div class="fl" style="width:62%;background:#7c3aed"></div></div><span class="vv num">FV .31</span></div>
+      <div class="bar"><span class="lb">电芯间热障</span><div class="tr"><div class="fl" style="width:36%;background:#7c3aed"></div></div><span class="vv num">FV .18</span></div>
+      <div class="bar"><span class="lb">舱内泄爆/防爆</span><div class="tr"><div class="fl" style="width:18%;background:#7c3aed"></div></div><span class="vv num">FV .09</span></div>
+      <div style="padding:6px 13px 0;font-size:11px;color:var(--faint)">提示:人因屏障 FV 最高 —— 训练/程序优化的收益 > 增配硬件</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><b>数据置信度构成</b><span>97 条 · 参考库</span></div>
+    <div class="don">
+      <div class="ring"><i>67%<br>≥C 级</i></div>
+      <div style="font-size:12px;color:var(--ink2);display:grid;gap:4px">
+        <span><span class="gr" style="background:#16a34a">A</span> 现场实测 <b class="num">14</b> 条(贝叶斯升级)</span>
+        <span><span class="gr" style="background:#2563eb">B</span> 厂商数据 <b class="num">18</b> 条(用户层)</span>
+        <span><span class="gr" style="background:#d97706">C</span> 行业统计 <b class="num">33</b> 条</span>
+        <span><span class="gr" style="background:#6b7280">D</span> 文献推断 <b class="num">32</b> 条 · <a style="color:#b45309">5 条待修正 →</a></span>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="grid-column:2/4">
+    <div class="ch"><b>分析案例(证据链)</b><span>版本 → 设置 → 结果,全程可溯</span></div>
+    <div class="eta"><span class="num" style="color:var(--faint)">#23</span><span class="nm">报告导出 docx · 5000 样本 · seed 42</span><span class="tag">v14</span><span class="num" style="color:var(--faint)">2026-07-08 14:32</span></div>
+    <div class="eta"><span class="num" style="color:var(--faint)">#22</span><span class="nm">不确定性带 C1–C5(p05/p50/p95)</span><span class="tag">v14</span><span class="num" style="color:var(--faint)">14:18</span></div>
+    <div class="eta"><span class="num" style="color:var(--faint)">#21</span><span class="nm">精确量化(共享事件否定)· 7 序列</span><span class="tag">v13</span><span class="num" style="color:var(--faint)">11:02</span></div>
+  </div>
+</div>
+</body></html>

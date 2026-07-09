@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>方向C · 画布至上(Canvas-first)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#eef2f7;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--c1:#16a34a;--c2:#65a30d;--c3:#d97706;--c4:#ea580c;--c5:#dc2626;--acc:#0f766e}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12.5px/1.5 -apple-system,'PingFang SC',sans-serif;height:100vh;overflow:hidden;position:relative}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.glass{background:rgba(255,255,255,.86);backdrop-filter:blur(10px);border:1px solid rgba(226,232,240,.9);border-radius:13px;box-shadow:0 8px 28px rgba(15,23,42,.08)}
+.rail{position:fixed;left:12px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;padding:8px 6px;z-index:5}
+.rail div{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:15px;color:var(--muted);cursor:default}
+.rail div.on{background:var(--acc);color:#fff}
+.rail div:hover:not(.on){background:var(--soft)}
+.top{position:fixed;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:7px 12px;z-index:5}
+.top b{font-size:13px}
+.tag{font-size:10.5px;padding:2px 8px;border-radius:6px;background:var(--soft);color:var(--ink2);font-family:var(--mono)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#065f46;background:#d1fae5;border-radius:99px;padding:3px 10px}
+.pill i{width:7px;height:7px;border-radius:50%;background:#10b981;font-style:normal}
+.canvas{position:absolute;inset:0;padding:80px 360px 60px 70px}
+svg{width:100%;height:100%}
+.lbl{font:11px 'PingFang SC',sans-serif;fill:var(--ink2)}
+.lbl2{font:600 11.5px 'PingFang SC',sans-serif;fill:var(--ink)}
+.frq{font:11px ui-monospace,Menlo,monospace;fill:var(--muted)}
+.pop{position:fixed;right:20px;top:86px;width:316px;padding:0;z-index:6;overflow:hidden}
+.pop .hd{padding:11px 14px;border-bottom:1px solid var(--line);background:var(--soft);display:flex;justify-content:space-between;align-items:center}
+.pop .hd b{font-size:12.5px}
+.pop .sec{padding:10px 14px;border-bottom:1px dashed #eef2f7}
+.pop .row{display:flex;justify-content:space-between;font-size:12px;padding:2.5px 0;color:var(--ink2)}
+.pop .row b{color:var(--muted);font-weight:500}
+.gr{display:inline-block;min-width:16px;height:16px;border-radius:4px;color:#fff;font-size:10px;font-weight:700;text-align:center;line-height:16px;padding:0 2px}
+.chain{font-size:11px;color:var(--ink2);display:grid;gap:5px}
+.chain span{display:flex;gap:7px;align-items:center}
+.chain i{font-style:normal;width:15px;height:15px;border-radius:50%;background:var(--soft);border:1px solid var(--line);font-size:9px;display:grid;place-items:center;color:var(--muted)}
+.kbar{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);width:520px;z-index:8;overflow:hidden}
+.kbar input{width:100%;border:0;outline:0;padding:12px 16px;font-size:14px;background:transparent;color:var(--ink)}
+.kbar .it{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:12.5px;color:var(--ink2);border-top:1px solid #f1f5f9}
+.kbar .it.on{background:#e6f2f0}
+.kbar kbd{margin-left:auto;font:10.5px var(--mono);background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--faint)}
+.ghost{position:fixed;left:70px;bottom:12px;display:flex;gap:8px;align-items:center;padding:8px 12px;z-index:5;border-style:dashed;border-color:#7c3aed55}
+.ghost .b{border:1px solid var(--line);border-radius:7px;padding:3px 10px;font-size:11.5px;background:#fff}
+.note{position:fixed;right:12px;bottom:10px;font-size:10.5px;color:var(--faint);background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:2px 8px;z-index:9}
+</style></head><body>
+<div class="note">方向C:画布至上 — 模型即屏幕 · ⌘K 命令板 · 点任意数字弹证据链(可解释数字)</div>
+
+<div class="top glass"><b>电芯内短路</b><span class="tag">IE 1.2e-2 /yr</span><span class="tag">v14</span>
+  <span class="pill"><i></i>实时精确量化 · 96 ms</span><span class="tag">⌘K 命令</span></div>
+
+<div class="rail glass">
+  <div class="on" title="事件树">⑂</div><div title="故障树">⌥</div><div title="参考库">⛁</div>
+  <div title="FMEA">▤</div><div title="报告">▦</div><div title="AI 草案">✦</div>
+</div>
+
+<div class="canvas"><svg viewBox="0 0 900 560">
+  <!-- 列头 -->
+  <text x="8"   y="18" class="lbl" fill="#94a3b8">初始事件</text>
+  <text x="150" y="18" class="lbl">离气探测+联动</text>
+  <text x="300" y="18" class="lbl">BMS 切断/隔离</text>
+  <text x="450" y="18" class="lbl">电芯间热障</text>
+  <text x="600" y="18" class="lbl">舱内泄爆/防爆</text>
+  <text x="750" y="18" class="lbl">应急响应</text>
+  <!-- 主干 -->
+  <path d="M20 300 H150" stroke="#334155" stroke-width="1.6" fill="none"/>
+  <!-- 离气 -->
+  <path d="M150 300 V80  H870" stroke="#16a34a" stroke-width="1.6" fill="none"/>
+  <path d="M150 300 V420 H300" stroke="#334155" stroke-width="1.6" fill="none"/>
+  <!-- BMS -->
+  <path d="M300 420 V180 H870" stroke="#65a30d" stroke-width="1.5" fill="none"/>
+  <path d="M300 420 V480 H450" stroke="#334155" stroke-width="1.5" fill="none"/>
+  <!-- 热障 -->
+  <path d="M450 480 V260 H870" stroke="#d97706" stroke-width="1.5" fill="none"/>
+  <path d="M450 480 V510 H600" stroke="#334155" stroke-width="1.5" fill="none"/>
+  <!-- 泄爆 -->
+  <path d="M600 510 V340 H870" stroke="#ea580c" stroke-width="1.5" fill="none"/>
+  <path d="M600 510 V536 H750" stroke="#334155" stroke-width="1.5" fill="none"/>
+  <!-- 应急 -->
+  <path d="M750 536 V440 H870" stroke="#dc2626" stroke-width="1.5" fill="none"/>
+  <path d="M750 536 H870" stroke="#dc2626" stroke-width="1.8" fill="none"/>
+  <!-- 分支点 -->
+  <circle cx="150" cy="300" r="4.5" fill="#fff" stroke="#334155" stroke-width="1.6"/>
+  <circle cx="300" cy="420" r="4.5" fill="#fff" stroke="#334155" stroke-width="1.6"/>
+  <circle cx="450" cy="480" r="4.5" fill="#fff" stroke="#334155" stroke-width="1.6"/>
+  <circle cx="600" cy="510" r="4.5" fill="#fff" stroke="#334155" stroke-width="1.6"/>
+  <circle cx="750" cy="536" r="4.5" fill="#fff" stroke="#334155" stroke-width="1.6"/>
+  <!-- 初始事件盒 -->
+  <rect x="6" y="282" width="118" height="36" rx="9" fill="#fff" stroke="#e2e8f0"/>
+  <text x="16" y="298" class="lbl2">电芯内短路</text><text x="16" y="312" class="frq">1.200e-2 /yr</text>
+  <!-- 末态 -->
+  <text x="878" y="76"  class="lbl2" fill="#16a34a">0</text><text x="820" y="76"  class="frq">1.140e-2</text><text x="740" y="76" class="lbl">单体安全排气</text>
+  <text x="878" y="176" class="lbl2" fill="#65a30d">I</text><text x="820" y="176" class="frq">5.400e-4</text><text x="740" y="176" class="lbl">模组内蔓延</text>
+  <!-- 选中的数字(热点) -->
+  <rect x="806" y="248" width="70" height="20" rx="6" fill="#e6f2f0" stroke="#0f766e" stroke-width="1.4"/>
+  <text x="820" y="262" class="frq" fill="#0f766e" font-weight="700">5.700e-5</text>
+  <text x="878" y="262" class="lbl2" fill="#d97706">II</text><text x="740" y="262" class="lbl">Pack/簇级起火</text>
+  <text x="878" y="336" class="lbl2" fill="#ea580c">III</text><text x="820" y="336" class="frq">5.400e-6</text><text x="740" y="336" class="lbl">箱级起火</text>
+  <text x="878" y="436" class="lbl2" fill="#dc2626">IV</text><text x="820" y="436" class="frq">8.700e-8</text><text x="740" y="436" class="lbl">多舱蔓延</text>
+  <text x="878" y="532" class="lbl2" fill="#dc2626">IV</text><text x="820" y="532" class="frq">3.600e-8</text><text x="740" y="532" class="lbl">爆炸+毒气</text>
+  <!-- ghost 分支(AI 草案) -->
+  <path d="M600 340 V300 H720" stroke="#7c3aed" stroke-width="1.4" stroke-dasharray="5 4" fill="none" opacity=".7"/>
+  <rect x="614" y="286" width="128" height="22" rx="7" fill="#f5f3ff" stroke="#7c3aed" stroke-dasharray="4 3"/>
+  <text x="622" y="301" class="lbl" fill="#6d28d9">✦ 气溶胶抑爆联动(草案)</text>
+</svg></div>
+
+<aside class="pop glass">
+  <div class="hd"><b>这个数字从哪来?</b><span class="tag">序列 L2</span></div>
+  <div class="sec">
+    <div class="row"><b>频率(引擎精确)</b><span class="num" style="font-size:15px;font-weight:650">5.700e-5 /yr</span></div>
+    <div class="row"><b>不确定性</b><span class="num">p05 1.2e-5 · p95 2.1e-4</span></div>
+    <div class="row"><b>与积式差异</b><span class="num" style="color:#b45309">+6.3%(共享事件)</span></div>
+  </div>
+  <div class="sec"><div style="font-size:11px;color:var(--faint);margin-bottom:6px">证据链</div>
+    <div class="chain">
+      <span><i>1</i>路径:离气✗ → BMS✗ → 热障✓</span>
+      <span><i>2</i>B_OFFGAS · PFD <b class="num">0.050</b> · <span class="gr" style="background:#6b7280">D</span> Sandia 现场族 2024</span>
+      <span><i>3</i>B_BMS · FTA 顶值 <b class="num">0.100</b> · 传感2oo3∨逻辑∨接触器</span>
+      <span><i>4</i>B_THERMAL · PFD <b class="num">0.100</b> · <span class="gr" style="background:#6b7280">D</span> UL 9540A 单元级</span>
+      <span><i>5</i>模型 <b class="num">v14 · 7c1a29</b> · 引擎 0.1.0 · 案例 <b class="num">#21</b></span>
+    </div>
+  </div>
+  <div class="sec" style="display:flex;gap:6px;border:0">
+    <span class="b tag">查看割集</span><span class="b tag">重要度</span><span class="b tag">现场更新 PFD</span>
+  </div>
+</aside>
+
+<div class="kbar glass">
+  <input value="加 " placeholder="⌘K 输入命令或搜索…">
+  <div class="it on">⑂ 在 L3 之后<b>加</b>入屏障「舱间距」<kbd>↵</kbd></div>
+  <div class="it">⌥ 为 B_THERMAL 挂载故障树<kbd>⌘T</kbd></div>
+  <div class="it">✦ AI 草案:为当前 ETA 补全爆燃分支<kbd>⌘⇧A</kbd></div>
+  <div class="it">▦ 导出报告(自动钉扎版本)<kbd>⌘E</kbd></div>
+</div>
+
+<div class="ghost glass"><span style="font-size:11.5px;color:#6d28d9">✦ AI 草案:1 个 ghost 屏障待裁决</span>
+  <span class="b" style="border-color:#7c3aed;color:#6d28d9">接受</span><span class="b">拒绝</span><span class="b">查看依据(2 条引用)</span></div>
+</body></html>
