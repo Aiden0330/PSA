@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { getExamples, getModel, quantify, getBessEventTree, getScenarios, listSaved, loadSaved, saveWorkspace, deleteSaved, getLibrary, importMef, wasSavedOffline, draftAiModel } from './api'
+import { getExamples, getModel, quantify, getScenarios, listSaved, saveWorkspace, deleteSaved, getLibrary, importMef, wasSavedOffline, draftAiModel } from './api'
 import type { ExampleItem, QuantifyResult, ScenarioItem, SavedItem, LibraryData } from './api'
 import { LibPicker } from './components/LibPicker'
 import { layoutFaultTree } from './layout'
@@ -11,9 +11,11 @@ import type { EtaSummary } from './components/EventTreeEditor'
 import { ReferenceLibrary } from './components/ReferenceLibrary'
 import { FmeaWorkbench } from './components/FmeaWorkbench'
 import { ConsequencesTab } from './components/ConsequencesTab'
-import { buildCascade, newBlankEta, normalizeEta, setLinkFt, CONSEQUENCE_AT_DEPTH, addFe, branchLeaf, setConsequence, consequenceTotals, layout, CONSEQUENCES, consLevel } from './eventtree'
+import { newBlankEta, setLinkFt, addFe, branchLeaf, setConsequence, consequenceTotals, layout, CONSEQUENCES, consLevel } from './eventtree'
 import type { EventTreeModel } from './eventtree'
-import { serializeProject, deserializeProject, duplicateProjectEta } from './project'
+import { serializeProject, duplicateProjectEta } from './project'
+import { buildScenarioTab } from './features/persistence/scenarioLoader'
+import { loadProjectArchive, importProjectText } from './features/persistence/projectIo'
 import type { FmeaRow, MappingConfig } from './fmea'
 import { loadRows, saveRows } from './fmeaStore'
 import { loadMapping, saveMapping } from './mappingStore'
@@ -24,7 +26,7 @@ import { useModel, useHistory } from './useModel'
 import type { ModelJson } from './model'
 import { addGate, addBasic, connect, deleteNode, updateNode, updateParam, setTop, setCcf, getFt, activatedNodes, attachStarterFt, addBasicFromLib, renameNode, addFaultTree, deleteFaultTree } from './model'
 import { BarrierFtModal } from './components/BarrierFtModal'
-import { buildProjectFile, parseProjectFile, downloadProjectFile } from './projectFile'
+import { buildProjectFile, downloadProjectFile } from './projectFile'
 import { applyOverlay, getOverlay, mergeOverlay } from './libraryStore'
 import { Icon } from './components/icons'
 import { formatEtaNumber } from './etaNumberFormat'
@@ -167,28 +169,6 @@ export default function App() {
     }
   }, [etModel, aiTargetFeId])
 
-  // 各 FTA 屏障的顶事件概率 = 其 PFD
-  async function computePfds(fts: ModelJson, m: EventTreeModel): Promise<Record<string, number>> {
-    const out: Record<string, number> = {}
-    for (const fe of m.functionalEvents) {
-      if (fe.linkFt) { try { out[fe.id] = (await quantify(fts, fe.id)).probability } catch {} }
-    }
-    return out
-  }
-  // 由场景构建一个 ETA 页签
-  const buildScenarioTab = async (sid: string, name: string): Promise<EtaTab> => {
-    const d = await getBessEventTree(sid || undefined)
-    const fts: ModelJson = { model_data: { parameters: (d.parameters ?? []) as any }, fault_trees: Object.values(d.fault_trees ?? {}) as any }
-    const fes = d.functional_events.map((id) => ({
-      id, label: d.labels[id] ?? id, failProb: d.fe_prob[id] ?? 0.1,
-      linkFt: ((d.fault_trees?.[id]?.nodes?.length ?? 0) > 2) ? id : undefined,
-    }))
-    const base: EventTreeModel = { initEvent: d.init_event, initFreq: d.init_frequency, functionalEvents: fes, root: buildCascade(fes, CONSEQUENCE_AT_DEPTH) }
-    const p = await computePfds(fts, base)
-    const model: EventTreeModel = { ...base, functionalEvents: base.functionalEvents.map((f) => (f.id in p ? { ...f, failProb: p[f.id] } : f)) }
-    return { key: 'sc:' + (sid || 'default'), name, renamed: false, model, fts, pfds: p }
-  }
-
   // 把当前活动编辑态写回其页签快照(切换/新增前调用)
   const snapshotActive = (list: EtaTab[]): EtaTab[] =>
     list.map((t) => (t.key === activeKey && etModel ? { ...t, model: etModel, fts: etFts.model ?? EMPTY_FTS, pfds } : t))
@@ -293,20 +273,11 @@ export default function App() {
   // 读取项目存档:完整还原全部 ETA(替换当前所有页签)。兼容旧版单 ETA 存档。
   const loadProject = async (id: string) => {
     try {
-      const rec = await loadSaved(id); setArchiveLocal(wasSavedOffline())
-      const proj = deserializeProject(rec.payload, rec.name)
-      const tabs: EtaTab[] = proj.etas.map((e) => ({
-        key: e.key,
-        name: e.name,
-        renamed: e.renamed,
-        model: normalizeEta(e.model as EventTreeModel),
-        fts: (e.fts as ModelJson) ?? EMPTY_FTS,
-        pfds: e.pfds ?? {},
-      }))
-      if (!tabs.length) return
-      setEtaTabs(tabs)
+      const proj = await loadProjectArchive(id); setArchiveLocal(wasSavedOffline())
+      if (!proj.tabs.length) return
+      setEtaTabs(proj.tabs)
       setCheckedKeys(proj.checkedKeys)
-      loadIntoActive(tabs.find((t) => t.key === proj.activeKey) ?? tabs[0])
+      loadIntoActive(proj.tabs.find((t) => t.key === proj.activeKey) ?? proj.tabs[0])
       userFts.reset(proj.userFts ?? EMPTY_FTS)
       applyProjectFmea(proj)
     } catch (e: any) { setError(String(e?.message ?? e)) }
@@ -322,17 +293,11 @@ export default function App() {
   // 从文件导入项目(替换全部页签);若文件携带参考库覆盖层则非破坏并入
   const onImportFile = async (file: File) => {
     try {
-      const { payload, libraryOverlay } = parseProjectFile(await file.text())
-      const proj = deserializeProject(payload, file.name.replace(/\.[^.]+$/, ''))
-      const tabs: EtaTab[] = proj.etas.map((e) => ({
-        key: e.key, name: e.name, renamed: e.renamed,
-        model: normalizeEta(e.model as EventTreeModel),
-        fts: (e.fts as ModelJson) ?? EMPTY_FTS, pfds: e.pfds ?? {},
-      }))
-      if (!tabs.length) return
-      if (libraryOverlay) { mergeOverlay(libraryOverlay as any); setLibVersion((n) => n + 1) }
-      setEtaTabs(tabs); setCheckedKeys(proj.checkedKeys); setSavedId('')
-      loadIntoActive(tabs.find((t) => t.key === proj.activeKey) ?? tabs[0])
+      const proj = importProjectText(await file.text(), file.name.replace(/\.[^.]+$/, ''))
+      if (!proj.tabs.length) return
+      if (proj.libraryOverlay) { mergeOverlay(proj.libraryOverlay as any); setLibVersion((n) => n + 1) }
+      setEtaTabs(proj.tabs); setCheckedKeys(proj.checkedKeys); setSavedId('')
+      loadIntoActive(proj.tabs.find((t) => t.key === proj.activeKey) ?? proj.tabs[0])
       userFts.reset(proj.userFts ?? EMPTY_FTS)
       applyProjectFmea(proj)
     } catch (e: any) { setError(String(e?.message ?? e)) }
