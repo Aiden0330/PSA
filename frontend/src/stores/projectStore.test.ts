@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { EMPTY_FTS, resetProjectStore, selectActiveEta, useProjectStore } from './projectStore'
+import { EMPTY_FTS, resetProjectStore, selectActiveEta, selectEtaPfds, useProjectStore } from './projectStore'
 import { serializeProject } from '../project'
 import type { ProjectEta } from '../project'
 
@@ -61,11 +61,15 @@ describe('projectStore(双真相消解)', () => {
     expect(e2.fts.fault_trees).toHaveLength(0)
   })
 
-  it('setEtaPfd 是派生量写入:不产生历史条目', () => {
+  it('setEtaPfd 写入历史之外的派生缓存:不产生历史条目,undo 不回滚', () => {
     const depth = S().past.length
     S().setEtaPfd('a', 'FE1', 0.042)
-    expect(S().present.etas[0].pfds).toEqual({ FE1: 0.042 })
+    expect(selectEtaPfds(S(), 'a')).toEqual({ FE1: 0.042 })
     expect(S().past).toHaveLength(depth)
+    S().setEtaModel('a', (m) => ({ ...m, initEvent: 'X' }))    // 内容编辑
+    S().setEtaPfd('a', 'FE1', 0.05)                            // 再次量化
+    S().undo()                                                 // 撤销内容编辑
+    expect(selectEtaPfds(S(), 'a')).toEqual({ FE1: 0.05 })     // 派生缓存不随 undo 回退
   })
 
   it('removeTab:仅剩 1 个不允许删;删活动页转邻位;可撤销恢复', () => {

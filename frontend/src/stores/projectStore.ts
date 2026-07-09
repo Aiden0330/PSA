@@ -24,6 +24,8 @@ export interface ProjectStore {
   future: ProjectDoc[]
   activeKey: string
   checkedKeys: Record<string, boolean>
+  /** 派生量缓存(各 ETA 的 PFD/顶值),在撤销历史之外:undo/redo 永不回滚派生值。 */
+  pfds: Record<string, Record<string, number>>
 
   /** 整体载入(读档/导入/初始场景):替换内容并清空历史。 */
   load: (etas: ProjectEta[], activeKey: string, checkedKeys: Record<string, boolean>, userFts?: ModelJson) => void
@@ -37,7 +39,6 @@ export interface ProjectStore {
   setEtaFts: (key: string, m: Updater<ModelJson>) => void
   setUserFts: (m: Updater<ModelJson>) => void
   addTab: (tab: ProjectEta, opts?: { checked?: boolean; activate?: boolean }) => void
-  insertTabs: (tabs: ProjectEta[], afterKey?: string) => void
   removeTab: (key: string) => void
   renameTab: (key: string, name: string) => void
   /** 挂载屏障故障树:starter FT + linkFt 同步写入,单条历史。 */
@@ -56,11 +57,12 @@ function mapEta(doc: ProjectDoc, key: string, f: (e: ProjectEta) => ProjectEta):
   return { ...doc, etas: doc.etas.map((e) => (e.key === key ? f(e) : e)) }
 }
 
+const pfdsOf = (etas: ProjectEta[]): Record<string, Record<string, number>> =>
+  Object.fromEntries(etas.map((e) => [e.key, { ...(e.pfds ?? {}) }]))
+
 export const useProjectStore = create<ProjectStore>()((set) => {
   const push = (f: (doc: ProjectDoc) => ProjectDoc) =>
     set((s) => ({ past: [...s.past, s.present], present: f(s.present), future: [] }))
-  // 派生量写入:替换 present,不推历史(撤销栈对派生缓存透明)
-  const quiet = (f: (doc: ProjectDoc) => ProjectDoc) => set((s) => ({ present: f(s.present) }))
 
   return {
     past: [],
@@ -68,9 +70,10 @@ export const useProjectStore = create<ProjectStore>()((set) => {
     future: [],
     activeKey: '',
     checkedKeys: {},
+    pfds: {},
 
     load: (etas, activeKey, checkedKeys, userFts) =>
-      set({ past: [], future: [], present: { etas, userFts: userFts ?? EMPTY_FTS }, activeKey, checkedKeys }),
+      set({ past: [], future: [], present: { etas, userFts: userFts ?? EMPTY_FTS }, activeKey, checkedKeys, pfds: pfdsOf(etas) }),
 
     applyProject: ({ etas, checkedKeys, activeKey, userFts }) =>
       set((s) => ({
@@ -79,6 +82,7 @@ export const useProjectStore = create<ProjectStore>()((set) => {
         future: [],
         activeKey,
         checkedKeys,
+        pfds: { ...s.pfds, ...pfdsOf(etas) },
       })),
 
     setActive: (activeKey) => set({ activeKey }),
@@ -93,16 +97,10 @@ export const useProjectStore = create<ProjectStore>()((set) => {
         past: [...s.past, s.present],
         present: { ...s.present, etas: [...s.present.etas, tab] },
         future: [],
+        pfds: { ...s.pfds, [tab.key]: { ...(tab.pfds ?? {}) } },
         ...(opts?.activate !== false ? { activeKey: tab.key } : {}),
         ...(opts?.checked !== false ? { checkedKeys: { ...s.checkedKeys, [tab.key]: true } } : {}),
       })),
-
-    insertTabs: (tabs, afterKey) =>
-      push((doc) => {
-        const idx = afterKey ? doc.etas.findIndex((e) => e.key === afterKey) : -1
-        const at = idx >= 0 ? idx + 1 : doc.etas.length
-        return { ...doc, etas: [...doc.etas.slice(0, at), ...tabs, ...doc.etas.slice(at)] }
-      }),
 
     removeTab: (key) =>
       set((s) => {
@@ -125,9 +123,24 @@ export const useProjectStore = create<ProjectStore>()((set) => {
           return { ...e, fts: attachStarterFt(e.fts ?? EMPTY_FTS, fe.id, fe.failProb), model: setLinkFt(e.model, feIndex, fe.id) }
         })),
 
-    detachFt: (key, feIndex) => push((doc) => mapEta(doc, key, (e) => ({ ...e, model: setLinkFt(e.model, feIndex, undefined) }))),
+    // 解除挂载时把当前派生 PFD 物化进内容层(数值不跳变,之后可手工编辑)
+    detachFt: (key, feIndex) =>
+      set((s) => {
+        const doc = mapEta(s.present, key, (e) => {
+          const fe = e.model.functionalEvents[feIndex]
+          const derived = fe ? (s.pfds[key]?.[fe.id] ?? e.pfds?.[fe.id]) : undefined
+          let m = setLinkFt(e.model, feIndex, undefined)
+          if (fe && derived != null) {
+            m = { ...m, functionalEvents: m.functionalEvents.map((f) => (f.id === fe.id ? { ...f, failProb: derived } : f)) }
+          }
+          return { ...e, model: m }
+        })
+        return { past: [...s.past, s.present], present: doc, future: [] }
+      }),
 
-    setEtaPfd: (key, feId, prob) => quiet((doc) => mapEta(doc, key, (e) => ({ ...e, pfds: { ...(e.pfds ?? {}), [feId]: prob } }))),
+    // 派生量只写历史之外的缓存:undo/redo 对其透明
+    setEtaPfd: (key, feId, prob) =>
+      set((s) => ({ pfds: { ...s.pfds, [key]: { ...(s.pfds[key] ?? {}), [feId]: prob } } })),
 
     undo: () =>
       set((s) => {
@@ -146,9 +159,13 @@ export const useProjectStore = create<ProjectStore>()((set) => {
 
 /** 测试用:回到空项目。 */
 export function resetProjectStore() {
-  useProjectStore.setState({ past: [], present: initialDoc, future: [], activeKey: '', checkedKeys: {} })
+  useProjectStore.setState({ past: [], present: initialDoc, future: [], activeKey: '', checkedKeys: {}, pfds: {} })
 }
 
 /** 便捷选择器:活动 ETA(不存在时 null)。 */
 export const selectActiveEta = (s: ProjectStore): ProjectEta | null =>
   s.present.etas.find((e) => e.key === s.activeKey) ?? null
+
+/** 某 ETA 的有效派生缓存:侧表优先,载入时的静态 pfds 兜底(如撤销恢复的页签)。 */
+export const selectEtaPfds = (s: ProjectStore, key: string): Record<string, number> =>
+  s.pfds[key] ?? s.present.etas.find((e) => e.key === key)?.pfds ?? {}

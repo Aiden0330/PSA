@@ -37,6 +37,7 @@ import type { AiApplyMode, AiDraftResponse, AiDraftTarget } from './aiDraft'
 import { useViewStore } from './stores/viewStore'
 import type { FtEditTarget } from './stores/viewStore'
 import { useProjectStore } from './stores/projectStore'
+import { composeModel, composeEta, stripDerived, INIT_FREQ_KEY } from './stores/derived'
 
 function buildHeat(importance: Record<string, { fv: number }>): Record<string, number> {
   const max = Math.max(...Object.values(importance).map((v) => v.fv), 1e-12)
@@ -102,11 +103,21 @@ export default function App() {
   const docRedo = useProjectStore((s) => s.redo)
   const docCanUndo = useProjectStore((s) => s.past.length > 0)
   const docCanRedo = useProjectStore((s) => s.future.length > 0)
+  const pfdsMap = useProjectStore((s) => s.pfds)     // 派生量缓存(撤销历史之外)
   const P = useProjectStore.getState                 // 动作入口(动作引用稳定,处理器内即取即用)
+  const etaPfds = (t: ProjectEta) => pfdsMap[t.key] ?? t.pfds ?? {}
   const activeEta = etaTabs.find((t) => t.key === activeKey) ?? null
-  const etModel = activeEta?.model ?? null
+  // 展示/量化/序列化一律用「内容 × 派生」合成模型;回写经 stripDerived 剥离派生量
+  const pfds = activeEta ? etaPfds(activeEta) : {}
+  const etModel = activeEta ? composeModel(activeEta.model, pfds) : null
   const etFtsModel = activeEta?.fts ?? EMPTY_FTS
-  const pfds = activeEta?.pfds ?? {}
+  const writeEtModel = (next: EventTreeModel) => {
+    const prev = P().present.etas.find((e) => e.key === P().activeKey)?.model
+    if (!prev) return
+    const stripped = stripDerived(next, prev)
+    if (JSON.stringify(stripped) === JSON.stringify(prev)) return   // 纯派生差异 → 不产生历史条目
+    P().setEtaModel(P().activeKey, stripped)
+  }
   const tab = useViewStore((s) => s.tab)
   const setTab = useViewStore((s) => s.setTab)
   const [busy, setBusy] = useState(false)
@@ -148,7 +159,7 @@ export default function App() {
     try { saveMapping(next) } catch (e: any) { setError(String(e?.message ?? e)) }
   }
   const buildPayload = () =>
-    serializeProject(etaTabs, activeKey, checkedKeys, userFtsModel, fmeaRows, fmeaMapping)
+    serializeProject(etaTabs.map((t) => composeEta({ ...t, pfds: etaPfds(t) })), activeKey, checkedKeys, userFtsModel, fmeaRows, fmeaMapping)
   const applyProjectFmea = (proj: { fmeaRows?: FmeaRow[]; fmeaMapping?: MappingConfig }) => {
     if (proj.fmeaRows) persistFmeaRows(proj.fmeaRows)
     if (proj.fmeaMapping) persistFmeaMapping(proj.fmeaMapping)
@@ -211,7 +222,7 @@ export default function App() {
     let m3 = branchLeaf(m2, path, newId)
     const worse = CONSEQUENCES[Math.min(CONSEQUENCES.indexOf(consLevel(m2, oldCons)) + 1, CONSEQUENCES.length - 1)]
     m3 = setConsequence(m3, [...path, 'failure'], worse)
-    P().setEtaModel(activeKey, m3)
+    writeEtModel(m3)
   }
   // 打开内置场景为新页签(已打开则切换)
   const openEta = async (val: string) => {
@@ -312,7 +323,7 @@ export default function App() {
     if (!active || active.model.initFreqSource !== 'ft') return
     try {
       const top = (await quantify(active.fts, '__init__')).probability
-      P().setEtaModel(active.key, (m) => ({ ...m, initFreq: top }))
+      P().setEtaPfd(active.key, INIT_FREQ_KEY, top)            // 派生量入缓存,不进内容历史
     } catch {}
   }
 
@@ -323,8 +334,7 @@ export default function App() {
     if (!active) return
     try {
       const prob = (await quantify(active.fts, feId)).probability
-      P().setEtaPfd(active.key, feId, prob)
-      P().setEtaModel(active.key, (m) => ({ ...m, functionalEvents: m.functionalEvents.map((f) => (f.id === feId ? { ...f, failProb: prob } : f)) }))
+      P().setEtaPfd(active.key, feId, prob)                    // 派生量入缓存,不进内容历史
     } catch {}
   }
 
@@ -337,18 +347,19 @@ export default function App() {
     } catch {}
   })() }, [])
 
-  // 页签摘要 + 多 ETA 汇总(单一来源:所有页签同源于 projectStore)
+  // 页签摘要 + 多 ETA 汇总(单一来源:所有页签同源于 projectStore;数字用合成模型)
   const summaries: EtaSummary[] = etaTabs.map((t) => {
-    const totals = consequenceTotals(t.model)
-    const leafCount = layout(t.model, 1, 0).leafCount
+    const cm = composeModel(t.model, etaPfds(t))
+    const totals = consequenceTotals(cm)
+    const leafCount = layout(cm, 1, 0).leafCount
     let worstC = '—', worstFreq = 0
     for (let i = CONSEQUENCES.length - 1; i >= 0; i--) { const c = CONSEQUENCES[i]; if ((totals[c] ?? 0) > 0) { worstC = c; worstFreq = totals[c]; break } }
-    return { key: t.key, name: etaDisplayName(t, t.model), leafCount, worstC, worstFreq, active: t.key === activeKey, checked: !!checkedKeys[t.key] }
+    return { key: t.key, name: etaDisplayName(t, cm), leafCount, worstC, worstFreq, active: t.key === activeKey, checked: !!checkedKeys[t.key] }
   })
   const aggregateTotals: Record<string, number> = {}
   for (const t of etaTabs) {
     if (!checkedKeys[t.key]) continue
-    const tt = consequenceTotals(t.model)
+    const tt = consequenceTotals(composeModel(t.model, etaPfds(t)))
     for (const c of Object.keys(tt)) aggregateTotals[c] = (aggregateTotals[c] ?? 0) + tt[c]
   }
   const activeName = summaries.find((s) => s.active)?.name ?? 'ETA'
@@ -374,15 +385,14 @@ export default function App() {
       if (ftEtaName === '__init__') {
         if (target.model.initFreqSource === 'ft') {
           const top = (await quantify(m, '__init__')).probability
-          P().setEtaModel(ftEtaKey, (em) => ({ ...em, initFreq: top }))
+          P().setEtaPfd(ftEtaKey, INIT_FREQ_KEY, top)          // 派生量入缓存,不进内容历史
         }
       } else {
         // C1 守护:若该屏障已 detach(linkFt 已清空),不覆盖用户手动填写的 PFD
         const fe = target.model.functionalEvents.find((f) => f.id === ftEtaName)
         if (!fe?.linkFt) return
         const prob = (await quantify(m, ftEtaName)).probability
-        P().setEtaPfd(ftEtaKey, ftEtaName, prob)
-        P().setEtaModel(ftEtaKey, (em) => ({ ...em, functionalEvents: em.functionalEvents.map((f) => (f.id === ftEtaName ? { ...f, failProb: prob } : f)) }))
+        P().setEtaPfd(ftEtaKey, ftEtaName, prob)               // 派生量入缓存,不进内容历史
       }
     } catch {}
   }
@@ -650,12 +660,12 @@ export default function App() {
                   ETA 故障树: <strong>{ftEtaName === '__init__' ? '初始事件' : (ftEtaTab?.model.functionalEvents.find((f) => f.id === ftEtaName)?.label ?? ftEtaName)}</strong>
                   {ftEtaName !== '__init__' && (
                     <span style={{ marginLeft: 8, color: 'var(--psa-faint)' }}>
-                      PFD = {formatEtaNumber(ftEtaTab?.pfds?.[ftEtaName])}
+                      PFD = {formatEtaNumber(ftEtaTab && etaPfds(ftEtaTab)[ftEtaName])}
                     </span>
                   )}
                   {ftEtaName === '__init__' && ftEtaTab && (
                     <span style={{ marginLeft: 8, color: 'var(--psa-faint)' }}>
-                      freq = {formatEtaNumber(ftEtaTab.model.initFreq)}
+                      freq = {formatEtaNumber(composeModel(ftEtaTab.model, etaPfds(ftEtaTab)).initFreq)}
                     </span>
                   )}
                   {/* M2:来源非 FTA 时提示编辑无效 */}
@@ -758,7 +768,7 @@ export default function App() {
         </div>
       ) : tab === 'cons' ? (
         <div style={{ flex: 1, minHeight: 0, background: '#fff' }}>
-          {etModel ? <ConsequencesTab model={etModel} onChange={(m) => P().setEtaModel(activeKey, m)} /> : <p style={{ padding: 16 }}>加载中…</p>}
+          {etModel ? <ConsequencesTab model={etModel} onChange={writeEtModel} /> : <p style={{ padding: 16 }}>加载中…</p>}
         </div>
       ) : tab === 'fmea' ? (
         <FmeaWorkbench
@@ -866,7 +876,7 @@ export default function App() {
           {/* ETA 主体 */}
           <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: 12, display: 'flex' }}>
             {!etModel ? <p style={{ padding: 12 }}>加载中…</p> : (
-              <EventTreeEditor model={etModel} onChange={(m) => P().setEtaModel(activeKey, m)}
+              <EventTreeEditor model={etModel} onChange={writeEtModel}
                 linked={{ fault_trees: etFtsModel.fault_trees ?? [], parameters: etFtsModel.model_data.parameters ?? [] }}
                 fts={etFtsModel} ftsApi={{ set: (m) => P().setEtaFts(activeKey, m), undo: docUndo, redo: docRedo, canUndo: docCanUndo, canRedo: docCanRedo }}
                 pfds={pfds} onAttachFt={onAttachFt} onDetachFt={onDetachFt} onFtEdited={onFtEdited}
