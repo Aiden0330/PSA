@@ -44,6 +44,10 @@ class EtQuantifyRequest(BaseModel):
     house_states: dict[str, bool] = {}               # 4a2 边界条件(直接覆盖)
     boundary_condition_sets: list[dict[str, Any]] = []   # 4a2 命名集定义(随模型)
     boundary_condition_set: Optional[str] = None     # 4a2 按名引用
+    # 4a4:携带项目上下文 → 不确定性/重要度运行同样自动钉扎为分析案例(ADR-2 证据链)
+    project_uuid: Optional[str] = None
+    project_payload: Optional[dict[str, Any]] = None
+    scenario_name: Optional[str] = None
 
 class EtQuantifyResponse(BaseModel):
     sequences: dict[str, float]

@@ -126,7 +126,8 @@ export function EventTreeEditor(
   }
   const onDeepen = async () => {
     setDeepBusy(true); setQErr(null)
-    try { const im = await importanceEventTree(toEngineRequest(model, linked)); setImp(im.importance) }
+    // 4a4:携带项目上下文 → 重要度运行自动钉扎为分析案例(证据链)
+    try { const im = await importanceEventTree({ ...toEngineRequest(model, linked), ...(reportContext ?? {}) }); setImp(im.importance) }
     catch (e: any) { setQErr(String(e?.message ?? e)) }
     finally { setDeepBusy(false) }
   }

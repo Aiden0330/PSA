@@ -70,6 +70,24 @@ def api_event_tree_quantify(req: schemas.EtQuantifyRequest):
         raise HTTPException(400, str(e))
     return schemas.EtQuantifyResponse(sequences=res["sequences"], consequences=res["consequences"])
 
+def _pin_case(project_uuid: str, project_payload, kind: str, name_hint: str | None,
+              settings: dict, results: dict, audit_action: str):
+    """ADR-2 自动钉扎:项目上下文 → 版本(幂等)+ 分析案例。返回 {case_id, version_hash, engine_version}。"""
+    from backend import store
+    from backend.canonical import to_canonical
+    try:
+        doc, sidecar = to_canonical(project_payload, project_uuid)
+    except Exception as e:
+        raise HTTPException(400, f"project_payload 无法规范化: {e}")
+    store.ensure_project(project_uuid, name_hint or "项目")
+    ver = store.create_version(project_uuid, doc, sidecar, origin="auto_pin",
+                               message=f"auto: {kind}")
+    case_id = store.create_case(project_uuid, ver["id"], kind, settings=settings,
+                                results=results, audit_action=audit_action)
+    return {"case_id": case_id, "version_hash": ver["content_hash"],
+            "engine_version": store.engine_version()}
+
+
 @app.post("/api/report")
 def api_report(req: schemas.ReportRequest, format: str = "docx"):
     """由当前 ETA 重算 → 生成 Word/PDF/CSV 报告下载。"""
@@ -88,23 +106,13 @@ def api_report(req: schemas.ReportRequest, format: str = "docx"):
     evidence, case_id = None, None
     if req.project_uuid and req.project_payload is not None:
         from datetime import datetime, timezone
-        from backend import store
-        from backend.canonical import to_canonical
-        try:
-            doc, sidecar = to_canonical(req.project_payload, req.project_uuid)
-        except Exception as e:
-            raise HTTPException(400, f"project_payload 无法规范化: {e}")
-        store.ensure_project(req.project_uuid, req.scenario_name or "项目")
-        ver = store.create_version(req.project_uuid, doc, sidecar, origin="auto_pin",
-                                   message=f"auto: report {format}")
-        case_id = store.create_case(
-            req.project_uuid, ver["id"], "report",
-            settings={"format": format, "samples": req.samples, "seed": req.seed,
-                      "error_factor": req.error_factor, "scenario_name": req.scenario_name},
-            results={"consequences": data["consequences"], "bands": data["bands"]},
-            audit_action="report.export")
-        evidence = {"case_id": case_id, "version_hash": ver["content_hash"],
-                    "engine_version": store.engine_version(),
+        pinned = _pin_case(req.project_uuid, req.project_payload, "report", req.scenario_name,
+                           settings={"format": format, "samples": req.samples, "seed": req.seed,
+                                     "error_factor": req.error_factor, "scenario_name": req.scenario_name},
+                           results={"consequences": data["consequences"], "bands": data["bands"]},
+                           audit_action="report.export")
+        case_id = pinned["case_id"]
+        evidence = {**pinned,
                     "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     png = None
     if req.tree_png and "," in req.tree_png:
@@ -195,9 +203,15 @@ def api_event_tree_uncertainty(req: schemas.EtUncertaintyRequest):
     from backend.et_builder import build_model_from_request
     from psaengine.eta.uncertainty import event_tree_uncertainty
     model = build_model_from_request(req.model_dump())
-    return event_tree_uncertainty(model, "TR", samples=req.samples, seed=req.seed, error_factor=req.error_factor,
-                                  house_states=req.house_states or None,
-                                  boundary_condition_set=req.boundary_condition_set)
+    res = event_tree_uncertainty(model, "TR", samples=req.samples, seed=req.seed, error_factor=req.error_factor,
+                                 house_states=req.house_states or None,
+                                 boundary_condition_set=req.boundary_condition_set)
+    if req.project_uuid and req.project_payload is not None:   # 4a4:不确定性运行钉扎为案例
+        pinned = _pin_case(req.project_uuid, req.project_payload, "uncertainty", req.scenario_name,
+                           settings={"samples": req.samples, "seed": req.seed, "error_factor": req.error_factor},
+                           results=res, audit_action="analysis.uncertainty")
+        res = {**res, "case": pinned}
+    return res
 
 @app.post("/api/event-tree/importance")
 def api_event_tree_importance(req: schemas.EtQuantifyRequest):
@@ -205,8 +219,14 @@ def api_event_tree_importance(req: schemas.EtQuantifyRequest):
     from backend.et_builder import build_model_from_request
     from psaengine.eta.uncertainty import barrier_importance_exact
     model = build_model_from_request(req.model_dump())
-    return {"importance": barrier_importance_exact(model, "TR", house_states=req.house_states or None,
-                                                   boundary_condition_set=req.boundary_condition_set)}
+    imp = barrier_importance_exact(model, "TR", house_states=req.house_states or None,
+                                   boundary_condition_set=req.boundary_condition_set)
+    out: dict = {"importance": imp}
+    if req.project_uuid and req.project_payload is not None:   # 4a4:重要度运行钉扎为案例
+        out["case"] = _pin_case(req.project_uuid, req.project_payload, "importance", req.scenario_name,
+                                settings={"method": "perturbation-exact"},
+                                results={"importance": imp}, audit_action="analysis.importance")
+    return out
 
 @app.get("/api/bess/library")
 def api_bess_library():
