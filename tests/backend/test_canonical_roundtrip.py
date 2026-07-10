@@ -124,3 +124,27 @@ def test_sidecarless_reconstruction_is_semantic():
     # regenerated fts params exclude minted bookkeeping params
     ids = {p["id"] for p in v2["etas"][0]["fts"]["model_data"]["parameters"]}
     assert ids == {"S1", "S2", "S3", "LOGIC"}
+
+
+def test_init_provenance_survives_roundtrip():
+    """4c2:模板初因溯源(source/grade/evidence)进频率参数 provenance 块,无损往返。"""
+    payload = {"v": 2, "etas": [{"key": "t", "name": "T", "model": {
+        "initEvent": "IE", "initFreq": 5e-3, "initFreqSource": "manual",
+        "initSource": "DNV GL McMicken 2020", "initGrade": "D", "initEvidence": "折算系统级频率",
+        "functionalEvents": [{"id": "FE1", "label": "b", "failProb": 0.1}],
+        "root": {"kind": "branch", "feId": "FE1",
+                 "success": {"kind": "leaf", "consequence": "C1"},
+                 "failure": {"kind": "leaf", "consequence": "C2"}}},
+        "fts": {"model_data": {"parameters": []}, "fault_trees": []}, "pfds": {}}],
+        "activeKey": "t", "checkedKeys": {"t": True}}
+    doc, sc = to_canonical(copy.deepcopy(payload), PUUID)
+    m = to_v2(doc, sc)["etas"][0]["model"]
+    assert m["initSource"] == "DNV GL McMicken 2020"
+    assert m["initGrade"] == "D"
+    assert m["initEvidence"] == "折算系统级频率"
+    # sidecarless(canonical-normal 语义再生)同样保留
+    assert to_v2(doc, None)["etas"][0]["model"]["initSource"] == "DNV GL McMicken 2020"
+    # 不同溯源 → 不同内容哈希(provenance 是内容,参与哈希)
+    p2 = copy.deepcopy(payload)
+    p2["etas"][0]["model"]["initGrade"] = "C"
+    assert content_hash(to_canonical(p2, PUUID)[0]) != content_hash(doc)

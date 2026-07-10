@@ -108,6 +108,14 @@ export function EtInspector(
               <span style={{ width: 48, fontSize: 11, color: 'var(--psa-muted)' }}>名称</span>
               <input value={model.initEvent} onChange={(e) => onChange(setInitEvent(model, e.target.value))} style={{ flex: 1, fontSize: 12 }} />
             </div>
+            {/* 初因溯源(模板/库带入;证据链首环)*/}
+            {(model.initSource || model.initGrade) && (
+              <div style={{ fontSize: 10.5, color: 'var(--psa-muted)', marginBottom: 6, lineHeight: 1.5 }}>
+                {model.initGrade && <span style={{ display: 'inline-block', border: '1px solid var(--psa-line-strong)', borderRadius: 4, padding: '0 5px', marginRight: 6, fontFamily: 'var(--psa-font-mono)' }}>置信 {model.initGrade}</span>}
+                {model.initSource && <span>来源:{model.initSource}</span>}
+                {model.initEvidence && <div style={{ color: 'var(--psa-faint)', marginTop: 2 }}>{model.initEvidence}</div>}
+              </div>
+            )}
             {/* 频率来源单选 */}
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontSize: 11, color: 'var(--psa-muted)', marginBottom: 4 }}>频率来源</div>

@@ -39,6 +39,10 @@ export interface EventTreeModel {
   consequences?: ConsequenceDef[]
   initFreqSource?: InitFreqSource
   product?: ProductDims
+  // 初因事件溯源(证据链首环:数字→数据条目 value+unit+grade+citation)。模板/库带入,可编辑。
+  initSource?: string
+  initGrade?: string
+  initEvidence?: string
 }
 
 export const CONSEQUENCES = ['C1', 'C2', 'C3', 'C4', 'C5']

@@ -234,8 +234,16 @@ def to_canonical(payload: dict, project_uuid: str,
         ie_ref = "IE_FREQ"
         while ie_ref in param_by_ref:
             ie_ref += "_"
+        # 初因溯源(4c2)进入频率参数的 provenance 块(ADR-1 D4 的正位;随内容哈希,无损往返)
+        ie_prov = M.Provenance()
+        if m.get("initSource") or m.get("initGrade") or m.get("initEvidence"):
+            ie_prov = M.Provenance(
+                source=M.Source(citation=m["initSource"]) if m.get("initSource") else None,
+                grade=m.get("initGrade"),
+                evidence=[m["initEvidence"]] if m.get("initEvidence") else [])
         ie_param = M.Parameter(uuid=entity_uuid(ns, f"{escope}/param:{ie_ref}"),
                                ref=ie_ref, kind="frequency", value=m["initFreq"],
+                               provenance=ie_prov,
                                extra={"__minted__": "ie_freq"})
         params.append(ie_param)
         prod = m.get("product")
@@ -374,6 +382,16 @@ def to_v2(doc: M.ProjectDocument, sidecar: Optional[dict] = None) -> dict:
                                      for c in t.consequences if c.ref not in synth]
         if "initFreqSource" in model_fields or sidecar is None:
             model["initFreqSource"] = t.initiating_event.freq_source
+        # 初因溯源:从频率参数 provenance 块还原(4c2)
+        ie_prov = param_by_uuid[t.initiating_event.frequency_param].provenance
+        if ie_prov.source and ie_prov.source.citation:
+            model["initSource"] = ie_prov.source.citation
+        if ie_prov.grade:
+            model["initGrade"] = ie_prov.grade
+        if ie_prov.evidence:
+            # v2 initEvidence 为单串,取首条(当前唯一写入者 to_canonical 只写 1 条,无损)。
+            # 若后续贝叶斯等向 Provenance.evidence 追加多条,此处需改为拼接以免静默截断。
+            model["initEvidence"] = ie_prov.evidence[0]
         if ("product" in model_fields or sidecar is None) and t.initiating_event.product is not None:
             p = t.initiating_event.product
             model["product"] = {"cellsPerPack": p.cells_per_pack,

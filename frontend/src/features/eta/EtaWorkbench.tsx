@@ -10,6 +10,7 @@ import { newBlankEta, addFe, branchLeaf, setConsequence, CONSEQUENCES, consLevel
 import { attachStarterFt } from '../../model'
 import { duplicateProjectEta } from '../../project'
 import { buildScenarioTab } from '../persistence/scenarioLoader'
+import { getTemplate, listTemplates, templateToEtaModel } from '../templates/etaTemplates'
 import { useActiveEta, etaDisplayName } from '../../stores/useActiveEta'
 import { INIT_FREQ_KEY } from '../../stores/derived'
 import { EMPTY_FTS } from '../../stores/projectStore'
@@ -36,6 +37,7 @@ export function EtaWorkbench(
   },
 ) {
   const { etaTabs, activeKey, checkedKeys, etModel, etFtsModel, pfds, writeEtModel, activeEta, P, docUndo, docRedo, docCanUndo, docCanRedo } = useActiveEta()
+  const [templateNotice, setTemplateNotice] = useState<string | null>(null)
 
   const selectEta = (key: string) => { if (key !== activeKey && etaTabs.some((t) => t.key === key)) P().setActive(key) }
   const onToggleEta = (key: string) => P().toggleChecked(key)
@@ -71,6 +73,14 @@ export function EtaWorkbench(
     const worse = CONSEQUENCES[Math.min(CONSEQUENCES.indexOf(consLevel(m2, oldCons)) + 1, CONSEQUENCES.length - 1)]
     m3 = setConsequence(m3, [...path, 'failure'], worse)
     writeEtModel(m3)
+  }
+  // 从预置模板新建 ETA 页签(4c2:前身模板迁移;模板是可编辑起点,量化前应按项目实测替换)
+  const openTemplate = (id: string) => {
+    const tpl = getTemplate(id)
+    if (!tpl) return
+    const key = 'tpl' + Date.now().toString(36)
+    P().addTab({ key, name: tpl.name, renamed: true, model: templateToEtaModel(tpl), fts: EMPTY_FTS, pfds: {} })
+    setTemplateNotice(tpl.name)
   }
   // 打开内置场景为新页签(已打开则切换)
   const openEta = async (val: string) => {
@@ -131,6 +141,10 @@ export function EtaWorkbench(
           <input type="file" accept=".json,.psaproj.json" style={{ display: 'none' }}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) persistence.onImportFile(f); e.currentTarget.value = '' }} />
         </label>
+        <select value="" onChange={(e) => { if (e.target.value) { openTemplate(e.target.value); e.currentTarget.value = '' } }} style={ribbonSelect} title="从预置模板新建 ETA（可编辑起点，量化前请按项目实测替换取值）">
+          <option value="">从模板…</option>
+          {listTemplates().map((t) => <option key={t.id} value={t.id}>{t.category} · {t.name}</option>)}
+        </select>
         <select value="" onChange={(e) => { if (e.target.value) { openEta(e.target.value); e.currentTarget.value = '' } }} style={ribbonSelect} title="打开内置场景为新页签">
           <option value="">打开场景…</option>
           {scenarios.map((s) => <option key={s.id} value={'sc:' + s.id}>{s.name}</option>)}
@@ -146,6 +160,15 @@ export function EtaWorkbench(
         {persistence.archiveLocal && <span style={{ fontSize: 11.5, color: 'var(--psa-faint)' }} title="后端不可达,存档保存在此浏览器(localStorage)">离线存档</span>}
         <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--psa-faint)' }}>前端积式实时;引擎精确量化按需</span>
       </div>
+
+      {/* 4c2:模板为可编辑起点,数据多为示例/文献推断(C/D 级)——量化前须按项目实测替换 */}
+      {templateNotice && (
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: 'var(--psa-primary-soft)', borderBottom: '1px solid var(--psa-line-2)', fontSize: 11.5, color: 'var(--psa-primary-strong)' }}>
+          <Icon name="bolt" size={13} />
+          <span style={{ flex: 1 }}>已从模板「{templateNotice}」新建 ETA。模板取值为示例/文献推断(C/D 级,见检视器逐条来源),<b>量化前请按本项目实测替换</b>。</span>
+          <button onClick={() => setTemplateNotice(null)} style={{ border: 0, background: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13 }}>✕</button>
+        </div>
+      )}
 
       {ai.aiOpen && (
         <AiDraftPanel
