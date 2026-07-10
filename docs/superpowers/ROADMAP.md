@@ -36,7 +36,24 @@
   ⑩**金例评测门**(0c54f13):6 个 BESS 域金例 + 确定性 rubric(结构/可量化/接地声明/含糊必问)+ 本地 run_cases 走全管线 + **Batch API CLI**(`python -m backend.ai_eval submit|status|fetch`,custom_id 携带 PROMPT_VERSION 2026-07-09-p1)= 模型/提示词升级门。
   收口:py **239**(0 skipped)、fe **190**、benchmark 24/24、`make check` 绿、bundle 2.71MB;preview 实测版本对比与驾驶舱。
 - **UX 报障收口(2026-07-10)**:①**默认 ETA 不显示/存档不加载**——早于本轮已在 `1d03d36` 修(bootstrap 竞态覆盖用户内容、静默失败死路、archive-select 回弹);本轮 preview 复验通过(总览落地即含 1 个引导 ETA、ETA 页直出树 55 文本节点/7 序列、无需「+」;存档下拉重载后可加载,footer 带项目 UUID)。②**新窗口加载慢**(`c893550`):根因 = dev server 首个请求触发 esbuild 依赖优化 + 整页刷新(~18s),且 ETA 关键路径**急切**导入 reactflow(≈1MB/FtaWorkbench)、ag-grid(≈900KB/ParamLibrary·FMEA)。修:`optimizeDeps.include` 启动即预打包(Vite ready 108ms、ETA 页 <100ms 出树);`React.lazy`+Suspense 拆分 FTA/参数库/参考库/FMEA/后果/报告/BarrierFtModal(ETA 关键路径仅 340KB 主块,reactflow/ag-grid 点击对应页签才拉);`bundle` 改 `--mode singlefile` 保离线内联(单块 2.71MB 不变)。preview 实测:8 页签均正常渲染、无 stuck、reactflow 点 FTA 才载(305ms)、无 console error。已知留存:FTA 三栏布局在 <~500px 视口会把 reactflow 画布挤成 0 宽(仅本工具窄预览窗可见;桌面 ≥1024px 画布 800px+ 正常)——非本改动引入,留待响应式扫尾。
-- **下一步**:Phase 5 多用户(认证 → 服务端权威 → Yjs/Loro 再评估 → 评审工作流);次优先:边界条件/后处理/CCF-per-barrier 的分析设置面板 UI(账本 #8)、真实 Anthropic 供应商联调 + 金例 Batch 首跑(需 API key)、模板迁移(docs/reference-assets/templates-eta-claude.ts)。**GitHub 远程仍待建**(CI 与 CUDD Linux 任务未激活)。
+- **Phase 4 收尾三缺口(2026-07-10)**:①**分析设置面板 UI**(4c1,`ef5b5d0`):FTA 工作台右列可折叠
+  「分析设置」= house 覆盖(边界条件)+ 割集后处理规则(互斥/删除/恢复);`quantify()` 增可选 opts,
+  ResultsPanel 加后处理段(removed/recovered + REA/MCUB,与精确顶值分列)。preview 实测:互斥规则删
+  同现割集 1 条、REA 落 1.12e-2、**精确顶值 1.364e-2 不变**(卖点守护)。②**模板迁移**(4c2,`a6592f6`):
+  前身 7 个 ETA 模板逐条迁入 `features/templates/etaTemplates.ts`+ converter +「从模板…」选择器;
+  初因溯源(initSource/initGrade/initEvidence)两层贯通——EventTreeModel + 检视器显示 + **canonical 层写入
+  频率参数 Provenance 块**(ADR-1 D4 正位,无损往返、参与哈希);模板带 consequences 建页即正确文字;
+  可见免责横幅。**domain-reviewer 首轮 FAIL**(揪出我把 LOPA 模板**杜撰**成 4 屏障/改 SIL2 vent 0.01→0.1/
+  C→D,自测因编码了杜撰值而漏检)→ 逐字复原 + 证据链两层修 + R1 展示路径修 → **复评 PASS**;缺陷#3
+  (手改值不清置信快照)与开放问题④(模板 IE 频率与 scenarios 口径差)诚实留跟进。③**AI 上线联调**
+  (4c3,`768aa1c`):管线离线全绿(FakeClient 端到端、门控、Batch 构建 6 例钉 claude-fable-5/
+  PROMPT_VERSION 2026-07-09-p1),真模型首跑 + 金例 Batch 首提为**用户持 key 的运营步**,runbook 交付
+  (`docs/design/ai-live-run-runbook.md`)。收口:fe vitest 全绿、py 240、`make check` 绿、bundle 2.73MB。
+  账本缺口 #2(house/边界)/#3(后处理)UI 落地;#8 分析设置面板成形。
+- **下一步**:Phase 5 多用户——**须先 blindspot-pass + interview-me**(认证/实时同步/CRDT 无仓库先例;
+  「并发编辑 vs 共享项目+评审工作流」的取舍决定架构量级)→ 认证 → 服务端权威 → Yjs/Loro 再评估 →
+  评审工作流。**GitHub 远程仍待建**(CI 与 CUDD Linux 任务未激活;Phase 4 全部提交仍仅在本机)。
+  背景跟进:FTA 三栏响应式(task_bee07b95)、手改值清置信快照含 IE 字段(task_7dcd9495)。
 
 ---
 
