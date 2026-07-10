@@ -29,7 +29,7 @@ export interface EtaSummary { key: string; name: string; leafCount: number; wors
  */
 export function EventTreeEditor(
   { model, onChange, linked, fts, ftsApi, pfds, onAttachFt, onDetachFt, onFtEdited, libBarriers, libComponents,
-    etaSummaries = [], aggregateTotals, onSelectEta, onToggleEta, onAddBarrier, onEditInitFt, reportContext }: {
+    etaSummaries = [], aggregateTotals, onSelectEta, onToggleEta, onAddBarrier, onEditInitFt, getReportContext }: {
     model: EventTreeModel; onChange: (m: EventTreeModel) => void; linked?: Linked
     fts?: any; ftsApi?: Api; pfds?: Record<string, number>
     onAttachFt?: (idx: number) => void; onDetachFt?: (idx: number) => void; onFtEdited?: (feId: string) => void
@@ -39,7 +39,7 @@ export function EventTreeEditor(
     onSelectEta?: (key: string) => void; onToggleEta?: (key: string) => void; onAddBarrier?: () => void
     onEditInitFt?: () => void
     /** ADR-2 报告钉扎:随导出请求提交项目上下文 → 后端 auto-pin 版本 + 案例 + 证据页脚 */
-    reportContext?: { project_uuid: string; project_payload: unknown }
+    getReportContext?: () => { project_uuid: string; project_payload: unknown }
   },
 ) {
   const [sel, setSel] = useState<string[] | null>(null)
@@ -127,7 +127,7 @@ export function EventTreeEditor(
   const onDeepen = async () => {
     setDeepBusy(true); setQErr(null)
     // 4a4:携带项目上下文 → 重要度运行自动钉扎为分析案例(证据链)
-    try { const im = await importanceEventTree({ ...toEngineRequest(model, linked), ...(reportContext ?? {}) }); setImp(im.importance) }
+    try { const im = await importanceEventTree({ ...toEngineRequest(model, linked), ...(getReportContext?.() ?? {}) }); setImp(im.importance) }
     catch (e: any) { setQErr(String(e?.message ?? e)) }
     finally { setDeepBusy(false) }
   }
@@ -141,7 +141,7 @@ export function EventTreeEditor(
         ...req, samples: 1000,
         consequence_defs: Object.fromEntries(CONSEQUENCES.map((c) => [c, consDef(model, c)])),
         labels: Object.fromEntries(model.functionalEvents.map((f) => [f.id, f.label])),
-        ...(reportContext ?? {}),                            // ADR-2:钉扎版本 + 案例 + 证据页脚
+        ...(getReportContext?.() ?? {}),                     // ADR-2:钉扎版本 + 案例 + 证据页脚(点击时惰性构造)
       }, model.initEvent, png)
     } catch (e: any) { setQErr(String(e?.message ?? e)) }
     finally { setExpBusy(false) }

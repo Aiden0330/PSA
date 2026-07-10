@@ -22,7 +22,7 @@ const C_COLOR: Record<string, string> = { C1: '#16a34a', C2: '#65a30d', C3: '#d9
 
 /** ETA 工作台:工具带 + AI 面板 + 页签行 + 编辑器 + 初始事件 FTA 模态(蓝图 §三 features/eta)。 */
 export function EtaWorkbench(
-  { lib, ai, persistence, scenarios, summaries, aggregateTotals, activeName, onError, reportContext }: {
+  { lib, ai, persistence, scenarios, summaries, aggregateTotals, activeName, onError, getReportContext }: {
     lib: LibraryData | null
     ai: AiDraftState
     persistence: ProjectPersistence
@@ -31,7 +31,7 @@ export function EtaWorkbench(
     aggregateTotals: Record<string, number>
     activeName: string
     onError: (msg: string) => void
-    reportContext?: { project_uuid: string; project_payload: unknown }
+    getReportContext?: () => { project_uuid: string; project_payload: unknown }
   },
 ) {
   const { etaTabs, activeKey, checkedKeys, etModel, etFtsModel, pfds, writeEtModel, activeEta, P, docUndo, docRedo, docCanUndo, docCanRedo } = useActiveEta()
@@ -135,7 +135,9 @@ export function EtaWorkbench(
           {scenarios.map((s) => <option key={s.id} value={'sc:' + s.id}>{s.name}</option>)}
         </select>
         <span style={{ fontSize: 12, color: 'var(--psa-muted)' }}>存档</span>
-        <select value={persistence.savedId} onChange={(e) => { if (e.target.value) persistence.loadProject(e.target.value) }} style={ribbonSelect}>
+        <select value={persistence.savedId} disabled={persistence.loading}
+          onChange={(e) => { if (e.target.value) persistence.loadProject(e.target.value) }} style={ribbonSelect}
+          title={persistence.loading ? '存档载入中…' : '选择即载入该项目存档'}>
           <option value="">—</option>
           {persistence.saved.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
@@ -217,7 +219,7 @@ export function EtaWorkbench(
             libBarriers={lib?.barrier_effectiveness ?? []} libComponents={lib?.component_failure_rates ?? []}
             etaSummaries={summaries} aggregateTotals={aggregateTotals}
             onSelectEta={selectEta} onToggleEta={onToggleEta} onAddBarrier={onAddBarrier}
-            onEditInitFt={onEditInitFt} reportContext={reportContext} />
+            onEditInitFt={onEditInitFt} getReportContext={getReportContext} />
         )}
       </div>
 

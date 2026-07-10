@@ -8,6 +8,7 @@ import { ParamLibrary } from './components/ParamLibrary'
 import { ReferenceLibrary } from './components/ReferenceLibrary'
 import { updateParam, setCcf } from './model'
 import { buildScenarioTab } from './features/persistence/scenarioLoader'
+import { ensureDefaultProject } from './features/persistence/bootstrap'
 import { useProjectPersistence } from './features/persistence/useProjectPersistence'
 import { useAiDraft } from './features/ai-draft/useAiDraft'
 import { useLibrary } from './features/library/useLibrary'
@@ -22,7 +23,6 @@ import { CommandPalette } from './features/shell/CommandPalette'
 import { useViewStore } from './stores/viewStore'
 import type { MainTab } from './stores/viewStore'
 import { useActiveEta } from './stores/useActiveEta'
-import { useProjectStore } from './stores/projectStore'
 
 const TAB_LABELS: [MainTab, string][] = [
   ['home', '总览'], ['bess', '事件树（ETA）'], ['ft', '故障树（FTA）'], ['params', '参数库 / CCF'],
@@ -48,19 +48,14 @@ export default function App() {
   const aggregateTotals = computeAggregateTotals(etaTabs, checkedKeys, etaPfds)
   const activeName = summaries.find((s) => s.active)?.name ?? 'ETA'
   const ai = useAiDraft(lib, persistence.buildPayload, activeName, persistence.projectUuid)
-  const reportContext = persistence.projectUuid
-    ? { project_uuid: persistence.projectUuid, project_payload: persistence.buildPayload() }
+  // 惰性构造:buildPayload 深拷贝全部页签,若在每次渲染时求值,编辑器每击键都全量序列化(性能坑)
+  const getReportContext = persistence.projectUuid
+    ? () => ({ project_uuid: persistence.projectUuid, project_payload: persistence.buildPayload() })
     : undefined
 
   useEffect(() => { getScenarios().then(setScenarios).catch(() => {}) }, [])
-  // 初次进入:默认级联作为第一个页签(store 已有内容则不重复载入)
-  useEffect(() => { (async () => {
-    try {
-      if (useProjectStore.getState().present.etas.length) return
-      const t = await buildScenarioTab('', '默认热失控级联')
-      useProjectStore.getState().load([t], t.key, { [t.key]: true })
-    } catch {}
-  })() }, [])
+  // 初次进入:默认级联作为第一个页签。竞态守护 + 失败兜底见 bootstrap.ts(2026-07-09 报障修复)
+  useEffect(() => { void ensureDefaultProject(setError) }, [])
   // ⌘K / Ctrl+K 命令板
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -157,7 +152,7 @@ export default function App() {
         ) : (
           <EtaWorkbench lib={lib} ai={ai} persistence={persistence} scenarios={scenarios}
             summaries={summaries} aggregateTotals={aggregateTotals} activeName={activeName}
-            onError={setError} reportContext={reportContext} />
+            onError={setError} getReportContext={getReportContext} />
         )}
       </div>
 

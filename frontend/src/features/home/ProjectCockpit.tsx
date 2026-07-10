@@ -88,6 +88,11 @@ export function ProjectCockpit(
         {/* ETA 卡片网格 */}
         <div style={{ flex: '2 1 420px', minWidth: 320 }}>
           <div style={secHead}>事件树</div>
+          {summaries.length === 0 && (
+            <div className="psa-panel" style={{ padding: 14, fontSize: 12.5, color: 'var(--psa-muted)', marginBottom: 10 }}>
+              正在载入默认场景…(若后端未就绪会自动创建空白 ETA 并在顶部提示)
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 10 }}>
             {summaries.map((s) => (
               <div key={s.key} onClick={() => openEta(s.key)} className="psa-panel" style={{ padding: 12, cursor: 'pointer', border: s.active ? '1px solid var(--psa-primary)' : undefined }}>

@@ -23,6 +23,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   const [savedId, setSavedId] = useState('')
   const [archiveLocal, setArchiveLocal] = useState(false)
   const [projectUuid, setProjectUuid] = useState('')
+  const [loading, setLoading] = useState(false)      // 读档进行中(下拉禁用,防止值回弹误导)
   const [fmeaRows, setFmeaRows] = useState<FmeaRow[]>(() => loadRows())
   const [fmeaMapping, setFmeaMapping] = useState<MappingConfig>(() => loadMapping())
 
@@ -80,14 +81,25 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     await refreshList()
   }
   // 读取项目存档:完整还原全部 ETA(替换当前所有页签)。兼容旧版单 ETA 存档。
+  // savedId 乐观置位:受控下拉在 await 期间不回弹到「—」;失败则回退并亮错。
   const loadProject = async (id: string) => {
+    const prevId = savedId
+    setSavedId(id)
+    setLoading(true)
     try {
       const proj = await loadProjectArchive(id); setArchiveLocal(wasSavedOffline())
-      if (!proj.tabs.length) return
-      setSavedId(id); setProjectUuid(proj.projectUuid ?? '')
+      if (!proj.tabs.length) {
+        setSavedId(prevId)
+        onError('该存档不含任何 ETA,未载入。')
+        return
+      }
+      setProjectUuid(proj.projectUuid ?? '')
       P().load(proj.tabs, proj.activeKey, proj.checkedKeys, proj.userFts ?? EMPTY_FTS)
       applyProjectFmea(proj)
-    } catch (e: any) { onError(String(e?.message ?? e)) }
+    } catch (e: any) {
+      setSavedId(prevId)
+      onError(`读取存档失败:${String(e?.message ?? e)}`)
+    } finally { setLoading(false) }
   }
   // 导出项目为文件(含参考库覆盖层, 离线可用)
   const onExportFile = () => {
@@ -109,11 +121,13 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   }
   const onDeleteSaved = async () => {
     if (!savedId) return
+    const name = saved.find((s) => s.id === savedId)?.name ?? savedId
+    if (!window.confirm(`删除项目存档「${name}」?存档删除不可撤销(版本库中的历史版本仍保留)。`)) return
     await deleteSaved(savedId); setSavedId(''); setProjectUuid(''); await refreshList()
   }
 
   return {
-    saved, savedId, archiveLocal, projectUuid,
+    saved, savedId, archiveLocal, projectUuid, loading,
     fmeaRows, fmeaMapping, persistFmeaRows, persistFmeaMapping,
     buildPayload, onSaveWorkspace, onSaveAs, loadProject, onExportFile, onImportFile, onDeleteSaved,
   }
