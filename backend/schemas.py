@@ -82,11 +82,18 @@ class AiDraftRequest(BaseModel):
     current_project: dict[str, Any]
     active_eta_key: Optional[str] = None
     user_context: dict[str, Any] = {}
+    project_uuid: Optional[str] = None               # 4b2:有项目上下文时生成即落 ai_drafts + 审计
+
+class AiDraftAppliedRequest(BaseModel):
+    status: Literal["applied", "rejected"] = "applied"
+    accepted: dict[str, Any] = {}                    # 逐元素接受清单(D7 ghost-diff)
+    project_uuid: Optional[str] = None
 
 class AiDraftValidation(BaseModel):
     ok: bool
     errors: list[str] = []
     warnings: list[str] = []
+    stages: Optional[dict[str, Any]] = None          # 4b1:schema/lint/dry_run 分段错误
 
 class AiDraftResponse(BaseModel):
     draft_id: str
@@ -98,3 +105,5 @@ class AiDraftResponse(BaseModel):
     traceability: list[dict[str, Any]] = []
     warnings: list[str] = []
     validation: AiDraftValidation
+    provenance: Optional[dict[str, Any]] = None      # 4b1:model_id/served_by/prompt_version/轨迹
+    ai_draft_id: Optional[int] = None                # 4b2:ai_drafts 行 id(应用回执用)

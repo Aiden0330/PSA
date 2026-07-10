@@ -354,14 +354,40 @@ def api_project_document_schema():
 
 @app.post("/api/ai/draft-model", response_model=schemas.AiDraftResponse)
 def api_ai_draft_model(req: schemas.AiDraftRequest):
-    """LLM 生成 ETA/FTA 草案。只返回待审核草案;不直接写入项目。"""
-    from backend import ai_draft
+    """LLM 生成 ETA/FTA 草案。只返回待审核草案;不直接写入项目。
+    生成即落 ai_drafts 溯源表(4b2);带 project_uuid 时并记 ai.draft 审计。"""
+    from backend import ai_draft, store
     if not ai_draft.is_enabled():
         raise HTTPException(503, "AI draft model is disabled; set PSA_AI_ENABLED=1 to enable it.")
     try:
-        return ai_draft.create_draft(req)
+        resp = ai_draft.create_draft(req)
     except ai_draft.ProviderError as e:
         raise HTTPException(502, str(e))
+    try:
+        resp["ai_draft_id"] = store.record_ai_draft(resp, req.model_dump(), req.project_uuid)
+    except Exception:
+        pass                                          # 溯源落库失败不阻断草案返回(草案本身无副作用)
+    return resp
+
+
+@app.post("/api/ai/drafts/{rid}/applied")
+def api_ai_draft_applied(rid: int, body: schemas.AiDraftAppliedRequest):
+    """4b2 应用回执:记录逐元素接受清单与状态(applied|rejected)+ ai.apply 审计。"""
+    from backend import store
+    try:
+        ok = store.mark_ai_draft_applied(rid, accepted=body.accepted,
+                                         project_uuid=body.project_uuid, status=body.status)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if not ok:
+        raise HTTPException(404, f"no ai draft {rid}")
+    return {"ok": True}
+
+
+@app.get("/api/ai/drafts")
+def api_ai_drafts(project_uuid: str | None = None, limit: int = 50):
+    from backend import store
+    return store.list_ai_drafts(project_uuid, limit=limit)
 
 # ---- 静态托管前端构建产物(存在时) ----
 _DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")

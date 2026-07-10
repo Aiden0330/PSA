@@ -55,6 +55,17 @@ CREATE TABLE IF NOT EXISTS analysis_cases(
   settings_json TEXT NOT NULL DEFAULT '{}', results_json TEXT NOT NULL DEFAULT '{}',
   artifacts_json TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL, actor TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS ai_drafts(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  draft_id TEXT NOT NULL,
+  project_uuid TEXT,
+  goal TEXT, mode TEXT, target TEXT,
+  model_id TEXT, served_by TEXT, prompt_version TEXT,
+  rounds INTEGER, tool_trace_json TEXT NOT NULL DEFAULT '[]',
+  repair_trace_json TEXT NOT NULL DEFAULT '[]',
+  draft_json TEXT NOT NULL, validation_json TEXT NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'generated' CHECK(status IN ('generated','applied','rejected')),
+  applied_json TEXT, created_at TEXT NOT NULL, applied_at TEXT, actor TEXT NOT NULL);
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit_log
   BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_log
@@ -248,4 +259,68 @@ def list_cases(puuid: str) -> list[dict]:
     with _conn() as cx:
         rows = cx.execute("SELECT * FROM analysis_cases WHERE project_uuid=?"
                           " ORDER BY id DESC", (puuid,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+# ── ADR-3 ai_drafts:AI 生成溯源(4b2)──
+
+def record_ai_draft(response: dict, req: dict, project_uuid: str | None = None) -> int:
+    """落库一次生成:草案全文 + 校验结果 + 模型/提示词/工具/修复轨迹。返回行 id。
+    有项目上下文时记 ai.draft 审计。"""
+    prov = response.get("provenance") or {}
+    with _conn() as cx:
+        cur = cx.execute(
+            "INSERT INTO ai_drafts(draft_id, project_uuid, goal, mode, target, model_id, served_by,"
+            " prompt_version, rounds, tool_trace_json, repair_trace_json, draft_json, validation_json,"
+            " created_at, actor) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (response.get("draft_id", ""), project_uuid, req.get("goal"),
+             (req.get("user_context") or {}).get("mode"), req.get("target"),
+             prov.get("model_id"), prov.get("served_by"), prov.get("prompt_version"),
+             prov.get("rounds"), json.dumps(prov.get("tool_trace", []), ensure_ascii=False),
+             json.dumps(prov.get("repair_trace", []), ensure_ascii=False),
+             json.dumps(response, ensure_ascii=False),
+             json.dumps(response.get("validation", {}), ensure_ascii=False),
+             _now(), actor()))
+        rid = int(cur.lastrowid)
+        if project_uuid:
+            record_audit(cx, "ai.draft", project_uuid=project_uuid,
+                         details={"ai_draft_row": rid, "draft_id": response.get("draft_id", ""),
+                                  "model_id": prov.get("model_id"), "served_by": prov.get("served_by"),
+                                  "prompt_version": prov.get("prompt_version")})
+        cx.commit()
+        return rid
+
+
+def mark_ai_draft_applied(row_id: int, accepted: dict | None = None,
+                          project_uuid: str | None = None, status: str = "applied") -> bool:
+    """记录应用/拒绝结果(逐元素接受清单入 applied_json);有项目上下文时记 ai.apply 审计。"""
+    if status not in ("applied", "rejected"):
+        raise ValueError("status must be applied|rejected")
+    with _conn() as cx:
+        cur = cx.execute(
+            "UPDATE ai_drafts SET status=?, applied_json=?, applied_at=?,"
+            " project_uuid=COALESCE(?, project_uuid) WHERE id=?",
+            (status, json.dumps(accepted or {}, ensure_ascii=False), _now(), project_uuid, row_id))
+        if cur.rowcount == 0:
+            return False
+        pu = project_uuid or (cx.execute("SELECT project_uuid FROM ai_drafts WHERE id=?",
+                                         (row_id,)).fetchone() or {"project_uuid": None})["project_uuid"]
+        if pu:
+            record_audit(cx, "ai.apply" if status == "applied" else "ai.reject",
+                         project_uuid=pu, details={"ai_draft_row": row_id, "accepted": accepted or {}})
+        cx.commit()
+        return True
+
+
+def list_ai_drafts(project_uuid: str | None = None, limit: int = 50) -> list[dict]:
+    with _conn() as cx:
+        if project_uuid:
+            rows = cx.execute("SELECT id, draft_id, project_uuid, goal, mode, target, model_id,"
+                              " served_by, prompt_version, rounds, status, created_at, applied_at"
+                              " FROM ai_drafts WHERE project_uuid=? ORDER BY id DESC LIMIT ?",
+                              (project_uuid, limit)).fetchall()
+        else:
+            rows = cx.execute("SELECT id, draft_id, project_uuid, goal, mode, target, model_id,"
+                              " served_by, prompt_version, rounds, status, created_at, applied_at"
+                              " FROM ai_drafts ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         return [dict(r) for r in rows]
