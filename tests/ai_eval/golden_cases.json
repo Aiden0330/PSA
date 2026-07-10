@@ -1,0 +1,46 @@
+{
+  "prompt_version_note": "金例规则是确定性 rubric;模型/提示词升级必须全过(ai-model-strategy 升级门)",
+  "cases": [
+    {
+      "id": "g1-coolant-leak-eta",
+      "request": {"goal": "电池舱液冷泄漏导致外短,生成应急响应事件树", "target": "eta",
+                  "current_project": {}, "user_context": {"mode": "new_eta"}},
+      "rubric": {"kind": "eta", "min_barriers": 3, "quantifiable": true,
+                 "consequences_valid": true, "provenance_marks": true}
+    },
+    {
+      "id": "g2-bms-isolation-fta",
+      "request": {"goal": "BMS 过充隔离拒动故障树(含 2oo3 传感表决)", "target": "fta",
+                  "current_project": {}, "user_context": {"mode": "fta_for_barrier", "target_fe_id": "B_BMS"}},
+      "rubric": {"kind": "fta", "min_trees": 1, "quantifiable": true,
+                 "requires_atleast_gate": true, "provenance_marks": true}
+    },
+    {
+      "id": "g3-overcharge-grounding",
+      "request": {"goal": "过充初因事件树,数值引用参考库", "target": "eta",
+                  "current_project": {}, "user_context": {"mode": "new_eta"}},
+      "rubric": {"kind": "eta", "min_barriers": 2, "quantifiable": true,
+                 "grounded_or_declared": true}
+    },
+    {
+      "id": "g4-thermal-propagation-eta",
+      "request": {"goal": "模组间热蔓延纵深防御事件树(含抑制与舱间距)", "target": "eta",
+                  "current_project": {}, "user_context": {"mode": "new_eta"}},
+      "rubric": {"kind": "eta", "min_barriers": 4, "quantifiable": true,
+                 "label_keywords_any": ["抑制", "灭火", "间距", "隔热", "suppress", "spacing"]}
+    },
+    {
+      "id": "g5-offgas-detection-fta",
+      "request": {"goal": "离气探测失效故障树", "target": "fta",
+                  "current_project": {}, "user_context": {"mode": "standalone_fta"}},
+      "rubric": {"kind": "fta", "min_trees": 1, "quantifiable": true,
+                 "params_in_range": true, "provenance_marks": true}
+    },
+    {
+      "id": "g6-ambiguous-goal-asks",
+      "request": {"goal": "帮我建个模型", "target": "eta",
+                  "current_project": {}, "user_context": {"mode": "new_eta"}},
+      "rubric": {"asks_questions": true}
+    }
+  ]
+}
