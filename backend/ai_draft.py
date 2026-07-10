@@ -330,11 +330,20 @@ def validate_draft(draft: dict[str, Any]) -> dict[str, Any]:
     return {"ok": not errors, "errors": errors, "warnings": warnings}
 
 
-def create_draft(req: schemas.AiDraftRequest) -> dict[str, Any]:
-    raw = call_provider(req)
-    draft, errors = _coerce_payload(raw)
-    if errors or draft is None:
-        return _empty_response(errors, raw)
+def create_draft(req: schemas.AiDraftRequest, client: Any | None = None) -> dict[str, Any]:
+    """ADR-3 管线:client(可注入)生成 → schema 校验 → 领域 lint → 引擎试运行;
+    支持修复的客户端(anthropic)在 generate_draft 内按错误迭代 ≤3 轮。
+    响应恒带 provenance(model_id/served_by/prompt_version/rounds/tool_trace/repair_trace)。"""
+    from backend.ai_pipeline import dry_run_draft, generate_draft, library_id_set, resolve_client
+    from backend.canonical.lint import lint_draft
+
+    payload = _request_payload(req)
+    cl = client or resolve_client(req)
+    draft, provenance = generate_draft(payload, cl)
+    if draft is None:
+        resp = _empty_response(provenance["repair_trace"][-1]["errors"] if provenance.get("repair_trace") else ["生成失败"])
+        resp["provenance"] = provenance
+        return resp
 
     response = {
         "draft_id": str(draft.get("draft_id") or f"ai-{uuid.uuid4().hex[:8]}"),
@@ -346,8 +355,17 @@ def create_draft(req: schemas.AiDraftRequest) -> dict[str, Any]:
         "traceability": draft.get("traceability") if isinstance(draft.get("traceability"), list) else [],
         "warnings": [str(x) for x in draft.get("warnings", []) if isinstance(x, (str, int, float))],
     }
-    validation = validate_draft(response)
+    schema_v = validate_draft(response)
+    lint = lint_draft(response, library_id_set())
+    errors = schema_v["errors"] + lint["errors"]
+    stages = {"schema": schema_v["errors"], "lint": lint["errors"], "dry_run": []}
+    if not errors:                                   # 结构与域规则过关后才喂引擎
+        stages["dry_run"] = dry_run_draft(response)
+        errors = errors + stages["dry_run"]
+    validation = {"ok": not errors, "errors": errors,
+                  "warnings": schema_v["warnings"] + lint["warnings"], "stages": stages}
     response["validation"] = validation
     if validation["warnings"]:
         response["warnings"] = response["warnings"] + validation["warnings"]
+    response["provenance"] = provenance
     return response
