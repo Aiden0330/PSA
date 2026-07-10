@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { EventTreeModel } from '../eventtree'
 import {
   addFe, layout, toEngineRequest, CONSEQUENCES,
   consequenceTotals, consLevel, consDef, reorderFe, isCascade, gradeLabel,
 } from '../eventtree'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { BarrierFtModal } from './BarrierFtModal'
 import { RiskMatrix } from './RiskMatrix'
 import { RiskSummary } from './RiskSummary'
 import { SequencePaths } from './SequencePaths'
@@ -18,6 +17,9 @@ import { EtInspector } from './eta/EtInspector'
 import { EtKpiStrip } from './eta/EtKpiStrip'
 import { EtaSummaryList } from './eta/EtaSummaryList'
 import type { SeqRow } from './eta/types'
+
+// 懒加载:reactflow 只随故障树画布进入,ETA 关键路径不解析它(性能报障修复 2026-07-09)
+const BarrierFtModal = lazy(() => import('./BarrierFtModal').then((m) => ({ default: m.BarrierFtModal })))
 
 interface Linked { fault_trees: any[]; parameters: any[]; ccf_groups?: any[] }
 interface Api { set: (m: any) => void; undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean }
@@ -264,8 +266,10 @@ export function EventTreeEditor(
       />
 
       {editingFt && fts && ftsApi && (
-        <BarrierFtModal model={fts} ftName={editingFt} api={ftsApi} pfd={pfds?.[editingFt]} libComponents={libComponents}
-          onClose={() => { const id = editingFt; setEditingFt(null); onFtEdited?.(id) }} />
+        <Suspense fallback={null}>
+          <BarrierFtModal model={fts} ftName={editingFt} api={ftsApi} pfd={pfds?.[editingFt]} libComponents={libComponents}
+            onClose={() => { const id = editingFt; setEditingFt(null); onFtEdited?.(id) }} />
+        </Suspense>
       )}
     </div>
   )

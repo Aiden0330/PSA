@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "bundle": "vite build && node scripts/inline-html.mjs",
+    "bundle": "vite build --mode singlefile && node scripts/inline-html.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run"

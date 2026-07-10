@@ -1,11 +1,7 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { getScenarios } from './api'
 import type { ScenarioItem } from './api'
-import { ConsequencesTab } from './components/ConsequencesTab'
-import { FmeaWorkbench } from './components/FmeaWorkbench'
-import { ParamLibrary } from './components/ParamLibrary'
-import { ReferenceLibrary } from './components/ReferenceLibrary'
 import { updateParam, setCcf } from './model'
 import { buildScenarioTab } from './features/persistence/scenarioLoader'
 import { ensureDefaultProject } from './features/persistence/bootstrap'
@@ -13,16 +9,27 @@ import { useProjectPersistence } from './features/persistence/useProjectPersiste
 import { useAiDraft } from './features/ai-draft/useAiDraft'
 import { useLibrary } from './features/library/useLibrary'
 import { useExampleModel } from './features/fta/useExampleModel'
-import { FtaWorkbench } from './features/fta/FtaWorkbench'
 import { EtaWorkbench } from './features/eta/EtaWorkbench'
 import { computeSummaries, computeAggregateTotals } from './features/eta/summaries'
 import { ProjectCockpit } from './features/home/ProjectCockpit'
-import { ReportDossier } from './features/report/ReportDossier'
 import { ProjectDrawer } from './features/shell/ProjectDrawer'
 import { CommandPalette } from './features/shell/CommandPalette'
 import { useViewStore } from './stores/viewStore'
 import type { MainTab } from './stores/viewStore'
 import { useActiveEta } from './stores/useActiveEta'
+
+// 启动关键路径(总览/ETA)不携带重库:FTA(reactflow)、参数库/FMEA(ag-grid)、
+// 结果图(echarts)等页签按需分块加载 —— 新窗口只解析 ETA 所需代码(性能报障修复 2026-07-09)
+const FtaWorkbench = lazy(() => import('./features/fta/FtaWorkbench').then((m) => ({ default: m.FtaWorkbench })))
+const ParamLibrary = lazy(() => import('./components/ParamLibrary').then((m) => ({ default: m.ParamLibrary })))
+const ReferenceLibrary = lazy(() => import('./components/ReferenceLibrary').then((m) => ({ default: m.ReferenceLibrary })))
+const FmeaWorkbench = lazy(() => import('./components/FmeaWorkbench').then((m) => ({ default: m.FmeaWorkbench })))
+const ConsequencesTab = lazy(() => import('./components/ConsequencesTab').then((m) => ({ default: m.ConsequencesTab })))
+const ReportDossier = lazy(() => import('./features/report/ReportDossier').then((m) => ({ default: m.ReportDossier })))
+
+function TabFallback() {
+  return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--psa-faint)', fontSize: 13, background: '#fff' }}>载入模块…</div>
+}
 
 const TAB_LABELS: [MainTab, string][] = [
   ['home', '总览'], ['bess', '事件树（ETA）'], ['ft', '故障树（FTA）'], ['params', '参数库 / CCF'],
@@ -116,6 +123,8 @@ export default function App() {
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
         <ProjectDrawer persistence={persistence} />
+        {/* 懒页签统一挂起点:总览/ETA 为即时组件,其余页签首次进入时按需拉块 */}
+        <Suspense fallback={<TabFallback />}>
         {tab === 'home' ? (
           <ProjectCockpit summaries={summaries} aggregateTotals={aggregateTotals} scenarios={scenarios} persistence={persistence} onOpenScenario={openScenario} />
         ) : tab === 'ft' ? (
@@ -154,6 +163,7 @@ export default function App() {
             summaries={summaries} aggregateTotals={aggregateTotals} activeName={activeName}
             onError={setError} getReportContext={getReportContext} />
         )}
+        </Suspense>
       </div>
 
       <footer className="psa-statusbar">

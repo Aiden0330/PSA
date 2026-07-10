@@ -1,10 +1,9 @@
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { quantify } from '../../api'
 import type { ScenarioItem, LibraryData } from '../../api'
 import { EventTreeEditor } from '../../components/EventTreeEditor'
 import type { EtaSummary } from '../../components/EventTreeEditor'
-import { BarrierFtModal } from '../../components/BarrierFtModal'
 import { AiDraftPanel } from '../../components/AiDraftPanel'
 import { Icon } from '../../components/icons'
 import { newBlankEta, addFe, branchLeaf, setConsequence, CONSEQUENCES, consLevel } from '../../eventtree'
@@ -17,6 +16,8 @@ import { EMPTY_FTS } from '../../stores/projectStore'
 import { AiAppliedPill } from '../ai-draft/AiAppliedPill'
 import type { AiDraftState } from '../ai-draft/useAiDraft'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
+
+const BarrierFtModal = lazy(() => import('../../components/BarrierFtModal').then((m) => ({ default: m.BarrierFtModal })))
 
 const C_COLOR: Record<string, string> = { C1: '#16a34a', C2: '#65a30d', C3: '#d97706', C4: '#ea580c', C5: '#dc2626' }
 
@@ -225,14 +226,16 @@ export function EtaWorkbench(
 
       {/* 初始事件 FTA 模态 */}
       {initFtOpen && activeEta && (
-        <BarrierFtModal
-          model={etFtsModel}
-          ftName="__init__"
-          api={{ set: (m) => P().setEtaFts(activeKey, m), undo: docUndo, redo: docRedo, canUndo: docCanUndo, canRedo: docCanRedo }}
-          pfd={etModel?.initFreq}
-          libComponents={lib?.component_failure_rates ?? []}
-          onClose={onInitFtClose}
-        />
+        <Suspense fallback={null}>
+          <BarrierFtModal
+            model={etFtsModel}
+            ftName="__init__"
+            api={{ set: (m) => P().setEtaFts(activeKey, m), undo: docUndo, redo: docRedo, canUndo: docCanUndo, canRedo: docCanRedo }}
+            pfd={etModel?.initFreq}
+            libComponents={lib?.component_failure_rates ?? []}
+            onClose={onInitFtClose}
+          />
+        </Suspense>
       )}
     </div>
   )
