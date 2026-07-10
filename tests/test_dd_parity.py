@@ -54,3 +54,36 @@ def test_dd_backend_kofn(backend):
         return x
     q = {"a": 0.1, "b": 0.2, "c": 0.3}
     assert abs(_prob(backend, g(), q) - _prob("python", g(), q)) < 1e-12
+
+
+# ── 非相干函数对拍(engine-reviewer 2026-07-09:dd 适配器补标记缺陷的锁定测试)──
+# dd 的 Function.high/.low 不传播补标记;修复前 NOT/XOR/成功分支形状在 dd 后端
+# 概率静默出错(NOT x, p=0.2 曾给 0.2 而非 0.8)。python 内核(无补边)始终正确。
+
+def _pdag_not() -> PDAG:
+    g = PDAG(); g.basic("a"); g.basic("b"); g.basic("c")
+    g.gate("T", Op.NOT, ["a"]); g.top = "T"
+    return g
+
+
+def _pdag_success_branch() -> PDAG:
+    # AND(a, NOT b):事件树成功分支的最小形状
+    g = PDAG(); g.basic("a"); g.basic("b"); g.basic("c")
+    g.gate("nb", Op.NOT, ["b"]); g.gate("T", Op.AND, ["a", "nb"]); g.top = "T"
+    return g
+
+
+def _pdag_xor() -> PDAG:
+    g = PDAG(); g.basic("a"); g.basic("b"); g.basic("c")
+    g.gate("T", Op.XOR, ["a", "b"]); g.top = "T"
+    return g
+
+
+@pytest.mark.parametrize("backend", ["autoref", "cudd"])
+def test_dd_backend_noncoherent_matches_python(backend):
+    pytest.importorskip("dd." + backend)
+    q = {"a": 0.3, "b": 0.5, "c": 0.05}
+    for build, closed in ((_pdag_not, 1 - 0.3), (_pdag_success_branch, 0.3 * 0.5), (_pdag_xor, 0.3 * 0.5 + 0.7 * 0.5)):
+        ref = _prob("python", build(), q)
+        assert abs(ref - closed) < 1e-12                      # python 内核对闭式
+        assert abs(_prob(backend, build(), q) - ref) < 1e-12  # dd 后端对 python

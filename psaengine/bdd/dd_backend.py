@@ -61,7 +61,11 @@ class DdBddManager:
     def cofactor(self, h, var_index: int, val: int):
         if h.var is None or self.var_index[h.var] != var_index:
             return h
-        return h.high if val == 1 else h.low
+        child = h.high if val == 1 else h.low
+        # dd 的 Function.high/.low 返回**正则节点**的裸子节点,不携带父指针的补标记:
+        # f = ¬g 时 f|_x = ¬(g|_x),必须手动传播,否则非相干函数(NOT/XOR/成功分支)
+        # 概率静默出错(engine-reviewer 2026-07-09 真值表模糊测试发现)
+        return ~child if h.negated else child
 
     def var_name(self, var_index: int) -> str:
         return self.var_order[var_index]
