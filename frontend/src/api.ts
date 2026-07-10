@@ -187,6 +187,15 @@ export interface CaseInfo { id: number; version_id: number; kind: string; engine
 export const listProjects = () => jget<ProjectInfo[]>('/projects')
 export const listProjectVersions = (uuid: string) => jget<VersionInfo[]>(`/projects/${uuid}/versions`)
 export const listProjectCases = (uuid: string) => jget<CaseInfo[]>(`/projects/${uuid}/cases`)
+export interface DiffChange { op: 'added' | 'removed' | 'changed'; path: string; from?: unknown; to?: unknown }
+export interface VersionDiff {
+  from: { id: number; content_hash: string }
+  to: { id: number; content_hash: string }
+  changes: DiffChange[]
+  summary: { added: number; removed: number; changed: number }
+}
+export const diffProjectVersions = (uuid: string, from: number, to: number) =>
+  jget<VersionDiff>(`/projects/${uuid}/diff?from=${from}&to=${to}`)
 
 export async function importMef(xml: string): Promise<{ model: any; fault_tree: string }> {
   const r = await fetch(`${BASE}/import/mef`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ xml }) })

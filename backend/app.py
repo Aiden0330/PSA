@@ -1,6 +1,6 @@
 from __future__ import annotations
 import os
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -316,6 +316,24 @@ def api_project_version(puuid: str, vid: int, include_doc: bool = False):
     if v is None:
         raise HTTPException(404, f"no version {vid} in project {puuid}")
     return v
+
+@app.get("/api/projects/{puuid}/diff")
+def api_project_diff(puuid: str, frm: int = Query(alias="from"), to: int = Query()):
+    """4a5 模型版本对比(parity #5):canonical 文档结构化 diff,列表按身份键对齐。"""
+    from backend import store
+    from backend.diff import diff_documents
+    raws = {}
+    for label, vid in (("from", frm), ("to", to)):
+        raw = store.get_version_raw(puuid, vid)
+        if raw is None:
+            raise HTTPException(404, f"no version {vid} in project {puuid}")
+        raws[label] = raw[0]
+    vs = {v["id"]: v for v in store.list_versions(puuid)}
+    return {
+        "from": {"id": frm, "content_hash": vs[frm]["content_hash"]},
+        "to": {"id": to, "content_hash": vs[to]["content_hash"]},
+        **diff_documents(raws["from"], raws["to"]),
+    }
 
 @app.get("/api/projects/{puuid}/audit")
 def api_project_audit(puuid: str, limit: int = 200):

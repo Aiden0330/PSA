@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { exportReport, listProjectCases, listProjectVersions } from '../../api'
-import type { CaseInfo, VersionInfo } from '../../api'
+import { diffProjectVersions, exportReport, listProjectCases, listProjectVersions } from '../../api'
+import type { CaseInfo, VersionDiff, VersionInfo } from '../../api'
 import { Icon } from '../../components/icons'
 import { CONSEQUENCES, consDef, toEngineRequest } from '../../eventtree'
 import { useActiveEta } from '../../stores/useActiveEta'
@@ -49,6 +49,31 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
   const versionByCase = (c: CaseInfo) => versions.find((v) => v.id === c.version_id)
   const artifacts = (c: CaseInfo): { format?: string; sha256?: string } => {
     try { return typeof c.artifacts_json === 'string' ? JSON.parse(c.artifacts_json) : (c.artifacts_json ?? {}) } catch { return {} }
+  }
+
+  // ── 4a5 版本对比(parity #5)──
+  const byIdDesc = [...versions].sort((a, b) => b.id - a.id)
+  const [fromV, setFromV] = useState<number | ''>('')
+  const [toV, setToV] = useState<number | ''>('')
+  const [diff, setDiff] = useState<VersionDiff | null>(null)
+  const [diffBusy, setDiffBusy] = useState(false)
+  useEffect(() => {
+    // 默认对比:最近两个版本
+    if (byIdDesc.length >= 2) { setToV(byIdDesc[0].id); setFromV(byIdDesc[1].id) }
+    else { setToV(''); setFromV('') }
+    setDiff(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versions.length, pu])
+  const onDiff = async () => {
+    if (!pu || fromV === '' || toV === '') return
+    setDiffBusy(true); setErr(null)
+    try { setDiff(await diffProjectVersions(pu, Number(fromV), Number(toV))) }
+    catch (e: any) { setErr(String(e?.message ?? e)) }
+    finally { setDiffBusy(false) }
+  }
+  const fmtVal = (v: unknown) => {
+    const s = typeof v === 'string' ? v : JSON.stringify(v)
+    return s !== undefined && s.length > 60 ? s.slice(0, 60) + '…' : s
   }
 
   return (
@@ -124,6 +149,56 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
                   <span style={{ marginLeft: 'auto', fontFamily: mono, fontSize: 10.5, color: 'var(--psa-faint)' }}>{v.created_at.slice(0, 19).replace('T', ' ')}</span>
                 </div>
               ))
+            )}
+          </div>
+
+          {/* 4a5 版本对比(仿 RiskSpectrum Model Compare) */}
+          <div style={{ ...secHead, marginTop: 16 }}>版本对比</div>
+          <div className="psa-panel" style={{ padding: 10 }}>
+            {byIdDesc.length < 2 ? (
+              <div style={{ fontSize: 12, color: 'var(--psa-muted)' }}>需要至少两个版本。</div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                  <select value={fromV} onChange={(e) => setFromV(Number(e.target.value))} style={{ fontSize: 12 }}>
+                    {byIdDesc.map((v) => <option key={v.id} value={v.id}>{v.content_hash.slice(0, 8)} · v{v.id}</option>)}
+                  </select>
+                  <span style={{ color: 'var(--psa-faint)', fontSize: 12 }}>→</span>
+                  <select value={toV} onChange={(e) => setToV(Number(e.target.value))} style={{ fontSize: 12 }}>
+                    {byIdDesc.map((v) => <option key={v.id} value={v.id}>{v.content_hash.slice(0, 8)} · v{v.id}</option>)}
+                  </select>
+                  <button className="psa-btn psa-btn--primary" onClick={onDiff} disabled={diffBusy || fromV === '' || toV === ''}>
+                    {diffBusy ? '对比中…' : '对比'}
+                  </button>
+                  {diff && (
+                    <span style={{ fontSize: 11.5, color: 'var(--psa-muted)' }}>
+                      +{diff.summary.added} · −{diff.summary.removed} · ~{diff.summary.changed}
+                    </span>
+                  )}
+                </div>
+                {diff && (diff.changes.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--psa-muted)' }}>两版本内容一致。</div>
+                ) : (
+                  <div style={{ maxHeight: 280, overflowY: 'auto', fontSize: 11.5 }}>
+                    {diff.changes.slice(0, 200).map((c, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 8, padding: '4px 6px', borderBottom: '1px solid var(--psa-line)', alignItems: 'baseline' }}>
+                        <span style={{ ...badge, background: c.op === 'added' ? 'rgba(22,163,74,.12)' : c.op === 'removed' ? 'var(--psa-danger-soft)' : 'var(--psa-primary-soft)', color: c.op === 'added' ? 'var(--psa-ok)' : c.op === 'removed' ? 'var(--psa-danger-strong)' : 'var(--psa-primary-strong)', flexShrink: 0 }}>
+                          {c.op === 'added' ? '增' : c.op === 'removed' ? '删' : '改'}
+                        </span>
+                        <span style={{ fontFamily: mono, fontSize: 10.5, color: 'var(--psa-ink-2)', wordBreak: 'break-all' }}>{c.path}</span>
+                        {c.op === 'changed' && (
+                          <span style={{ marginLeft: 'auto', fontFamily: mono, fontSize: 10.5, color: 'var(--psa-faint)', flexShrink: 0 }}>
+                            {fmtVal(c.from)} → {fmtVal(c.to)}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    {diff.changes.length > 200 && (
+                      <div style={{ padding: 6, color: 'var(--psa-faint)' }}>…共 {diff.changes.length} 条,仅显示前 200</div>
+                    )}
+                  </div>
+                ))}
+              </>
             )}
           </div>
         </div>
