@@ -35,6 +35,7 @@
   ⑨**ghost-diff 逐元素接受(D7)**(61336d4):draftElements/filterDraftByAcceptance(拒屏障=delFe 折叠、拒树连独占参数剔除)、AiDraftPanel 幽灵清单(虚线半透明+划线拒绝+父子置灰)+ 溯源行、应用即回执。
   ⑩**金例评测门**(0c54f13):6 个 BESS 域金例 + 确定性 rubric(结构/可量化/接地声明/含糊必问)+ 本地 run_cases 走全管线 + **Batch API CLI**(`python -m backend.ai_eval submit|status|fetch`,custom_id 携带 PROMPT_VERSION 2026-07-09-p1)= 模型/提示词升级门。
   收口:py **239**(0 skipped)、fe **190**、benchmark 24/24、`make check` 绿、bundle 2.71MB;preview 实测版本对比与驾驶舱。
+- **UX 报障收口(2026-07-10)**:①**默认 ETA 不显示/存档不加载**——早于本轮已在 `1d03d36` 修(bootstrap 竞态覆盖用户内容、静默失败死路、archive-select 回弹);本轮 preview 复验通过(总览落地即含 1 个引导 ETA、ETA 页直出树 55 文本节点/7 序列、无需「+」;存档下拉重载后可加载,footer 带项目 UUID)。②**新窗口加载慢**(`c893550`):根因 = dev server 首个请求触发 esbuild 依赖优化 + 整页刷新(~18s),且 ETA 关键路径**急切**导入 reactflow(≈1MB/FtaWorkbench)、ag-grid(≈900KB/ParamLibrary·FMEA)。修:`optimizeDeps.include` 启动即预打包(Vite ready 108ms、ETA 页 <100ms 出树);`React.lazy`+Suspense 拆分 FTA/参数库/参考库/FMEA/后果/报告/BarrierFtModal(ETA 关键路径仅 340KB 主块,reactflow/ag-grid 点击对应页签才拉);`bundle` 改 `--mode singlefile` 保离线内联(单块 2.71MB 不变)。preview 实测:8 页签均正常渲染、无 stuck、reactflow 点 FTA 才载(305ms)、无 console error。已知留存:FTA 三栏布局在 <~500px 视口会把 reactflow 画布挤成 0 宽(仅本工具窄预览窗可见;桌面 ≥1024px 画布 800px+ 正常)——非本改动引入,留待响应式扫尾。
 - **下一步**:Phase 5 多用户(认证 → 服务端权威 → Yjs/Loro 再评估 → 评审工作流);次优先:边界条件/后处理/CCF-per-barrier 的分析设置面板 UI(账本 #8)、真实 Anthropic 供应商联调 + 金例 Batch 首跑(需 API key)、模板迁移(docs/reference-assets/templates-eta-claude.ts)。**GitHub 远程仍待建**(CI 与 CUDD Linux 任务未激活)。
 
 ---
