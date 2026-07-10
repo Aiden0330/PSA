@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import type { AiApplyMode, AiDraftResponse } from '../aiDraft'
+import type { AiApplyMode, AiDraftResponse, DraftElement } from '../aiDraft'
 import type { FuncEvent } from '../eventtree'
 import { Icon } from './icons'
 
@@ -19,6 +19,10 @@ interface AiDraftPanelProps {
   onGenerate: () => void
   onApply: () => void
   onClose: () => void
+  /** D7 ghost-diff:草案元素清单 + 接受集(缺省 = 不渲染逐元素区) */
+  elements?: DraftElement[]
+  acceptedIds?: string[]
+  onToggleElement?: (id: string) => void
 }
 
 const modeOptions: { mode: AiApplyMode; label: string }[] = [
@@ -67,6 +71,9 @@ export function AiDraftPanel({
   onGenerate,
   onApply,
   onClose,
+  elements = [],
+  acceptedIds = [],
+  onToggleElement,
 }: AiDraftPanelProps) {
   const warnings = draft ? [...(draft.warnings ?? []), ...(draft.validation?.warnings ?? [])] : []
   const errors = draft?.validation?.errors ?? []
@@ -82,7 +89,10 @@ export function AiDraftPanel({
     : mode === 'fta_for_barrier' || mode === 'standalone_fta'
       ? ftCount > 0
       : etaCount > 0
+  const accepted = new Set(acceptedIds)
   const canApply = !!draft?.validation?.ok && hasExpectedContent
+    && (elements.length === 0 || acceptedIds.length > 0)
+  const prov = draft?.provenance
 
   return (
     <section style={panel}>
@@ -182,6 +192,38 @@ export function AiDraftPanel({
                         : (etaCount > 0 ? `应用后将新增并切换到 ETA 页签: ${firstName(etaNames, 'AI ETA')}` : '应用前需要返回至少一个 ETA 草案。')}
                 </div>
               </div>
+              {/* D7 ghost-diff:逐元素接受清单(虚线幽灵样式;取消勾选 = 该元素不落地) */}
+              {elements.length > 0 && onToggleElement && (
+                <div style={ghostBox}>
+                  <div style={ghostHead}>
+                    草案元素(逐个接受)
+                    <span style={{ marginLeft: 'auto', fontWeight: 400, color: 'var(--psa-faint)' }}>
+                      {acceptedIds.length}/{elements.length} 已接受
+                    </span>
+                  </div>
+                  {elements.map((el) => {
+                    const on = accepted.has(el.id)
+                    const parentOff = el.parent ? !accepted.has(el.parent) : false
+                    return (
+                      <label key={el.id} style={{ ...ghostRow(on), marginLeft: el.parent ? 18 : 0, opacity: parentOff ? 0.35 : on ? 1 : 0.55 }}>
+                        <input type="checkbox" checked={on} disabled={parentOff}
+                          onChange={() => onToggleElement(el.id)} />
+                        <span style={ghostKind}>{el.kind === 'eta' ? 'ETA' : el.kind === 'barrier' ? '屏障' : 'FTA'}</span>
+                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{el.label}</span>
+                        {el.detail && <span style={{ marginLeft: 'auto', fontFamily: 'var(--psa-font-mono)', fontSize: 10.5, color: 'var(--psa-faint)', flexShrink: 0 }}>{el.detail}</span>}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+              {prov && (
+                <div style={provLine} title="AI 生成溯源(记入 ai_drafts 表与审计)">
+                  溯源:{prov.model_id ?? '—'}{prov.served_by && prov.served_by !== prov.model_id ? ` → ${prov.served_by}(服务端回退)` : ''}
+                  {prov.prompt_version ? ` · 提示词 ${prov.prompt_version}` : ''}
+                  {prov.rounds ? ` · ${prov.rounds} 轮` : ''}
+                  {prov.tool_trace?.length ? ` · 工具 ${prov.tool_trace.length} 次` : ''}
+                </div>
+              )}
               <ReadOnlyDraftPreview draft={draft} />
               {errors.length > 0 && <ListBlock title="校验错误" items={errors} tone="danger" />}
               {draft.assumptions?.length > 0 && <ListBlock title="假设" items={draft.assumptions} />}
@@ -293,6 +335,13 @@ function ListBlock({ title, items, tone }: { title: string; items: string[]; ton
     </div>
   )
 }
+
+// D7 ghost 样式:虚线边 + 半透明 = "尚未落地"的视觉语言
+const ghostBox: CSSProperties = { border: '1.5px dashed var(--psa-primary)', borderRadius: 8, padding: '8px 10px', background: 'var(--psa-primary-soft)', display: 'flex', flexDirection: 'column', gap: 4 }
+const ghostHead: CSSProperties = { display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 700, color: 'var(--psa-primary-strong)', marginBottom: 2 }
+const ghostRow = (on: boolean): CSSProperties => ({ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--psa-ink)', cursor: 'pointer', padding: '3px 6px', borderRadius: 5, border: `1px dashed ${on ? 'rgba(37,99,235,.35)' : 'var(--psa-line-2)'}`, background: on ? 'rgba(255,255,255,.6)' : 'transparent', textDecoration: on ? 'none' : 'line-through' })
+const ghostKind: CSSProperties = { flexShrink: 0, fontSize: 10, fontWeight: 700, color: 'var(--psa-primary-strong)', border: '1px solid rgba(37,99,235,.25)', borderRadius: 4, padding: '0 4px', background: 'var(--psa-surface)' }
+const provLine: CSSProperties = { fontSize: 11, color: 'var(--psa-faint)', fontFamily: 'var(--psa-font-mono)', padding: '2px 2px 0' }
 
 const panel: CSSProperties = {
   position: 'fixed',

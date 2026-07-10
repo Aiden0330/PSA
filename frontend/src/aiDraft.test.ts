@@ -142,3 +142,81 @@ describe('applyAiDraftToProject', () => {
     expect(result.userFts.fault_trees.map((f) => f.name)).toEqual(['AI_SENSOR_FT', 'AI_SENSOR_FT_2'])
   })
 })
+
+// ── D7 ghost-diff:元素清单 + 逐元素接受(4b3)──
+import { draftElements, filterDraftByAcceptance } from './aiDraft'
+
+function seqDraft(): AiDraftResponse {
+  return {
+    draft_id: 'd', summary: '', assumptions: [], questions: [], traceability: [], warnings: [],
+    validation: { ok: true, errors: [], warnings: [] },
+    fts: { model_data: { parameters: [] }, fault_trees: [] },
+    etas: [{
+      key: 'x', name: '草案ETA', renamed: false, pfds: {},
+      fts: { model_data: { parameters: [] }, fault_trees: [] },
+      model: {
+        initEvent: 'IE', initFreq: 1e-3,
+        functionalEvents: [
+          { id: 'B1', label: '屏障一', failProb: 0.1 },
+          { id: 'B2', label: '屏障二', failProb: 0.2 },
+        ],
+        root: {
+          kind: 'branch', feId: 'B1',
+          success: { kind: 'leaf', consequence: 'C1' },
+          failure: {
+            kind: 'branch', feId: 'B2',
+            success: { kind: 'leaf', consequence: 'C2' },
+            failure: { kind: 'leaf', consequence: 'C3' },
+          },
+        },
+      } as any,
+    }],
+  } as AiDraftResponse
+}
+
+describe('D7 逐元素接受', () => {
+  it('draftElements:new_eta 列出 ETA + 屏障;fta 模式列故障树', () => {
+    const els = draftElements(seqDraft(), 'new_eta')
+    expect(els.map((e) => e.id)).toEqual(['eta:0', 'eta:0/fe:B1', 'eta:0/fe:B2'])
+    expect(els[1].parent).toBe('eta:0')
+    const ftDraft = { ...seqDraft(), etas: [], fts: { model_data: { parameters: [] }, fault_trees: [{ name: 'T1', top: 't', nodes: [] }] } } as any
+    expect(draftElements(ftDraft, 'standalone_fta').map((e) => e.id)).toEqual(['ft:T1'])
+  })
+
+  it('filterDraftByAcceptance:拒绝的屏障被折叠(delFe 同语义),接受的保留', () => {
+    const out = filterDraftByAcceptance(seqDraft(), 'new_eta', ['eta:0', 'eta:0/fe:B1'])
+    const m = out.etas[0].model as any
+    expect(m.functionalEvents.map((f: any) => f.id)).toEqual(['B1'])
+    // B2 分支折叠为末态:结构仍有效
+    expect(m.root.failure.kind).toBe('leaf')
+  })
+
+  it('filterDraftByAcceptance:拒绝整个 ETA → 清空;FT 模式剔除未接受的树与独占参数', () => {
+    expect(filterDraftByAcceptance(seqDraft(), 'new_eta', []).etas).toHaveLength(0)
+    const ftDraft = {
+      ...seqDraft(), etas: [],
+      fts: {
+        model_data: { parameters: [{ id: 'P1', kind: 'probability', value: 0.1 }, { id: 'P2', kind: 'probability', value: 0.2 }] },
+        fault_trees: [
+          { name: 'T1', top: 'T1', nodes: [{ id: 'E1', basic: true, param_ref: 'P1' }, { id: 'T1', op: 'or', args: ['E1'] }] },
+          { name: 'T2', top: 'T2', nodes: [{ id: 'E2', basic: true, param_ref: 'P2' }, { id: 'T2', op: 'or', args: ['E2'] }] },
+        ],
+      },
+    } as any
+    const out = filterDraftByAcceptance(ftDraft, 'standalone_fta', ['ft:T1'])
+    expect(out.fts.fault_trees.map((f: any) => f.name)).toEqual(['T1'])
+    expect(out.fts.model_data.parameters.map((p: any) => p.id)).toEqual(['P1'])   // P2 随 T2 剔除
+  })
+
+  it('applyAiDraftToProject 带 accepted:只应用接受的元素', () => {
+    const base: ProjectEta[] = [{ key: 'a', name: 'A', renamed: false, model: seqDraft().etas[0].model, fts: { model_data: { parameters: [] }, fault_trees: [] }, pfds: {} }]
+    const res = applyAiDraftToProject({
+      etaTabs: base, activeKey: 'a', checkedKeys: { a: true },
+      userFts: { model_data: { parameters: [] }, fault_trees: [] },
+      draft: seqDraft(), mode: 'new_eta', makeKey: () => 'k1',
+      accepted: ['eta:0', 'eta:0/fe:B1'],
+    })
+    expect(res.etaTabs).toHaveLength(2)
+    expect((res.etaTabs[1].model as any).functionalEvents.map((f: any) => f.id)).toEqual(['B1'])
+  })
+})

@@ -1,3 +1,4 @@
+import { delFe } from './eventtree'
 import type { EventTreeModel } from './eventtree'
 import type { FaultTreeJson, FtNodeJson, ModelJson, ParamJson } from './model'
 import type { ProjectEta } from './project'
@@ -9,6 +10,15 @@ export interface AiDraftValidation {
   ok: boolean
   errors: string[]
   warnings: string[]
+  stages?: Record<string, string[]>                  // 4b1:schema/lint/dry_run 分段
+}
+
+export interface AiDraftProvenance {
+  model_id?: string
+  served_by?: string
+  prompt_version?: string
+  rounds?: number
+  tool_trace?: { name: string }[]
 }
 
 export interface AiDraftResponse {
@@ -21,6 +31,8 @@ export interface AiDraftResponse {
   traceability: Record<string, unknown>[]
   warnings: string[]
   validation: AiDraftValidation
+  provenance?: AiDraftProvenance                     // 4b1
+  ai_draft_id?: number                               // 4b2:溯源行 id(应用回执)
 }
 
 export interface AiDraftRequest {
@@ -29,6 +41,46 @@ export interface AiDraftRequest {
   current_project: Record<string, unknown>
   active_eta_key?: string
   user_context?: Record<string, unknown>
+  project_uuid?: string                              // 4b2:生成即落库 + 审计
+}
+
+// ── D7 ghost-diff:草案元素清单 + 逐元素接受 ──
+
+export interface DraftElement {
+  id: string                                         // 'eta:0' | 'eta:0/fe:B_X' | 'ft:NAME'
+  kind: 'eta' | 'barrier' | 'fault_tree'
+  label: string
+  detail?: string
+  parent?: string
+}
+
+/** 把草案拆成可逐个接受的元素(D7)。complete_eta 需 currentModel 以识别"新增屏障"。 */
+export function draftElements(draft: AiDraftResponse, mode: AiApplyMode,
+                              currentModel?: EventTreeModel | null): DraftElement[] {
+  const out: DraftElement[] = []
+  if (mode === 'new_eta' || mode === 'complete_eta') {
+    const existing = new Set((currentModel?.functionalEvents ?? []).map((f) => f.id))
+    ;(draft.etas ?? []).forEach((eta, i) => {
+      const eid = `eta:${i}`
+      const m = eta.model as EventTreeModel | undefined
+      if (mode === 'new_eta') {
+        out.push({ id: eid, kind: 'eta', label: eta.name || m?.initEvent || `ETA ${i + 1}`,
+                   detail: `${m?.functionalEvents?.length ?? 0} 屏障` })
+      }
+      for (const fe of m?.functionalEvents ?? []) {
+        if (mode === 'complete_eta' && existing.has(fe.id)) continue   // 已有屏障不是"新增元素"
+        out.push({ id: `${eid}/fe:${fe.id}`, kind: 'barrier', label: fe.label || fe.id,
+                   detail: `PFD ${fe.failProb}`, parent: mode === 'new_eta' ? eid : undefined })
+      }
+      if (mode === 'complete_eta') return            // complete 只对首个草案 ETA 生效
+    })
+  } else {
+    for (const ft of draft.fts?.fault_trees ?? []) {
+      out.push({ id: `ft:${ft.name}`, kind: 'fault_tree', label: ft.name,
+                 detail: `${ft.nodes?.length ?? 0} 节点` })
+    }
+  }
+  return out
 }
 
 export interface ApplyAiDraftInput {
@@ -40,6 +92,8 @@ export interface ApplyAiDraftInput {
   mode: AiApplyMode
   targetFeId?: string
   makeKey?: () => string
+  /** D7 逐元素接受:缺省 = 全部接受(向后兼容)。 */
+  accepted?: string[]
 }
 
 export interface ApplyAiDraftResult {
@@ -165,8 +219,48 @@ function replaceActiveEta(etas: ProjectEta[], activeKey: string, patch: (eta: Pr
   return etas.map((eta) => (eta.key === activeKey ? patch(clone(eta)) : clone(eta)))
 }
 
+/** 按接受清单收窄草案(D7):被拒的 ETA 整体剔除、被拒的屏障折叠、被拒的 FT 连同独占参数剔除。 */
+export function filterDraftByAcceptance(draft: AiDraftResponse, mode: AiApplyMode,
+                                        accepted: string[], currentModel?: EventTreeModel | null): AiDraftResponse {
+  const acc = new Set(accepted)
+  const out = clone(draft)
+  if (mode === 'new_eta' || mode === 'complete_eta') {
+    const kept: ProjectEta[] = []
+    ;(out.etas ?? []).forEach((eta, i) => {
+      const eid = `eta:${i}`
+      if (mode === 'new_eta' && !acc.has(eid)) return
+      let m = eta.model as EventTreeModel
+      const existing = new Set((currentModel?.functionalEvents ?? []).map((f) => f.id))
+      const rejected = (m.functionalEvents ?? []).filter((fe) => {
+        if (mode === 'complete_eta' && existing.has(fe.id)) return false   // 既有屏障不受清单约束
+        return !acc.has(`${eid}/fe:${fe.id}`)
+      }).map((fe) => fe.id)
+      for (const rid of rejected) {
+        const idx = m.functionalEvents.findIndex((f) => f.id === rid)
+        if (idx >= 0) m = delFe(m, idx)              // 折叠引用分支为末态(与编辑器删除屏障同语义)
+      }
+      kept.push({ ...eta, model: m })
+    })
+    out.etas = kept
+  } else {
+    const keptTrees = (out.fts?.fault_trees ?? []).filter((ft) => acc.has(`ft:${ft.name}`))
+    const usedRefs = new Set(keptTrees.flatMap((ft) => (ft.nodes ?? []).map((n) => n.param_ref).filter(Boolean)))
+    out.fts = {
+      ...out.fts,
+      model_data: { ...out.fts.model_data,
+                    parameters: (out.fts.model_data?.parameters ?? []).filter((p) => usedRefs.has(p.id)) },
+      fault_trees: keptTrees,
+    }
+  }
+  return out
+}
+
 export function applyAiDraftToProject(input: ApplyAiDraftInput): ApplyAiDraftResult {
   requireValidDraft(input.draft)
+  if (input.accepted) {
+    const current = input.etaTabs.find((t) => t.key === input.activeKey)?.model ?? null
+    input = { ...input, draft: filterDraftByAcceptance(input.draft, input.mode, input.accepted, current) }
+  }
 
   const etaTabs = clone(input.etaTabs)
   const checkedKeys = { ...input.checkedKeys }

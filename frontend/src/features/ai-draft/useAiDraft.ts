@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
-import { draftAiModel } from '../../api'
+import { useEffect, useMemo, useState } from 'react'
+import { draftAiModel, reportAiDraftApplied } from '../../api'
 import type { LibraryData } from '../../api'
-import { applyAiDraftToProject } from '../../aiDraft'
-import type { AiApplyMode, AiDraftResponse, AiDraftTarget } from '../../aiDraft'
+import { applyAiDraftToProject, draftElements } from '../../aiDraft'
+import type { AiApplyMode, AiDraftResponse, AiDraftTarget, DraftElement } from '../../aiDraft'
 import type { ProjectEta, ProjectPayload } from '../../project'
 import { etaDisplayName, useActiveEta } from '../../stores/useActiveEta'
 import { useViewStore } from '../../stores/viewStore'
@@ -39,8 +39,9 @@ function compactLibraryContext(lib: LibraryData | null): Record<string, unknown>
   }
 }
 
-/** AI 建模助手状态机(生成 → 审阅 → 应用/导航),出 App(蓝图 §三 features/ai-draft)。 */
-export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectPayload, activeName: string) {
+/** AI 建模助手状态机(生成 → ghost 审阅(逐元素)→ 应用/回执/导航),出 App(蓝图 §三)。 */
+export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectPayload,
+                           activeName: string, projectUuid?: string) {
   const { etaTabs, userFtsModel, activeKey, checkedKeys, etModel, P } = useActiveEta()
   const setTab = useViewStore((s) => s.setTab)
   const setFtEditTarget = useViewStore((s) => s.setFtEditTarget)
@@ -56,6 +57,15 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiNotice, setAiNotice] = useState<string | null>(null)
   const [aiAppliedResult, setAiAppliedResult] = useState<AiAppliedResult | null>(null)
+  // ── D7 ghost-diff:元素清单 + 接受集(草案到达时默认全选)──
+  const elements: DraftElement[] = useMemo(
+    () => (aiDraft ? draftElements(aiDraft, aiMode, etModel) : []),
+    [aiDraft, aiMode, etModel],
+  )
+  const [acceptedIds, setAcceptedIds] = useState<string[]>([])
+  useEffect(() => { setAcceptedIds(elements.map((e) => e.id)) }, [elements])
+  const toggleElement = (id: string) =>
+    setAcceptedIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
 
   useEffect(() => {
     if (!etModel?.functionalEvents.length) return
@@ -85,6 +95,7 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
         target: aiTargetForMode(aiMode),
         current_project: buildPayload() as unknown as Record<string, unknown>,
         active_eta_key: activeKey,
+        project_uuid: projectUuid || undefined,      // 4b2:生成即落 ai_drafts + 审计
         user_context: {
           mode: aiMode,
           target_fe_id: aiMode === 'fta_for_barrier' ? aiTargetFeId : undefined,
@@ -119,7 +130,14 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
         mode: aiMode,
         targetFeId: applyTargetFeId,
         makeKey: () => `ai${Date.now().toString(36)}${(seq++).toString(36)}`,
+        accepted: acceptedIds,                       // D7:只应用接受的元素
       })
+      // 4b2 应用回执(尽力而为):逐元素接受清单入 ai_drafts + 审计
+      if (aiDraft.ai_draft_id != null) {
+        void reportAiDraftApplied(aiDraft.ai_draft_id,
+          { accepted: acceptedIds, rejected: elements.map((e) => e.id).filter((id) => !acceptedIds.includes(id)), mode: aiMode },
+          projectUuid || undefined)
+      }
       const tabs = result.etaTabs as ProjectEta[]
       const active = tabs.find((t) => t.key === result.activeKey) ?? tabs[0]
       // AI 应用 = 一条文档历史(整体替换,可一键撤销)
@@ -185,6 +203,7 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
     aiOpen, setAiOpen, aiGoal, setAiGoal, aiMode, setAiMode, aiTargetFeId, setAiTargetFeId,
     aiDraft, setAiDraft, aiDraftContext, setAiDraftContext, aiBusy, aiError, setAiError, aiNotice,
     aiAppliedResult, onGenerateAiDraft, onApplyAiDraft, openAiAppliedResult,
+    elements, acceptedIds, toggleElement,            // D7 ghost-diff
   }
 }
 

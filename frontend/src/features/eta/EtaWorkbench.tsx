@@ -161,6 +161,9 @@ export function EtaWorkbench(
           onGenerate={ai.onGenerateAiDraft}
           onApply={ai.onApplyAiDraft}
           onClose={() => ai.setAiOpen(false)}
+          elements={ai.elements}
+          acceptedIds={ai.acceptedIds}
+          onToggleElement={ai.toggleElement}
         />
       )}
 

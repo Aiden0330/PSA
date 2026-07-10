@@ -106,6 +106,17 @@ export async function draftAiModel(req: AiDraftRequest): Promise<AiDraftResponse
   return r.json()
 }
 
+/** 4b2 应用回执:记录逐元素接受清单(fire-and-forget,回执失败不阻断应用)。 */
+export async function reportAiDraftApplied(rid: number, accepted: Record<string, unknown>,
+                                           projectUuid?: string, status: 'applied' | 'rejected' = 'applied'): Promise<void> {
+  try {
+    await fetch(`${BASE}/ai/drafts/${rid}/applied`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, accepted, project_uuid: projectUuid }),
+    })
+  } catch { /* 回执尽力而为 */ }
+}
+
 export async function quantifyEventTree(req: any): Promise<EtQuantifyResult> {
   const r = await fetch(`${BASE}/event-tree/quantify`, {
     method: 'POST',

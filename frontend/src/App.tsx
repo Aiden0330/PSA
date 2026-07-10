@@ -47,7 +47,7 @@ export default function App() {
   const summaries = computeSummaries(etaTabs, activeKey, checkedKeys, etaPfds)
   const aggregateTotals = computeAggregateTotals(etaTabs, checkedKeys, etaPfds)
   const activeName = summaries.find((s) => s.active)?.name ?? 'ETA'
-  const ai = useAiDraft(lib, persistence.buildPayload, activeName)
+  const ai = useAiDraft(lib, persistence.buildPayload, activeName, persistence.projectUuid)
   const reportContext = persistence.projectUuid
     ? { project_uuid: persistence.projectUuid, project_payload: persistence.buildPayload() }
     : undefined
