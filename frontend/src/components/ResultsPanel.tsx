@@ -45,9 +45,22 @@ export function ResultsPanel({ result, onCutsetClick }: Props) {
         </div>
       </div>
 
+      {/* 4a3 后处理段:精确顶值 vs 后处理 MCS 估计,并列以免误读 */}
+      {result.post && (
+        <>
+          <div className="psa-ch"><span className="t">后处理（MCS 级）</span><span className="meta">精确顶值不受影响</span></div>
+          <div style={{ padding: '8px 14px', fontSize: 12, color: 'var(--psa-ink-2)', display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+            <span>删除 <b className="psa-num">{result.post.removed}</b> 条</span>
+            <span>恢复 <b className="psa-num">{result.post.recovered}</b> 条</span>
+            <span>REA <b className="psa-num">{result.post.probability_rea.toExponential(2)}</b></span>
+            <span>MCUB <b className="psa-num">{result.post.probability_mcub.toExponential(2)}</b></span>
+          </div>
+        </>
+      )}
+
       {/* Cut-set section header */}
       <div className="psa-ch">
-        <span className="t">最小割集</span>
+        <span className="t">最小割集{result.post ? '（后处理后）' : ''}</span>
         <span className="meta">点击行在树上高亮</span>
       </div>
 

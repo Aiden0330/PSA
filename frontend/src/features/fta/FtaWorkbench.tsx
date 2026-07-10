@@ -20,6 +20,9 @@ import { AiAppliedPill } from '../ai-draft/AiAppliedPill'
 import type { AiDraftState } from '../ai-draft/useAiDraft'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
 import type { ExampleModelState } from './useExampleModel'
+import { AnalysisSettingsPanel } from '../analysis/AnalysisSettingsPanel'
+import { EMPTY_SETTINGS, listHouseEvents, toQuantifyOptions } from '../analysis/analysisSettings'
+import type { AnalysisSettings } from '../analysis/analysisSettings'
 
 function buildHeat(importance: Record<string, { fv: number }>): Record<string, number> {
   const max = Math.max(...Object.values(importance).map((v) => v.fv), 1e-12)
@@ -45,11 +48,15 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
   const [busy, setBusy] = useState(false)
   const [highlight, setHighlight] = useState<Set<string>>(new Set())
   const [ftPos, setFtPos] = useState<Record<string, Record<string, { x: number; y: number }>>>({})
+  const [settings, setSettings] = useState<AnalysisSettings>(EMPTY_SETTINGS)
 
   // 示例切换 → 清选中与结果(与旧行为一致)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setSelected(null); setResult(null); setError(null) }, [current])
   useEffect(() => { setHighlight(new Set()) }, [model])
+  // 切换目标树 → 重置分析设置(house 覆盖/后处理规则按树而异,不跨树携带)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setSettings(EMPTY_SETTINGS) }, [ftEditTarget.src, current])
 
   const selectEta = (key: string) => { if (key !== activeKey && etaTabs.some((t) => t.key === key)) P().setActive(key) }
   const onAddFt = () => {
@@ -134,10 +141,13 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
   const onQuantify = async () => {
     if (!cvModel || !cvTreeExists) return
     setBusy(true); setError(null)
-    try { setResult(await quantify(cvModel, cvFtName)) }
+    try { setResult(await quantify(cvModel, cvFtName, 'exact', toQuantifyOptions(settings))) }
     catch (e: any) { setError(String(e?.message ?? e)); setResult(null) }
     finally { setBusy(false) }
   }
+  const houses = listHouseEvents(cvModel, cvFtName)
+  const cvBasics = (cvModel?.fault_trees?.find((f: any) => f.name === cvFtName)?.nodes ?? [])
+    .filter((n: any) => n.basic).map((n: any) => n.id)
 
   const aiAppliedResult = ai.aiAppliedResult
 
@@ -298,6 +308,9 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
             />
           )}
         </div>
+        {cvTreeExists && (
+          <AnalysisSettingsPanel houses={houses} basicEvents={cvBasics} settings={settings} onChange={setSettings} />
+        )}
         <div>
           <div className="psa-ch"><span className="t">量化结果</span></div>
           {error && <div style={{ margin: 14, padding: 10, background: 'var(--psa-danger-soft)', color: 'var(--psa-danger-strong)', borderRadius: 6, fontSize: 12 }}>量化失败:{error}</div>}

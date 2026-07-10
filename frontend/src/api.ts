@@ -11,11 +11,18 @@ export const wasSavedOffline = () => _savedOffline
 export interface ExampleItem { id: string; name: string }
 export interface ModelEnvelope { model: any; fault_tree: string }
 export interface CutSet { events: string[]; order: number; probability: number }
+export interface QuantifyPost {
+  removed: number
+  recovered: number
+  probability_rea: number
+  probability_mcub: number
+}
 export interface QuantifyResult {
   probability: number
   method: string
   cutsets: CutSet[]
   importance: Record<string, Record<string, number>>
+  post?: QuantifyPost | null              // 4a3:应用了后处理规则时的统计 + MCS 级估计
 }
 export interface BessResult {
   consequences: Record<string, number>
@@ -228,12 +235,23 @@ export async function exportReport(format: 'docx' | 'pdf' | 'csv', req: any, sce
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-export async function quantify(model: any, fault_tree: string, method = 'exact'): Promise<QuantifyResult> {
+// 4a2/4a3 分析设置:house 覆盖 / 命名边界条件集 / 割集后处理规则(空则不改旧请求形状)。
+export interface QuantifyOptions {
+  house_states?: Record<string, boolean>
+  boundary_condition_set?: string
+  post_rules?: unknown[]
+}
+export async function quantify(model: any, fault_tree: string, method = 'exact',
+                               opts: QuantifyOptions = {}): Promise<QuantifyResult> {
   const r = await fetch(`${BASE}/quantify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, fault_tree, method }),
+    body: JSON.stringify({ model, fault_tree, method, ...opts }),
   })
-  if (!r.ok) throw new Error(`quantify → ${r.status}`)
+  if (!r.ok) {
+    let detail = ''
+    try { const d = await r.json(); detail = typeof d?.detail === 'string' ? d.detail : '' } catch {}
+    throw new Error(detail || `quantify → ${r.status}`)
+  }
   return r.json()
 }
