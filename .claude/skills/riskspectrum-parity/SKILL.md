@@ -20,20 +20,22 @@ ledger is the single place that answers "how far are we?" — keep it current.
 | MC uncertainty (lognormal-EF/normal/uniform/beta) + tornado | ✅ | tests |
 | Field-Bayes updating (Beta-binomial, Poisson-Gamma) | ✅ exceeds (RS lacks it) | bayes.ts golden anchors |
 | Reliability models: prob, λ·MTTR, λτ/2, λ·mission | ✅ core four | parameters.py |
-| Open-PSA MEF XML I/O | ✅ | round-trip tests |
+| Open-PSA MEF XML I/O (incl. define-CCF-group nested placement + staggered via attributes) | ✅ | round-trip tests |
 | Graded reference library w/ citations + A/B/C/D | ✅ exceeds | reference_data.json |
+| **Alpha/MGL/phi CCF multi-level expansion** (+staggered alpha) | ✅ 2026-07-09 | NUREG/CR-5485 formulas SCRAM-source-verified; anchors rel 1e-12 + consistency-identity property tests + 2oo3 brute-force==BDD; ETA merged-PDAG expansion (shared CCF events in exact success negation); engine-reviewer 2-round PASS. Spec: `docs/superpowers/specs/2026-07-09-ccf-alpha-mgl-semantics.md` |
+| **House events / boundary-condition sets** per-analysis API | ✅ 2026-07-09 | Named bc_sets + house_states on quantify/ET/uncertainty/importance; model never mutated; loud errors. tests/unit/test_boundary_conditions.py |
+| **Cut-set post-processing** (mutually-exclusive / delete / recovery) | ✅ 2026-07-09 | MCS-list-only by design — exact BDD channel untouched (guarded test); REA/MCUB over processed list. tests/unit/test_postprocess.py |
+| **Analysis cases** (report + uncertainty + importance auto-pin) | ✅ 2026-07-09 | version hash + engine version + settings + results per run; audit actions; dossier ledgers |
+| **Model compare / diff** | ✅ 2026-07-09 | Identity-keyed structural diff over canonical versions + dossier compare view. tests/backend/test_diff.py |
+| CUDD backend correctness (coherent + non-coherent) | ✅ 2026-07-09 | dd.cudd built on macOS arm64, parity tests live (0 skipped); complement-mark cofactor fix + NOT/XOR/success-branch locks; 1000-event closed-form; iterative Shannon traversal (no recursion cap) |
 
-## Gaps (priority order — the Phase 4a backlog)
+## Gaps (remaining)
 
 | # | Gap | Why it matters | Notes |
 |---|---|---|---|
-| 1 | **Alpha-factor / MGL CCF expansion** (`ccf_expand.py` is beta-only; MGL/alpha approximated by first factor) | NUREG/CR-5485 alpha is what reviewers expect for redundant channels (2oo3 sensors, dual contactors) | Schema already declares `beta|mgl|alpha|phi`; staggered vs non-staggered testing distinction needed |
-| 2 | **House events / boundary condition sets** as first-class API | Sequence-specific logic, maintenance/config states | Constant propagation exists in preprocess — needs surfacing + per-analysis sets |
-| 3 | **Post-processing rules** (delete terms, mutually exclusive events, recovery) | Realistic large-model cleanup | Interacts with exact-negation design — spec carefully |
-| 4 | **Analysis cases** (model version + boundary set + settings + results as one stored, auditable record) | Parity feature AND the regulator evidence trail | Depends on Phase 2 storage/versioning ADR |
-| 5 | **Model compare / diff** | RS Model Compare; also self-review + future multi-user merge primitive | Old ROADMAP item B; depends on canonical schema |
-| 6 | CUDD-scale validation + hybrid MCS-BDD fallback | 10k+ event models | CI cudd-parity job is the first step; hybrid path per references |
+| 6b | CUDD CI job (Linux) + hybrid MCS-BDD fallback + 10k-event stress corpus | Reproducible scale proof in CI | Local macOS validation done 2026-07-09; CI inert until GitHub remote exists |
 | 7 | Exchange events; time-dependent Q(t) beyond core four; risk monitor | Long tail | Defer — not needed for BESS QRA near-term |
+| 8 | Boundary-condition / post-processing / CCF-per-barrier UI(engine+API done) | Analyst ergonomics | API-first shipped 2026-07-09; UI slot: analysis settings panel |
 
 ## Rules
 
