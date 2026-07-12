@@ -66,10 +66,28 @@ CREATE TABLE IF NOT EXISTS ai_drafts(
   draft_json TEXT NOT NULL, validation_json TEXT NOT NULL DEFAULT '{}',
   status TEXT NOT NULL DEFAULT 'generated' CHECK(status IN ('generated','applied','rejected')),
   applied_json TEXT, created_at TEXT NOT NULL, applied_at TEXT, actor TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS reviews(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_uuid TEXT NOT NULL REFERENCES projects(uuid),
+  version_id INTEGER NOT NULL REFERENCES versions(id),
+  state TEXT NOT NULL CHECK(state IN ('in_review','signed','returned')),
+  submitted_by TEXT NOT NULL, submitted_at TEXT NOT NULL,
+  decided_by TEXT, decided_at TEXT, note TEXT,
+  UNIQUE(project_uuid, version_id));
+CREATE UNIQUE INDEX IF NOT EXISTS reviews_one_in_review
+  ON reviews(project_uuid) WHERE state='in_review';
+CREATE TABLE IF NOT EXISTS review_comments(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_uuid TEXT NOT NULL REFERENCES projects(uuid),
+  version_id INTEGER NOT NULL REFERENCES versions(id),
+  author TEXT NOT NULL, created_at TEXT NOT NULL, body TEXT NOT NULL);
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit_log
   BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_log
   BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS reviews_signed_final BEFORE UPDATE ON reviews
+  WHEN OLD.state='signed'
+  BEGIN SELECT RAISE(ABORT, 'signed review is final'); END;
 """
 
 
@@ -259,6 +277,121 @@ def list_cases(puuid: str) -> list[dict]:
     with _conn() as cx:
         rows = cx.execute("SELECT * FROM analysis_cases WHERE project_uuid=?"
                           " ORDER BY id DESC", (puuid,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+# ── Phase 5 reviews:评审/签发状态机(D-P5-5 方向 A)──
+# 草稿 = 无行;in_review → signed(终态,触发器护住)| returned → 重新送审回转同一行。
+# 单项目至多一个 in_review 由部分唯一索引保证(违反 → IntegrityError,API 层转 409)。
+
+_REVIEW_SELECT = ("SELECT r.id, r.version_id, v.content_hash, r.state, r.submitted_by,"
+                  " r.submitted_at, r.decided_by, r.decided_at, r.note"
+                  " FROM reviews r JOIN versions v ON v.id = r.version_id"
+                  " WHERE r.project_uuid=?")
+
+
+def _require_version_hash(cx: sqlite3.Connection, puuid: str, version_id: int) -> str:
+    r = cx.execute("SELECT content_hash FROM versions WHERE project_uuid=? AND id=?",
+                   (puuid, version_id)).fetchone()
+    if r is None:
+        raise ValueError(f"version {version_id} not found in project")
+    return r["content_hash"]
+
+
+def _review_row(cx: sqlite3.Connection, puuid: str, version_id: int) -> Optional[sqlite3.Row]:
+    return cx.execute("SELECT * FROM reviews WHERE project_uuid=? AND version_id=?",
+                      (puuid, version_id)).fetchone()
+
+
+def _review_joined(cx: sqlite3.Connection, puuid: str, version_id: int) -> Optional[dict]:
+    r = cx.execute(_REVIEW_SELECT + " AND r.version_id=?", (puuid, version_id)).fetchone()
+    return dict(r) if r else None
+
+
+def submit_review(puuid: str, version_id: int, note: str | None = None) -> dict:
+    """草稿/退回 → 送审中。已签发不可再送审;已送审重复提交报错;
+    另一版本在审 → 部分唯一索引 IntegrityError 上抛。"""
+    with _conn() as cx:
+        h = _require_version_hash(cx, puuid, version_id)
+        row = _review_row(cx, puuid, version_id)
+        if row is not None and row["state"] == "signed":
+            raise ValueError("signed version cannot be resubmitted")
+        if row is not None and row["state"] == "in_review":
+            raise ValueError("version is already in review")
+        if row is None:
+            cx.execute("INSERT INTO reviews(project_uuid,version_id,state,submitted_by,"
+                       "submitted_at,note) VALUES(?,?,'in_review',?,?,?)",
+                       (puuid, version_id, actor(), _now(), note))
+        else:                                                  # returned → 回转
+            cx.execute("UPDATE reviews SET state='in_review', submitted_by=?, submitted_at=?,"
+                       " decided_by=NULL, decided_at=NULL, note=? WHERE id=?",
+                       (actor(), _now(), note, row["id"]))
+        record_audit(cx, "review.submit", project_uuid=puuid, version_id=version_id,
+                     details={"content_hash": h, "note": note})
+        return _review_joined(cx, puuid, version_id)  # type: ignore[return-value]
+
+
+def sign_review(puuid: str, version_id: int, note: str | None = None) -> dict:
+    """送审中 → 已签发(终态)。签发人身份/时间/版本哈希入只增审计(报告页脚同源)。"""
+    with _conn() as cx:
+        h = _require_version_hash(cx, puuid, version_id)
+        row = _review_row(cx, puuid, version_id)
+        if row is None or row["state"] != "in_review":
+            raise ValueError("only an in-review version can be signed")
+        cx.execute("UPDATE reviews SET state='signed', decided_by=?, decided_at=?, note=?"
+                   " WHERE id=?", (actor(), _now(), note, row["id"]))
+        record_audit(cx, "review.sign", project_uuid=puuid, version_id=version_id,
+                     details={"content_hash": h, "note": note})
+        return _review_joined(cx, puuid, version_id)  # type: ignore[return-value]
+
+
+def return_review(puuid: str, version_id: int, note: str) -> dict:
+    """送审中 → 退回(note 必填 —— 退回理由是证据链的一部分)。"""
+    if not note or not str(note).strip():
+        raise ValueError("return requires a note")
+    with _conn() as cx:
+        h = _require_version_hash(cx, puuid, version_id)
+        row = _review_row(cx, puuid, version_id)
+        if row is None or row["state"] != "in_review":
+            raise ValueError("only an in-review version can be returned")
+        cx.execute("UPDATE reviews SET state='returned', decided_by=?, decided_at=?, note=?"
+                   " WHERE id=?", (actor(), _now(), note, row["id"]))
+        record_audit(cx, "review.return", project_uuid=puuid, version_id=version_id,
+                     details={"content_hash": h, "note": note})
+        return _review_joined(cx, puuid, version_id)  # type: ignore[return-value]
+
+
+def list_reviews(puuid: str) -> list[dict]:
+    with _conn() as cx:
+        rows = cx.execute(_REVIEW_SELECT + " ORDER BY r.id", (puuid,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def review_for_version(puuid: str, version_id: int) -> Optional[dict]:
+    """导出门/页脚的查询点:该版本的评审状态(无行 = 草稿 → None)。"""
+    with _conn() as cx:
+        return _review_joined(cx, puuid, version_id)
+
+
+def add_review_comment(puuid: str, version_id: int, body: str) -> int:
+    if not body or not str(body).strip():
+        raise ValueError("comment body required")
+    with _conn() as cx:
+        _require_version_hash(cx, puuid, version_id)
+        cur = cx.execute("INSERT INTO review_comments(project_uuid,version_id,author,"
+                         "created_at,body) VALUES(?,?,?,?,?)",
+                         (puuid, version_id, actor(), _now(), body))
+        cid = int(cur.lastrowid)
+        record_audit(cx, "review.comment", project_uuid=puuid, version_id=version_id,
+                     details={"comment_id": cid})
+        return cid
+
+
+def list_review_comments(puuid: str, version_id: int) -> list[dict]:
+    with _conn() as cx:
+        rows = cx.execute("SELECT id,author,created_at,body FROM review_comments"
+                          " WHERE project_uuid=? AND version_id=? ORDER BY id",
+                          (puuid, version_id)).fetchall()
         return [dict(r) for r in rows]
 
 
