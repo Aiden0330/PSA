@@ -35,8 +35,9 @@ describe('Phase 5 评审 API 客户端', () => {
     vi.stubGlobal('fetch', fetchMock as any)
     await signReview(PU, 3, '同意')
     await returnReview(PU, 3, '补依据')
-    expect(String(fetchMock.mock.calls[0][0])).toContain('/reviews/3/sign')
-    expect(String(fetchMock.mock.calls[1][0])).toContain('/reviews/3/return')
+    const calls = fetchMock.mock.calls as unknown as [string][]
+    expect(String(calls[0][0])).toContain('/reviews/3/sign')
+    expect(String(calls[1][0])).toContain('/reviews/3/return')
   })
 
   it('网络不可达 → 显式抛错(评审无离线语义)', async () => {

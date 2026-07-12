@@ -66,6 +66,21 @@
   触发器 + 单送审部分唯一索引)、五端点、**导出门 = 内容寻址幂等**(改动即新哈希即工作稿,
   零冻结机制)、页脚签发行、ReportDossier 台账列增量;与认证解耦(只依赖 actor(),
   PSA_AUTH=off 全流程可用 —— 约束 #0)。待用户排期动工。
+- **Phase 5 评审/签发落地(2026-07-12,规格 §6 全六步)**:①store 层 reviews 状态机 +
+  版本评论(签发终态触发器、单送审部分唯一索引、审计 kinds review.submit/sign/return/comment,
+  10 测)`29e8ca0`;②API 五端点(LookupError→400 / ReviewStateError→409 / 裸 ValueError→422
+  类型化映射,中文 detail)`+3 测`;③**导出门**:`_evidence_line` 签发行/工作稿后缀 +
+  docx/pdf 标题区工作稿标识 + csv 首行注释 + artifacts.signed,门 = auto-pin 内容寻址幂等
+  (核心测试:签发版原样导出带签发行 → 改一个 PFD 即回工作稿);④api.ts 评审客户端
+  (显式抛错,**不入** localStorage 回退家族,4 测);⑤ReportDossier 台账增量:状态徽章
+  (送审中/已签发·签发人/退回+理由悬浮)、最新行送审、签发确认弹窗(完整哈希+终态警示)、
+  退回 prompt、案例正式性列(纯前端 join)、版本评论面板(默认选中送审中版本),既有导出/
+  对比控件零改动(4 组件测);⑥bundle 2.73MB 重建 + make check 全绿(py 255 / fe 218)。
+  **preview 实测全流程**:保存项目 → 台账出版本行+送审按钮 → 送审中徽章 → 签发弹窗
+  (哈希+只增审计文案)→ 已签发·root 徽章 → 版本评论落列表;审计链
+  project.create→version.create→review.submit→review.sign→review.comment,console 零错误。
+  剩余(auth 层,另排期):修复项 1-3(api.ts 401 地雷/actor 会话身份/CORS 白名单)+
+  accounts/sessions + 三角色守卫 + 签发口令复核 + 409 冲突对话。
 
 ---
 
