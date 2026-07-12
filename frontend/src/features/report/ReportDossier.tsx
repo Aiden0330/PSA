@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { diffProjectVersions, exportReport, listProjectCases, listProjectVersions } from '../../api'
-import type { CaseInfo, VersionDiff, VersionInfo } from '../../api'
+import { addVersionComment, diffProjectVersions, exportReport, listProjectCases, listProjectReviews, listProjectVersions, listVersionComments, returnReview, signReview, submitReview } from '../../api'
+import type { CaseInfo, ReviewComment, ReviewInfo, VersionDiff, VersionInfo } from '../../api'
 import { Icon } from '../../components/icons'
 import { CONSEQUENCES, consDef, toEngineRequest } from '../../eventtree'
 import { useActiveEta } from '../../stores/useActiveEta'
@@ -17,14 +17,16 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
   const { etModel, etFtsModel } = useActiveEta()
   const [versions, setVersions] = useState<VersionInfo[]>([])
   const [cases, setCases] = useState<CaseInfo[]>([])
+  const [reviews, setReviews] = useState<ReviewInfo[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const pu = persistence.projectUuid
 
   const refresh = () => {
-    if (!pu) { setVersions([]); setCases([]); return }
+    if (!pu) { setVersions([]); setCases([]); setReviews([]); return }
     listProjectVersions(pu).then(setVersions).catch(() => setVersions([]))
     listProjectCases(pu).then(setCases).catch(() => setCases([]))
+    listProjectReviews(pu).then(setReviews).catch(() => setReviews([]))
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(refresh, [pu])
@@ -47,6 +49,30 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
   }
 
   const versionByCase = (c: CaseInfo) => versions.find((v) => v.id === c.version_id)
+  const reviewByVersion = (vid: number) => reviews.find((r) => r.version_id === vid)
+
+  // ── Phase 5 台账签发(D-P5-5 方向 A):送审/签发/退回 + 版本评论 ──
+  const [signTarget, setSignTarget] = useState<VersionInfo | null>(null)
+  const [signNote, setSignNote] = useState('')
+  const [actBusy, setActBusy] = useState(false)
+  const doAction = async (fn: () => Promise<unknown>) => {
+    setActBusy(true); setErr(null)
+    try { await fn(); refresh() } catch (e: any) { setErr(String(e?.message ?? e)) }
+    finally { setActBusy(false) }
+  }
+  const onSubmitReview = (v: VersionInfo) => { if (pu) doAction(() => submitReview(pu, v.id)) }
+  const onReturnReview = (v: VersionInfo) => {
+    if (!pu) return
+    const note = window.prompt('退回理由(必填,入只增审计):')
+    if (note && note.trim()) doAction(() => returnReview(pu, v.id, note.trim()))
+  }
+  const onConfirmSign = () => {
+    if (!pu || !signTarget) return
+    const t = signTarget
+    setSignTarget(null)
+    doAction(() => signReview(pu, t.id, signNote.trim() || undefined))
+    setSignNote('')
+  }
   const artifacts = (c: CaseInfo): { format?: string; sha256?: string } => {
     try { return typeof c.artifacts_json === 'string' ? JSON.parse(c.artifacts_json) : (c.artifacts_json ?? {}) } catch { return {} }
   }
@@ -76,6 +102,31 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
     return s !== undefined && s.length > 60 ? s.slice(0, 60) + '…' : s
   }
 
+  // ── 版本评论(版本级;元素锚定线程为方向 B 的将来扩展)──
+  const [cmVersion, setCmVersion] = useState<number | ''>('')
+  const [cmList, setCmList] = useState<ReviewComment[]>([])
+  const [cmText, setCmText] = useState('')
+  useEffect(() => {
+    // 默认选中送审中的版本(评审注意力所在),否则最新版本
+    const inRev = reviews.find((r) => r.state === 'in_review')
+    setCmVersion(inRev?.version_id ?? byIdDesc[0]?.id ?? '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviews, versions.length, pu])
+  useEffect(() => {
+    if (!pu || cmVersion === '') { setCmList([]); return }
+    listVersionComments(pu, Number(cmVersion)).then(setCmList).catch(() => setCmList([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pu, cmVersion])
+  const onAddComment = async () => {
+    if (!pu || cmVersion === '' || !cmText.trim()) return
+    setErr(null)
+    try {
+      await addVersionComment(pu, Number(cmVersion), cmText.trim())
+      setCmText('')
+      setCmList(await listVersionComments(pu, Number(cmVersion)))
+    } catch (e: any) { setErr(String(e?.message ?? e)) }
+  }
+
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--psa-bg)', padding: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -96,7 +147,7 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
           ))}
         </div>
       </div>
-      {err && <div style={{ marginBottom: 12, padding: 10, background: 'var(--psa-danger-soft)', color: 'var(--psa-danger-strong)', borderRadius: 6, fontSize: 12 }}>导出失败:{err}</div>}
+      {err && <div style={{ marginBottom: 12, padding: 10, background: 'var(--psa-danger-soft)', color: 'var(--psa-danger-strong)', borderRadius: 6, fontSize: 12 }}>操作失败:{err}</div>}
 
       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {/* 分析案例台账 */}
@@ -109,7 +160,7 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: 'var(--psa-soft-2)', textAlign: 'left' }}>
-                    {['案例', '类型', '模型版本', '引擎', '产物', '时间'].map((h) => <th key={h} style={th}>{h}</th>)}
+                    {['案例', '类型', '模型版本', '正式性', '引擎', '产物', '时间'].map((h) => <th key={h} style={th}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -122,6 +173,11 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
                         <td style={td}>{c.kind === 'report' ? '报告' : c.kind}</td>
                         <td style={td}>
                           <span style={badge} title={v ? `完整哈希 ${v.content_hash}` : ''}>{v ? v.content_hash.slice(0, 8) : `v${c.version_id}`}</span>
+                        </td>
+                        <td style={td}>
+                          {reviewByVersion(c.version_id)?.state === 'signed'
+                            ? <span style={{ ...stBadge('signed') }}>正式(签发版)</span>
+                            : <span style={{ fontSize: 10.5, color: 'var(--psa-faint)' }}>工作稿</span>}
                         </td>
                         <td style={td}><span style={{ fontFamily: mono, fontSize: 11 }}>{c.engine_version}</span></td>
                         <td style={td}>{a.format ? <span title={a.sha256 ? `sha256 ${a.sha256.slice(0, 16)}…` : ''} style={{ fontFamily: mono }}>{a.format}</span> : '—'}</td>
@@ -142,13 +198,45 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
             {versions.length === 0 ? (
               <div style={{ padding: 16, fontSize: 12, color: 'var(--psa-muted)' }}>暂无版本。保存项目即产生内容寻址版本(同内容幂等)。</div>
             ) : (
-              [...versions].sort((a, b) => b.id - a.id).map((v) => (
-                <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderBottom: '1px solid var(--psa-line)', fontSize: 12 }}>
-                  <span style={badge} title={v.content_hash}>{v.content_hash.slice(0, 8)}</span>
-                  <span style={{ color: 'var(--psa-ink-2)' }}>{v.origin === 'auto_pin' ? '报告钉扎' : v.origin === 'import' ? '导入' : '保存'}</span>
-                  <span style={{ marginLeft: 'auto', fontFamily: mono, fontSize: 10.5, color: 'var(--psa-faint)' }}>{v.created_at.slice(0, 19).replace('T', ' ')}</span>
-                </div>
-              ))
+              [...versions].sort((a, b) => b.id - a.id).map((v, idx) => {
+                const rv = reviewByVersion(v.id)
+                const isLatest = idx === 0
+                const canSubmit = isLatest && (!rv || rv.state === 'returned')
+                return (
+                  <div key={v.id} style={{ padding: '7px 10px', borderBottom: '1px solid var(--psa-line)', fontSize: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={badge} title={v.content_hash}>{v.content_hash.slice(0, 8)}</span>
+                      <span style={{ color: 'var(--psa-ink-2)' }}>{v.origin === 'auto_pin' ? '报告钉扎' : v.origin === 'import' ? '导入' : '保存'}</span>
+                      {rv && (
+                        <span
+                          style={stBadge(rv.state)}
+                          title={rv.state === 'signed' ? `签发 ${rv.decided_by ?? ''} ${rv.decided_at ?? ''}${rv.note ? ` · ${rv.note}` : ''}`
+                            : rv.state === 'returned' ? `退回理由:${rv.note ?? ''}`
+                            : `送审 ${rv.submitted_by} ${rv.submitted_at}`}
+                        >
+                          {rv.state === 'in_review' ? '送审中'
+                            : rv.state === 'signed' ? `已签发 · ${(rv.decided_by ?? '').split('@')[0]}`
+                            : '退回'}
+                        </span>
+                      )}
+                      <span style={{ marginLeft: 'auto', fontFamily: mono, fontSize: 10.5, color: 'var(--psa-faint)' }}>{v.created_at.slice(0, 19).replace('T', ' ')}</span>
+                    </div>
+                    {(canSubmit || rv?.state === 'in_review') && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
+                        {canSubmit && (
+                          <button className="psa-btn" disabled={actBusy} onClick={() => onSubmitReview(v)}>送审</button>
+                        )}
+                        {rv?.state === 'in_review' && (
+                          <>
+                            <button className="psa-btn psa-btn--primary" disabled={actBusy} onClick={() => { setSignTarget(v); setSignNote('') }}>签发…</button>
+                            <button className="psa-btn" disabled={actBusy} onClick={() => onReturnReview(v)}>退回…</button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
             )}
           </div>
 
@@ -201,8 +289,73 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
               </>
             )}
           </div>
+
+          {/* Phase 5 版本评论(版本级) */}
+          <div style={{ ...secHead, marginTop: 16 }}>版本评论</div>
+          <div className="psa-panel" style={{ padding: 10 }}>
+            {byIdDesc.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--psa-muted)' }}>暂无版本。</div>
+            ) : (
+              <>
+                <select value={cmVersion} onChange={(e) => setCmVersion(Number(e.target.value))} style={{ fontSize: 12, marginBottom: 8 }}>
+                  {byIdDesc.map((v) => <option key={v.id} value={v.id}>{v.content_hash.slice(0, 8)} · v{v.id}</option>)}
+                </select>
+                <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                  {cmList.length === 0 ? (
+                    <div style={{ fontSize: 12, color: 'var(--psa-muted)' }}>该版本暂无评论。</div>
+                  ) : (
+                    cmList.map((c) => (
+                      <div key={c.id} style={{ padding: '5px 0', borderBottom: '1px solid var(--psa-line)', fontSize: 12 }}>
+                        <span style={{ fontWeight: 600 }}>{c.author.split('@')[0]}</span>
+                        <span style={{ fontFamily: mono, fontSize: 10.5, color: 'var(--psa-faint)', marginLeft: 6 }}>{c.created_at.slice(0, 19).replace('T', ' ')}</span>
+                        <div style={{ color: 'var(--psa-ink-2)' }}>{c.body}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <input
+                    value={cmText}
+                    onChange={(e) => setCmText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') onAddComment() }}
+                    placeholder="版本级评论(入审计)"
+                    style={{ flex: 1, fontSize: 12 }}
+                  />
+                  <button className="psa-btn" onClick={onAddComment} disabled={!cmText.trim() || cmVersion === ''}>评论</button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Phase 5 签发确认弹窗:身份/时间/哈希入只增审计 + 报告页脚 */}
+      {signTarget && (
+        <div style={signOverlay} onClick={() => setSignTarget(null)}>
+          <div className="psa-panel" style={{ width: 440, margin: 'auto', padding: 18, background: 'var(--psa-surface)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--psa-ink)', marginBottom: 8 }}>
+              签发版本 {signTarget.content_hash.slice(0, 8)}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--psa-muted)', lineHeight: 1.7 }}>
+              签发为<b>终态</b>(不可撤销;取代 = 签发更新的版本)。签发人身份、时间与版本哈希写入
+              <b>只增审计</b>,此后以该版本内容导出的报告页脚携带签发行;任何未保存改动导出即回到工作稿。
+            </div>
+            <div style={{ fontFamily: mono, fontSize: 11, background: 'var(--psa-soft)', border: '1px solid var(--psa-line)', borderRadius: 6, padding: '6px 8px', margin: '10px 0', wordBreak: 'break-all' }}>
+              {signTarget.content_hash}
+            </div>
+            <input
+              value={signNote}
+              onChange={(e) => setSignNote(e.target.value)}
+              placeholder="签发意见(可选,入审计)"
+              style={{ width: '100%', fontSize: 12, marginBottom: 12, boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="psa-btn" onClick={() => setSignTarget(null)}>取消</button>
+              <button className="psa-btn psa-btn--primary" disabled={actBusy} onClick={onConfirmSign}>确认签发</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -211,3 +364,10 @@ const secHead: CSSProperties = { fontSize: 12, fontWeight: 700, color: 'var(--ps
 const th: CSSProperties = { padding: '7px 10px', fontSize: 11, color: 'var(--psa-muted)', fontWeight: 600 }
 const td: CSSProperties = { padding: '7px 10px', verticalAlign: 'middle' }
 const badge: CSSProperties = { fontFamily: mono, fontSize: 11, fontWeight: 700, background: 'var(--psa-primary-soft)', color: 'var(--psa-primary-strong)', border: '1px solid rgba(37,99,235,.22)', borderRadius: 5, padding: '1px 6px' }
+const stBadge = (state: 'in_review' | 'signed' | 'returned'): CSSProperties => ({
+  fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: '1px 8px', whiteSpace: 'nowrap',
+  ...(state === 'in_review' ? { background: 'rgba(217,119,6,.12)', color: 'var(--psa-amber)' }
+    : state === 'signed' ? { background: 'rgba(46,194,106,.14)', color: '#1B7F42' }
+    : { background: 'var(--psa-danger-soft)', color: 'var(--psa-danger-strong)' }),
+})
+const signOverlay: CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(9,14,22,.42)', zIndex: 60, display: 'flex', padding: 24 }
