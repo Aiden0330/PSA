@@ -85,7 +85,7 @@ def _pin_case(project_uuid: str, project_payload, kind: str, name_hint: str | No
                                message=f"auto: {kind}")
     case_id = store.create_case(project_uuid, ver["id"], kind, settings=settings,
                                 results=results, audit_action=audit_action)
-    return {"case_id": case_id, "version_hash": ver["content_hash"],
+    return {"case_id": case_id, "version_id": ver["id"], "version_hash": ver["content_hash"],
             "engine_version": store.engine_version()}
 
 
@@ -115,6 +115,13 @@ def api_report(req: schemas.ReportRequest, format: str = "docx"):
         case_id = pinned["case_id"]
         evidence = {**pinned,
                     "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        # Phase 5 导出门:auto-pin 命中的版本已签发 → 页脚签发行;否则工作稿标识。
+        # 门本身 = 内容寻址幂等(任何未保存改动都是新哈希 → 无签发状态可命中)。
+        from backend import store as _store
+        review = _store.review_for_version(req.project_uuid, pinned["version_id"])
+        if review and review["state"] == "signed":
+            evidence["signoff"] = {"signer": review["decided_by"],
+                                   "signed_at": review["decided_at"]}
     png = None
     if req.tree_png and "," in req.tree_png:
         try:
@@ -132,7 +139,8 @@ def api_report(req: schemas.ReportRequest, format: str = "docx"):
         import hashlib
         from backend import store
         store.update_case_artifacts(case_id, {"format": ext, "filename": f"qra_report.{ext}",
-                                              "sha256": hashlib.sha256(body).hexdigest()})
+                                              "sha256": hashlib.sha256(body).hexdigest(),
+                                              "signed": bool(evidence and evidence.get("signoff"))})
     return Response(content=body, media_type=media,
                     headers={"Content-Disposition": f'attachment; filename="qra_report.{ext}"'})
 

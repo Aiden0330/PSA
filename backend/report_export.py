@@ -83,16 +83,31 @@ def build_report_data(model, et_name: str = "TR", *, consequence_defs: dict | No
             "importance": imp, "consequence_defs": consequence_out, "sequences": sequences, "fta": fta}
 
 
+_WORKING_MARK = "工作稿 — 未经签发"
+
+
+def _is_signed(evidence: dict | None) -> bool:
+    """Phase 5 导出门:签发状态由 app 层按 auto-pin 命中的版本查得(内容寻址幂等 =
+    任何未保存改动都是新哈希,不可能带着签发章导出)。无项目上下文 = 工作稿。"""
+    return bool(evidence and evidence.get("signoff"))
+
+
 def _evidence_line(ev: dict) -> str:
-    """ADR-2 证据链页脚:报告数字 → 分析案例 → 版本哈希 → 引擎版本。"""
-    return (f"评价依据:分析案例 #{ev['case_id']} · 模型版本 {ev['version_hash'][:8]}"
+    """ADR-2 证据链页脚:报告数字 → 分析案例 → 版本哈希 → 引擎版本(→ 签发行,Phase 5)。"""
+    base = (f"评价依据:分析案例 #{ev['case_id']} · 模型版本 {ev['version_hash'][:8]}"
             f" · 引擎 bess-psa {ev['engine_version']} · {ev['created_at']}")
+    so = ev.get("signoff")
+    if so:
+        return base + f" · 签发 {so['signer']} {str(so['signed_at'])[:10]}"
+    return base + " · 工作稿(未经签发)"
 
 
 def report_csv(data: dict, evidence: dict | None = None) -> bytes:
     buf = io.StringIO()
     w = csv.writer(buf)
     cdefs = data.get("consequence_defs", {})
+    if not _is_signed(evidence):
+        w.writerow([f"# {_WORKING_MARK}"])
     w.writerow(["后果", "内涵", "点估计/yr", "p05", "p50", "p95"])
     for c in _SEV:
         b = data["bands"].get(c, {})
@@ -137,6 +152,8 @@ def report_docx(data: dict, scenario_name: str, tree_png: bytes | None,
     doc = Document()
     doc.add_heading("BESS 热失控 QRA 报告", level=0)
     doc.add_paragraph(f"场景:{scenario_name}")
+    if not _is_signed(evidence):
+        doc.add_paragraph(f"⚠ {_WORKING_MARK}")
 
     doc.add_heading("后果频率(每站每年)", level=1)
     t = doc.add_table(rows=1, cols=5); t.style = "Table Grid"
@@ -241,6 +258,9 @@ def report_pdf(data: dict, scenario_name: str, tree_png: bytes | None,
     doc = SimpleDocTemplate(buf, pagesize=A4, title="BESS QRA Report")
     story = [Paragraph("BESS 热失控 QRA 报告" if cn else "BESS Thermal-Runaway QRA Report", h0),
              Paragraph((f"场景:{scenario_name}" if cn else f"Scenario: {scenario_name}"), nm), Spacer(1, 8)]
+    if not _is_signed(evidence):
+        story += [Paragraph(f"⚠ {_WORKING_MARK}" if cn else "WORKING COPY — NOT SIGNED OFF", nm),
+                  Spacer(1, 8)]
 
     def grid_style(extra=None):
         cmds = [("GRID", (0, 0), (-1, -1), 0.5, colors.grey), ("FONTNAME", (0, 0), (-1, -1), font),
