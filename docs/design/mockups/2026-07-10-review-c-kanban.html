@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>方向 C · 审批门看板 — 草稿→送审→已签发流水线</title>
+<style>
+:root{--psa-chrome:#0E1A27;--psa-chrome-2:#142231;--psa-chrome-ink:#AEBCCB;--psa-chrome-ink-dim:#7C8B9C;
+--psa-bg:#EEF1F4;--psa-surface:#FFFFFF;--psa-soft:#F8FAFC;--psa-soft-2:#FAFBFC;--psa-line:#E6ECF2;
+--psa-line-2:#D7DEE6;--psa-line-strong:#CFD8E1;--psa-ink:#16202B;--psa-ink-2:#33415A;--psa-muted:#64748B;
+--psa-faint:#94A3B8;--psa-primary:#1F6FE0;--psa-primary-strong:#1559B8;--psa-primary-soft:#E6F1FB;
+--psa-amber:#D97706;--psa-teal:#0F766E;--psa-ok:#2EC26A;--psa-danger:#DC2626;--psa-danger-soft:#FEF2F2;
+--mono:'IBM Plex Mono',ui-monospace,monospace;--r:10px}
+*{box-sizing:border-box}body{margin:0;background:var(--psa-bg);color:var(--psa-ink);
+font:14px/1.6 -apple-system,'PingFang SC','Noto Sans SC',sans-serif}
+header{background:var(--psa-chrome);color:#fff;min-height:52px;display:flex;align-items:center;gap:14px;padding:0 16px}
+header .logo{width:28px;height:28px;border-radius:7px;background:#F0541E;display:flex;align-items:center;justify-content:center;font-size:15px}
+header .t{font-weight:600}
+header .tabs{display:flex;gap:2px;background:rgba(0,0,0,.28);padding:3px;border-radius:9px;margin-left:12px}
+header .tabs span{padding:5px 13px;border-radius:6px;font-size:12.5px;color:var(--psa-chrome-ink)}
+header .tabs .on{background:var(--psa-primary);color:#fff}
+header .who{margin-left:auto;font-size:12px;color:var(--psa-chrome-ink)}header .who b{color:#fff}
+.role{display:inline-block;border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:1px 9px;font-size:11px;margin-left:6px;color:#BFE3CF}
+.wrap{padding:18px;max-width:1300px;margin:0 auto}
+.note{font-size:11.5px;color:var(--psa-muted);background:var(--psa-primary-soft);border:1px solid #BFD7F5;border-radius:8px;padding:8px 12px;margin-bottom:14px}
+.hd{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.hd h1{font-size:17px;margin:0}
+.hd .filter{margin-left:auto;display:flex;gap:6px}
+.hd .filter span{font-size:11.5px;border:1px solid var(--psa-line-strong);border-radius:99px;padding:3px 12px;background:#fff;color:var(--psa-muted);cursor:pointer}
+.hd .filter .on{background:var(--psa-chrome-2);color:#fff;border-color:var(--psa-chrome-2)}
+.board{display:grid;grid-template-columns:repeat(4,minmax(240px,1fr));gap:12px;align-items:start}
+@media(max-width:1000px){.board{grid-template-columns:repeat(2,1fr)}}
+.col{background:rgba(255,255,255,.55);border:1px solid var(--psa-line);border-radius:12px;padding:10px}
+.col>.ch{display:flex;align-items:center;gap:8px;padding:2px 6px 10px;font-size:12.5px;font-weight:700;color:var(--psa-ink-2)}
+.col>.ch .n{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--psa-faint);background:#fff;border:1px solid var(--psa-line);border-radius:99px;padding:0 8px}
+.col>.ch i{width:9px;height:9px;border-radius:50%}
+.c-draft i{background:var(--psa-faint)}.c-rev i{background:var(--psa-amber)}.c-signed i{background:#1B7F42}.c-ret i{background:var(--psa-danger)}
+.card{background:var(--psa-surface);border:1px solid var(--psa-line);border-radius:10px;padding:10px 12px;margin-bottom:9px;box-shadow:0 1px 2px rgba(9,14,22,.05);cursor:pointer}
+.card:hover{border-color:var(--psa-primary)}
+.card .pt{font-size:13px;font-weight:600;line-height:1.45}
+.card .pv{font-family:var(--mono);font-size:10.5px;color:var(--psa-faint);margin-top:2px}
+.card .kv{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.chip{font-size:10.5px;border-radius:5px;padding:1px 7px;border:1px solid var(--psa-line-2);color:var(--psa-muted);background:var(--psa-soft)}
+.chip.risk{font-family:var(--mono);font-weight:700;color:var(--psa-ink-2)}
+.chip.warn{background:#FFF7E6;border-color:#F5DFB8;color:var(--psa-amber)}
+.chip.ok{background:#E9F9EF;border-color:#BFE9CD;color:#1B7F42}
+.chip.dng{background:var(--psa-danger-soft);border-color:#F5C6C6;color:var(--psa-danger)}
+.card .who2{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--psa-muted)}
+.av{width:20px;height:20px;border-radius:50%;background:var(--psa-chrome-2);color:#fff;font-size:10px;display:inline-flex;align-items:center;justify-content:center}
+.gatebar{margin-top:8px;border-top:1px dashed var(--psa-line-2);padding-top:7px;font-size:11px;color:var(--psa-muted)}
+.gatebar .g{display:flex;align-items:center;gap:6px;margin:2px 0}
+.g .tick{width:14px;height:14px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:9.5px;color:#fff}
+.tick.y{background:#1B7F42}.tick.n{background:var(--psa-faint)}.tick.x{background:var(--psa-danger)}
+.modal{position:fixed;inset:0;background:rgba(9,14,22,.45);display:none;align-items:center;justify-content:center;z-index:50}
+.modal.on{display:flex}
+.mbox{width:470px;background:var(--psa-surface);border-radius:12px;padding:20px 22px;box-shadow:0 18px 48px rgba(9,14,22,.35)}
+.mbox h3{margin:0 0 8px;font-size:15px}
+.mbox .g{display:flex;align-items:center;gap:8px;font-size:12.5px;margin:6px 0;color:var(--psa-ink-2)}
+.mbox .row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 13px;border-radius:8px;border:1px solid var(--psa-line-strong);background:var(--psa-surface);font-size:12.5px;cursor:pointer;color:var(--psa-ink-2)}
+.btn.ok{background:#1B7F42;border-color:#1B7F42;color:#fff;font-weight:600}
+.footnote{margin-top:14px;font-size:11.5px;color:var(--psa-muted);background:var(--psa-soft);border:1px dashed var(--psa-line-strong);border-radius:8px;padding:9px 12px;font-family:var(--mono)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🔥</div><div class="t">BESS PSA</div>
+  <div class="tabs"><span>总览</span><span>工作台</span><span class="on">评审看板</span><span>报告</span></div>
+  <div class="who">当前身份 <b>王雪梅</b><span class="role">评审人</span></div>
+</header>
+<div class="wrap">
+  <div class="note"><b>方向 C 的赌注:</b>把「版本 × 评审状态」抬升为<b>全项目库的流水线视图</b>——评审人/管理员一眼看到所有项目卡在哪个门;
+  每张卡自带<b>签发前置门检查单</b>(线程清零 / 数据分级达标 / 量化案例钉扎),不过门推不动列;导出正式报告 = 只有「已签发」列的卡开放。适合多项目并行的团队节律。</div>
+
+  <div class="hd">
+    <h1>评审看板 — 全部项目</h1>
+    <div class="filter"><span class="on">全部</span><span>我待办</span><span>本周签发</span></div>
+  </div>
+
+  <div class="board">
+    <div class="col">
+      <div class="ch c-draft"><i></i>草稿 <span class="n">3</span></div>
+      <div class="card">
+        <div class="pt">金坛梅山 100 MWh · Rev 13 工作稿</div>
+        <div class="pv">9b2e44d0 · 张力群 · 07-09</div>
+        <div class="kv"><span class="chip risk">≥III 3.6×10⁻⁵ /yr</span><span class="chip">14 版本</span></div>
+        <div class="who2"><span class="av">张</span>张力群 编辑中 · 42 分钟前保存</div>
+      </div>
+      <div class="card">
+        <div class="pt">如东风光储一体化 200 MWh · 初版建模</div>
+        <div class="pv">77ab19e2 · 李文昊 · 07-10</div>
+        <div class="kv"><span class="chip risk">≥III 8.9×10⁻⁵ /yr</span><span class="chip warn">D 级参数 ×6</span></div>
+        <div class="who2"><span class="av">李</span>李文昊 · 事件树 3/5 完成</div>
+      </div>
+      <div class="card">
+        <div class="pt">舟山海岛微网 20 MWh · 变更评估</div>
+        <div class="pv">c41d90aa · 张力群 · 07-06</div>
+        <div class="kv"><span class="chip risk">≥III 1.2×10⁻⁵ /yr</span></div>
+        <div class="who2"><span class="av">张</span>张力群</div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="ch c-rev"><i></i>送审中 <span class="n">1</span></div>
+      <div class="card" onclick="document.getElementById('m').classList.add('on')">
+        <div class="pt">金坛梅山 100 MWh · Rev 12 送审</div>
+        <div class="pv">3f7a21c9 · 送审 07-10 14:05</div>
+        <div class="kv"><span class="chip risk">≥III 3.3×10⁻⁵ /yr</span><span class="chip ok">Δ −24% vs 基线</span></div>
+        <div class="gatebar">
+          <div class="g"><span class="tick y">✓</span>量化案例已钉扎(#10 · 精确顶值)</div>
+          <div class="g"><span class="tick y">✓</span>数据分级 ≥C 且引用完整(0 缺口)</div>
+          <div class="g"><span class="tick n">…</span>评论线程 2/3 已解决</div>
+        </div>
+        <div class="who2"><span class="av" style="background:var(--psa-amber)">王</span>待 王雪梅 处理 · <b style="color:var(--psa-amber)">点卡片看签发门</b></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="ch c-signed"><i></i>已签发 <span class="n">2</span></div>
+      <div class="card">
+        <div class="pt">金坛梅山 100 MWh · Rev 9 交付基线</div>
+        <div class="pv">ed188df9 · 🔏 王雪梅 07-08 12:10</div>
+        <div class="kv"><span class="chip risk">≥III 4.1×10⁻⁵ /yr</span><span class="chip ok">正式报告 ×2</span></div>
+        <div class="who2">审计 #218 · 版本已冻结 · 页脚含签发行</div>
+      </div>
+      <div class="card">
+        <div class="pt">舟山海岛微网 20 MWh · Rev 4</div>
+        <div class="pv">dae16c77 · 🔏 王雪梅 06-28 09:33</div>
+        <div class="kv"><span class="chip risk">≥III 1.1×10⁻⁵ /yr</span><span class="chip ok">正式报告 ×1</span></div>
+        <div class="who2">审计 #171</div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="ch c-ret"><i></i>已退回 <span class="n">1</span></div>
+      <div class="card">
+        <div class="pt">金坛梅山 100 MWh · Rev 8 首轮送审</div>
+        <div class="pv">51c0ab77 · ↩ 07-08 10:02</div>
+        <div class="kv"><span class="chip dng">B_OFFGAS 依据不足</span></div>
+        <div class="who2"><span class="av">王</span>王雪梅 退回 → 张力群 已在 Rev 12 修复</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    正式导出门(报告页):项目当前无「已签发」版本 → 仅工作稿水印导出;有 → 选签发版导出,页脚 =
+    <b style="color:var(--psa-ink-2)">分析案例 # · 模型版本哈希 · 引擎版本 · 签发 王雪梅 2026-07-10 15:58(审计 #219)</b>
+  </div>
+</div>
+
+<div class="modal" id="m">
+  <div class="mbox">
+    <h3>签发门 — 金坛梅山 Rev 12(3f7a21c9)</h3>
+    <div class="g"><span class="tick y">✓</span>量化案例已钉扎:案例 #10,精确 Shannon 顶值,后处理无</div>
+    <div class="g"><span class="tick y">✓</span>数据分级:23 参数全部 ≥C 级且 citation 完整;2 项 B 级(Sandia 实测)</div>
+    <div class="g"><span class="tick x">✗</span>评论线程:FT-SUPP.G1「挂载 FTA 增值说明」未解决 — 责任人 张力群</div>
+    <div style="font-size:12px;color:var(--psa-muted);margin-top:10px">全部门通过后,「签发」按钮解锁;签发 = 版本冻结 + 王雪梅 身份/时间/哈希入只增审计 + 卡片移入「已签发」列。</div>
+    <div class="row">
+      <button class="btn" onclick="document.getElementById('m').classList.remove('on')">关闭</button>
+      <button class="btn" style="border-color:var(--psa-danger);color:var(--psa-danger)">退回修改…</button>
+      <button class="btn ok" disabled title="1 个门未过">签发(门未过)</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

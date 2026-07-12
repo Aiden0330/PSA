@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>方向 A · 台账签发式 — 评审住在证据台账里</title>
+<style>
+:root{--psa-chrome:#0E1A27;--psa-chrome-2:#142231;--psa-chrome-ink:#AEBCCB;--psa-chrome-ink-dim:#7C8B9C;
+--psa-bg:#EEF1F4;--psa-surface:#FFFFFF;--psa-soft:#F8FAFC;--psa-soft-2:#FAFBFC;--psa-line:#E6ECF2;
+--psa-line-2:#D7DEE6;--psa-line-strong:#CFD8E1;--psa-ink:#16202B;--psa-ink-2:#33415A;--psa-muted:#64748B;
+--psa-faint:#94A3B8;--psa-primary:#1F6FE0;--psa-primary-strong:#1559B8;--psa-primary-soft:#E6F1FB;
+--psa-amber:#D97706;--psa-teal:#0F766E;--psa-ok:#2EC26A;--psa-danger:#DC2626;--psa-danger-soft:#FEF2F2;
+--mono:'IBM Plex Mono',ui-monospace,monospace;--r:10px}
+*{box-sizing:border-box}body{margin:0;background:var(--psa-bg);color:var(--psa-ink);
+font:14px/1.6 -apple-system,'PingFang SC','Noto Sans SC',sans-serif}
+header{background:var(--psa-chrome);color:#fff;min-height:52px;display:flex;align-items:center;gap:14px;padding:0 16px}
+header .logo{width:28px;height:28px;border-radius:7px;background:#F0541E;display:flex;align-items:center;justify-content:center;font-size:15px}
+header .t{font-weight:600;letter-spacing:.3px}
+header .tabs{display:flex;gap:2px;background:rgba(0,0,0,.28);padding:3px;border-radius:9px;margin-left:12px}
+header .tabs span{padding:5px 13px;border-radius:6px;font-size:12.5px;color:var(--psa-chrome-ink)}
+header .tabs .on{background:var(--psa-primary);color:#fff}
+header .who{margin-left:auto;font-size:12px;color:var(--psa-chrome-ink)}
+header .who b{color:#fff;font-weight:600}
+.role{display:inline-block;border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:1px 9px;font-size:11px;margin-left:6px;color:#BFE3CF}
+.wrap{padding:18px;max-width:1240px;margin:0 auto}
+.hd{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.hd h1{font-size:17px;margin:0}.hd .sub{font-size:11.5px;color:var(--psa-faint);font-family:var(--mono)}
+.panel{background:var(--psa-surface);border:1px solid var(--psa-line);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.ph{display:flex;align-items:center;padding:9px 14px;border-bottom:1px solid var(--psa-line);background:var(--psa-soft-2)}
+.ph .t{font-size:12px;font-weight:700;color:var(--psa-ink-2)}.ph .m{margin-left:auto;font-size:11px;color:var(--psa-faint)}
+table{border-collapse:collapse;width:100%;font-size:12.8px}
+th{text-align:left;font-size:11px;color:var(--psa-muted);font-weight:600;padding:7px 14px;background:var(--psa-soft);border-bottom:1px solid var(--psa-line-2);white-space:nowrap}
+td{padding:8px 14px;border-bottom:1px solid var(--psa-line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.mono{font-family:var(--mono);font-size:11.5px}
+.hash{font-family:var(--mono);font-size:11px;font-weight:700;background:var(--psa-primary-soft);color:var(--psa-primary-strong);border:1px solid #BFD7F5;border-radius:5px;padding:1px 7px}
+.st{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;border-radius:99px;padding:2px 10px}
+.st.draft{background:#F1F5F9;color:var(--psa-muted)}
+.st.rev{background:#FFF7E6;color:var(--psa-amber)}
+.st.signed{background:#E9F9EF;color:#1B7F42}
+.st.rej{background:var(--psa-danger-soft);color:var(--psa-danger)}
+.st i{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+.btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 13px;border-radius:8px;border:1px solid var(--psa-line-strong);background:var(--psa-surface);font-size:12.5px;cursor:pointer;color:var(--psa-ink-2)}
+.btn.primary{background:var(--psa-primary);border-color:var(--psa-primary);color:#fff;font-weight:600}
+.btn.dark{background:var(--psa-chrome-2);border-color:var(--psa-chrome-2);color:#fff}
+.btn.ok{background:#1B7F42;border-color:#1B7F42;color:#fff;font-weight:600}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.sidegrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
+@media(max-width:960px){.sidegrid{grid-template-columns:1fr}}
+.signrow{display:flex;gap:8px;align-items:center;font-size:12px;padding:8px 12px;border-top:1px dashed var(--psa-line-2);color:var(--psa-ink-2)}
+.footerpv{background:var(--psa-soft);border:1px dashed var(--psa-line-strong);border-radius:8px;margin:12px;padding:10px 14px;font-family:var(--mono);font-size:11.5px;color:var(--psa-muted)}
+.footerpv b{color:var(--psa-ink-2)}
+.modal{position:fixed;inset:0;background:rgba(9,14,22,.45);display:none;align-items:center;justify-content:center;z-index:50}
+.modal.on{display:flex}
+.mbox{width:430px;background:var(--psa-surface);border-radius:12px;padding:20px 22px;box-shadow:0 18px 48px rgba(9,14,22,.35)}
+.mbox h3{margin:0 0 6px;font-size:15px}
+.mbox p{font-size:12.5px;color:var(--psa-muted);margin:6px 0}
+.mbox .kv{font-family:var(--mono);font-size:11.5px;background:var(--psa-soft);border:1px solid var(--psa-line);border-radius:7px;padding:8px 10px;margin:10px 0}
+.mbox input{width:100%;height:32px;border:1px solid var(--psa-line-strong);border-radius:7px;padding:0 10px;font-size:13px;margin:4px 0 12px}
+.mbox .row{display:flex;gap:8px;justify-content:flex-end}
+.audline{font-size:11px;color:var(--psa-faint);font-family:var(--mono);padding:4px 14px 10px}
+.note{font-size:11.5px;color:var(--psa-muted);background:var(--psa-primary-soft);border:1px solid #BFD7F5;border-radius:8px;padding:8px 12px;margin-bottom:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🔥</div><div class="t">BESS PSA</div>
+  <div class="tabs"><span>总览</span><span>事件树（ETA）</span><span>故障树（FTA）</span><span class="on">报告</span></div>
+  <div class="who">当前身份 <b>王雪梅</b><span class="role">评审人</span></div>
+</header>
+<div class="wrap">
+  <div class="hd">
+    <h1>报告与证据链 — 金坛梅山 100 MWh 磷酸铁锂储能电站 QRA</h1>
+    <span class="sub">项目 dae16c77 · 14 版本 · 6 分析案例 · 2 签发</span>
+  </div>
+  <div class="note"><b>方向 A 的赌注:</b>评审不新开页面——签发就是台账上的一列。版本台账加「签发」状态与动作;
+  签发 = 冻结该版本 + 身份/时间/哈希入审计 + 此后导出的报告页脚自动携带签发行。分析员看到的还是熟悉的报告页。</div>
+
+  <div class="sidegrid">
+    <div>
+      <div class="panel">
+        <div class="ph"><span class="t">模型版本台账</span><span class="m">签发列 = 本方向新增</span></div>
+        <table>
+          <thead><tr><th>版本</th><th>来源</th><th>≥III 累计</th><th>时间 · 作者</th><th>签发状态</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="hash">3f7a21c9</span> <span class="mono" style="color:var(--psa-faint)">Rev 12</span></td>
+              <td>保存</td><td class="num">3.3×10⁻⁵ /yr</td>
+              <td class="mono">07-10 14:02 · 张力群</td>
+              <td><span class="st rev"><i></i>送审中</span></td>
+              <td><button class="btn ok" onclick="document.getElementById('m').classList.add('on')">签发此版本…</button></td>
+            </tr>
+            <tr>
+              <td><span class="hash">9b2e44d0</span> <span class="mono" style="color:var(--psa-faint)">Rev 11</span></td>
+              <td>保存</td><td class="num">3.6×10⁻⁵ /yr</td>
+              <td class="mono">07-09 17:44 · 张力群</td>
+              <td><span class="st draft"><i></i>草稿</span></td>
+              <td><button class="btn" disabled>签发</button></td>
+            </tr>
+            <tr style="background:var(--psa-soft-2)">
+              <td><span class="hash">ed188df9</span> <span class="mono" style="color:var(--psa-faint)">Rev 9</span></td>
+              <td>报告钉扎</td><td class="num">4.1×10⁻⁵ /yr</td>
+              <td class="mono">07-08 11:03 · 张力群</td>
+              <td><span class="st signed"><i></i>已签发 · 王雪梅</span></td>
+              <td><button class="btn">查看签发记录</button></td>
+            </tr>
+            <tr>
+              <td><span class="hash">51c0ab77</span> <span class="mono" style="color:var(--psa-faint)">Rev 8</span></td>
+              <td>保存</td><td class="num">4.1×10⁻⁵ /yr</td>
+              <td class="mono">07-08 09:21 · 张力群</td>
+              <td><span class="st rej"><i></i>退回 · 补充 B_OFFGAS 依据</span></td>
+              <td><button class="btn">查看意见</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="signrow">🔏 签发记录(审计 #218):<b>ed188df9</b> · 王雪梅 · 2026-07-08 12:10 · 意见「Rev 9 数据分级满足筛查级交付,同意签发」</div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><span class="t">分析案例台账</span><span class="m">正式导出仅允许已签发版本(门)</span></div>
+        <table>
+          <thead><tr><th>案例</th><th>类型</th><th>模型版本</th><th>产物</th><th>正式性</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">#12</td><td>报告</td><td><span class="hash">ed188df9</span></td><td class="mono">docx · sha256 fcfd…e655</td><td><span class="st signed"><i></i>正式(签发版)</span></td></tr>
+            <tr><td class="mono">#11</td><td>不确定性</td><td><span class="hash">ed188df9</span></td><td class="mono">N=1000 seed=42</td><td><span class="st signed"><i></i>正式</span></td></tr>
+            <tr><td class="mono">#10</td><td>报告</td><td><span class="hash">3f7a21c9</span></td><td class="mono">csv · sha256 88a1…c2d9</td><td><span class="st draft"><i></i>工作稿水印</span></td></tr>
+          </tbody>
+        </table>
+        <div class="footerpv">正式报告页脚将呈现:<br><b>评价依据:分析案例 #12 · 模型版本 ed188df9 · 引擎 bess-psa 0.1.0 · 签发 王雪梅 2026-07-08</b><br>未签发版本导出自动加「工作稿 — 未经签发」水印,页脚无签发行。</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="ph"><span class="t">送审版本 3f7a21c9 · 与已签发 ed188df9 的差异</span></div>
+        <table>
+          <thead><tr><th>变更</th><th>前 → 后</th></tr></thead>
+          <tbody>
+            <tr><td>屏障「离气/VOC 探测联动停机」PFD</td><td class="num">0.10 → 0.05</td></tr>
+            <tr><td>屏障「舱级气体灭火(全氟己酮)」新增挂载 FTA</td><td class="mono">+ 7 节点</td></tr>
+            <tr><td>CCF 组 G_探测 α₂</td><td class="num">0.03 → 0.04</td></tr>
+          </tbody>
+        </table>
+        <div class="audline">复用既有版本对比组件 — 评审人先看 diff 再签发</div>
+      </div>
+      <div class="panel">
+        <div class="ph"><span class="t">评审意见(版本级)</span></div>
+        <div style="padding:10px 14px;font-size:12.5px">
+          <p style="margin:6px 0"><b>王雪梅</b> <span class="mono" style="color:var(--psa-faint)">07-10 14:40</span><br>
+          B_OFFGAS 0.05 的 Sandia 依据已补充,√。请确认 α₂ 上调的现场检验记录编号。</p>
+          <p style="margin:6px 0"><b>张力群</b> <span class="mono" style="color:var(--psa-faint)">07-10 15:02</span><br>
+          检验记录 JT-2026-041,已附在参数 evidence。</p>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <input style="flex:1;height:30px;border:1px solid var(--psa-line-strong);border-radius:7px;padding:0 10px" placeholder="补充意见…">
+            <button class="btn">发送</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="m">
+  <div class="mbox">
+    <h3>签发版本 3f7a21c9</h3>
+    <p>签发后该版本<b>冻结</b>:身份、时间与版本哈希写入只增审计,此后以该版本导出的报告页脚携带签发行。此动作不可撤销(可另行签发新版本取代)。</p>
+    <div class="kv">签发人 王雪梅(评审人) · 2026-07-10 15:47<br>版本 3f7a21c9 · ≥III 3.3×10⁻⁵ /yr · 审计将记 #219</div>
+    <p>输入登录口令确认签发意向:</p>
+    <input type="password" placeholder="口令">
+    <div class="row">
+      <button class="btn" onclick="document.getElementById('m').classList.remove('on')">取消</button>
+      <button class="btn ok" onclick="alert('已签发:版本冻结,审计 #219 已落,台账行转「已签发 · 王雪梅」');document.getElementById('m').classList.remove('on')">确认签发</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

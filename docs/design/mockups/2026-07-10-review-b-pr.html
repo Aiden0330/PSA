@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>方向 B · PR 式评审 — 评审请求 + 元素锚定线程</title>
+<style>
+:root{--psa-chrome:#0E1A27;--psa-chrome-2:#142231;--psa-chrome-ink:#AEBCCB;--psa-chrome-ink-dim:#7C8B9C;
+--psa-bg:#EEF1F4;--psa-surface:#FFFFFF;--psa-soft:#F8FAFC;--psa-soft-2:#FAFBFC;--psa-line:#E6ECF2;
+--psa-line-2:#D7DEE6;--psa-line-strong:#CFD8E1;--psa-ink:#16202B;--psa-ink-2:#33415A;--psa-muted:#64748B;
+--psa-faint:#94A3B8;--psa-primary:#1F6FE0;--psa-primary-strong:#1559B8;--psa-primary-soft:#E6F1FB;
+--psa-amber:#D97706;--psa-teal:#0F766E;--psa-ok:#2EC26A;--psa-danger:#DC2626;--psa-danger-soft:#FEF2F2;
+--mono:'IBM Plex Mono',ui-monospace,monospace;--r:10px}
+*{box-sizing:border-box}body{margin:0;background:var(--psa-bg);color:var(--psa-ink);
+font:14px/1.6 -apple-system,'PingFang SC','Noto Sans SC',sans-serif}
+header{background:var(--psa-chrome);color:#fff;min-height:52px;display:flex;align-items:center;gap:14px;padding:0 16px}
+header .logo{width:28px;height:28px;border-radius:7px;background:#F0541E;display:flex;align-items:center;justify-content:center;font-size:15px}
+header .t{font-weight:600}
+header .tabs{display:flex;gap:2px;background:rgba(0,0,0,.28);padding:3px;border-radius:9px;margin-left:12px}
+header .tabs span{padding:5px 13px;border-radius:6px;font-size:12.5px;color:var(--psa-chrome-ink)}
+header .tabs .on{background:var(--psa-primary);color:#fff}
+header .tabs .badge{display:inline-block;min-width:16px;text-align:center;background:#F0541E;color:#fff;border-radius:99px;font-size:10px;margin-left:5px;padding:0 4px}
+header .who{margin-left:auto;font-size:12px;color:var(--psa-chrome-ink)}header .who b{color:#fff}
+.role{display:inline-block;border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:1px 9px;font-size:11px;margin-left:6px;color:#BFE3CF}
+.wrap{padding:18px;max-width:1280px;margin:0 auto}
+.note{font-size:11.5px;color:var(--psa-muted);background:var(--psa-primary-soft);border:1px solid #BFD7F5;border-radius:8px;padding:8px 12px;margin-bottom:12px}
+.prhead{background:var(--psa-surface);border:1px solid var(--psa-line);border-radius:var(--r);padding:14px 18px;margin-bottom:14px}
+.prhead h1{font-size:16px;margin:0 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.prid{font-family:var(--mono);font-size:12px;color:var(--psa-faint)}
+.st{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;border-radius:99px;padding:2px 10px}
+.st.open{background:#FFF7E6;color:var(--psa-amber)}
+.st i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.meta{font-size:12px;color:var(--psa-muted)}
+.meta .hash{font-family:var(--mono);font-size:11px;font-weight:700;background:var(--psa-primary-soft);color:var(--psa-primary-strong);border:1px solid #BFD7F5;border-radius:5px;padding:1px 7px}
+.actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 13px;border-radius:8px;border:1px solid var(--psa-line-strong);background:var(--psa-surface);font-size:12.5px;cursor:pointer;color:var(--psa-ink-2)}
+.btn.ok{background:#1B7F42;border-color:#1B7F42;color:#fff;font-weight:600}
+.btn.warn{background:#fff;border-color:var(--psa-danger);color:var(--psa-danger);font-weight:600}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.gate{font-size:11.5px;color:var(--psa-muted);margin-top:8px}
+.gate b{color:var(--psa-amber)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:14px;align-items:start}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--psa-surface);border:1px solid var(--psa-line);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.ph{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--psa-line);background:var(--psa-soft-2)}
+.ph .t{font-size:12px;font-weight:700;color:var(--psa-ink-2)}.ph .m{margin-left:auto;font-size:11px;color:var(--psa-faint)}
+table{border-collapse:collapse;width:100%;font-size:12.6px}
+th{text-align:left;font-size:11px;color:var(--psa-muted);font-weight:600;padding:7px 12px;background:var(--psa-soft);border-bottom:1px solid var(--psa-line-2)}
+td{padding:7px 12px;border-bottom:1px solid var(--psa-line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px}
+.del{background:#FEF2F2}.add{background:#EFFBF3}
+.del .num{color:var(--psa-danger);text-decoration:line-through}
+.add .num{color:#1B7F42;font-weight:700}
+.pin{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:99px;background:var(--psa-amber);color:#fff;font-size:10.5px;font-weight:700;cursor:pointer;vertical-align:middle}
+.pin.done{background:#1B7F42}
+.thread{border:1px solid var(--psa-line);border-radius:9px;margin:10px 12px;overflow:hidden}
+.thread.res{opacity:.62}
+.th-anchor{background:var(--psa-soft);border-bottom:1px solid var(--psa-line);padding:6px 12px;font-size:11.5px;color:var(--psa-ink-2)}
+.th-anchor .mono{font-family:var(--mono);font-size:10.5px;color:var(--psa-primary-strong);font-weight:700}
+.msg{padding:8px 12px;font-size:12.5px;border-bottom:1px solid var(--psa-line)}
+.msg:last-child{border-bottom:0}
+.msg .au{font-weight:700;font-size:12px}
+.msg .tm{font-family:var(--mono);font-size:10.5px;color:var(--psa-faint);margin-left:6px}
+.msg .tag{font-size:10px;border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px}
+.tag.rv{background:#FFF7E6;color:var(--psa-amber);border:1px solid #F5DFB8}
+.tag.an{background:var(--psa-primary-soft);color:var(--psa-primary-strong);border:1px solid #BFD7F5}
+.resolve{padding:6px 12px;background:var(--psa-soft-2);display:flex;gap:8px;align-items:center}
+.resolve button{height:24px;font-size:11px;padding:0 10px;border-radius:6px;border:1px solid var(--psa-line-strong);background:#fff;cursor:pointer;color:var(--psa-ink-2)}
+.resolved-line{font-size:11px;color:#1B7F42;font-weight:600;padding:6px 12px;background:#F2FBF5}
+.timeline{list-style:none;margin:0;padding:6px 0}
+.timeline li{display:flex;gap:10px;padding:7px 16px;font-size:12px;color:var(--psa-ink-2)}
+.timeline .dot{width:8px;height:8px;border-radius:50%;background:var(--psa-line-strong);margin-top:6px;flex:none}
+.timeline .dot.b{background:var(--psa-primary)}.timeline .dot.a{background:var(--psa-amber)}.timeline .dot.g{background:#1B7F42}
+.timeline .tm{font-family:var(--mono);font-size:10.5px;color:var(--psa-faint)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🔥</div><div class="t">BESS PSA</div>
+  <div class="tabs"><span>总览</span><span>事件树（ETA）</span><span>故障树（FTA）</span><span>报告</span><span class="on">评审<span class="badge">2</span></span></div>
+  <div class="who">当前身份 <b>王雪梅</b><span class="role">评审人</span></div>
+</header>
+<div class="wrap">
+  <div class="note"><b>方向 B 的赌注:</b>评审是一个<b>对象</b>(评审请求 RR-7),不是一列状态。分析员把「基线签发版 → 送审版」的 diff 打包送审;
+  评论<b>锚定到元素</b>(某屏障/某参数/某 CCF 组),线程可解决;全部线程解决 + 评审人批准 ⇒ 签发。工程团队的 PR 肌肉记忆直接迁移。</div>
+
+  <div class="prhead">
+    <h1><span class="prid">RR-7</span> Rev 12 送审:离气探测 PFD 修订(Sandia 实测)+ 灭火系统挂载 FTA <span class="st open"><i></i>评审中</span></h1>
+    <div class="meta">张力群 于 07-10 14:05 发起 · 基线 <span class="hash">ed188df9</span>(已签发 Rev 9)→ 送审 <span class="hash">3f7a21c9</span>(Rev 12)· ≥III 累计 4.1×10⁻⁵ → <b>3.3×10⁻⁵ /yr</b></div>
+    <div class="actions">
+      <button class="btn ok" id="approve" disabled>批准并签发 3f7a21c9</button>
+      <button class="btn warn">退回修改…</button>
+      <button class="btn">在只读工作台中打开送审版</button>
+    </div>
+    <div class="gate" id="gate">⛔ 签发门:<b>1 个未解决线程</b> · 批准按钮在全部线程解决前禁用(评审人也可强制批准并说明理由)</div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="panel">
+        <div class="ph"><span class="t">变更差异(元素级)</span><span class="m">📌 点针脚看线程</span></div>
+        <table>
+          <thead><tr><th>元素</th><th>字段</th><th>基线 ed188df9</th><th>送审 3f7a21c9</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td>屏障 B_OFFGAS 离气/VOC 探测联动停机</td><td>PFD</td>
+              <td class="del"><span class="num">0.10</span> <span style="font-size:10.5px;color:var(--psa-faint)">C 级</span></td>
+              <td class="add"><span class="num">0.05</span> <span style="font-size:10.5px;color:var(--psa-faint)">B 级 · Sandia 2024 实测</span></td>
+              <td><span class="pin done" title="线程已解决">✓</span></td>
+            </tr>
+            <tr>
+              <td>屏障 B_SUPP 舱级气体灭火(全氟己酮)</td><td>挂载 FTA</td>
+              <td class="del"><span class="num">手动 PFD 0.10</span></td>
+              <td class="add"><span class="num">FT-SUPP 顶事件 9.6×10⁻²</span>(7 节点)</td>
+              <td><span class="pin" onclick="document.getElementById('t2').scrollIntoView({behavior:'smooth'})">1</span></td>
+            </tr>
+            <tr>
+              <td>CCF 组 G_DET(3 通道探测)</td><td>α₂</td>
+              <td class="del"><span class="num">0.03</span></td>
+              <td class="add"><span class="num">0.04</span> <span style="font-size:10.5px;color:var(--psa-faint)">检验记录 JT-2026-041</span></td>
+              <td><span class="pin done">✓</span></td>
+            </tr>
+            <tr>
+              <td colspan="3" style="color:var(--psa-muted);font-size:12px">结果影响:序列 S-07(≥III)3.1×10⁻⁵ → 2.4×10⁻⁵ · C5 维持 4.0×10⁻⁸ /yr</td>
+              <td class="num">Δ −24%</td><td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><span class="t">评论线程</span><span class="m">2 已解决 · 1 未解决</span></div>
+
+        <div class="thread res">
+          <div class="th-anchor">📌 锚定 <span class="mono">B_OFFGAS.PFD</span> — 屏障「离气/VOC 探测联动停机」失效概率</div>
+          <div class="msg"><span class="au">王雪梅</span><span class="tag rv">评审人</span><span class="tm">07-10 14:40</span><br>0.05 的 Sandia 依据请补充测试温度范围——低温舱工况是否覆盖?</div>
+          <div class="msg"><span class="au">张力群</span><span class="tag an">分析员</span><span class="tm">07-10 15:02</span><br>已补:Sandia SAND2024-0451 表 6,−20…55 ℃ 全覆盖,evidence 字段已挂链接。</div>
+          <div class="resolved-line">✓ 已解决 — 王雪梅 · 07-10 15:20</div>
+        </div>
+
+        <div class="thread" id="t2">
+          <div class="th-anchor">📌 锚定 <span class="mono">FT-SUPP.G1</span> — 灭火 FTA 顶门「启动失败 OR 抑制无效」</div>
+          <div class="msg"><span class="au">王雪梅</span><span class="tag rv">评审人</span><span class="tm">07-10 15:31</span><br>FT 顶值 9.6×10⁻² 与原手动 PFD 0.10 几乎相同——挂载 FTA 的增值在哪?若仅为形式化建议注明;另外喷头堵塞基本事件用了 D 级筛查值,建议列入下轮数据改进清单。</div>
+          <div class="resolve">
+            <input style="flex:1;height:26px;border:1px solid var(--psa-line-strong);border-radius:6px;padding:0 8px;font-size:12px" placeholder="回复线程…">
+            <button onclick="this.closest('.thread').classList.add('res');this.closest('.thread').querySelector('.resolve').outerHTML='<div class=resolved-line>✓ 已解决 — 王雪梅 · 07-10 15:58</div>';document.getElementById('approve').disabled=false;document.getElementById('gate').innerHTML='✅ 签发门:全部线程已解决 — 可批准'">解决</button>
+            <button>回复</button>
+          </div>
+        </div>
+
+        <div class="thread res">
+          <div class="th-anchor">📌 锚定 <span class="mono">G_DET.alpha</span> — CCF 组「三通道离气探测」α 因子</div>
+          <div class="msg"><span class="au">王雪梅</span><span class="tag rv">评审人</span><span class="tm">07-10 14:55</span><br>α₂ 上调的现场检验记录编号?</div>
+          <div class="msg"><span class="au">张力群</span><span class="tag an">分析员</span><span class="tm">07-10 15:02</span><br>JT-2026-041,已附参数 evidence。</div>
+          <div class="resolved-line">✓ 已解决 — 王雪梅 · 07-10 15:21</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="ph"><span class="t">评审时间线(即审计视图)</span></div>
+        <ul class="timeline">
+          <li><span class="dot b"></span><div>张力群 发起评审请求 RR-7(基线 ed188df9 → 送审 3f7a21c9)<div class="tm">07-10 14:05 · 审计 #214</div></div></li>
+          <li><span class="dot a"></span><div>王雪梅 开启 3 个元素锚定线程<div class="tm">07-10 14:40–15:31 · 审计 #215–217</div></div></li>
+          <li><span class="dot b"></span><div>张力群 补充 evidence ×2(送审版未变——变更即重开评审)<div class="tm">07-10 15:02 · 审计 #218</div></div></li>
+          <li><span class="dot g"></span><div><b>待发生:</b>王雪梅 批准并签发 → 版本冻结 + 身份/时间/哈希入审计 + 报告页脚签发行<div class="tm">审计 #219(签发类,不可撤销)</div></div></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <div class="ph"><span class="t">签发后报告页脚(预览)</span></div>
+        <div style="margin:12px;padding:10px 14px;background:var(--psa-soft);border:1px dashed var(--psa-line-strong);border-radius:8px;font-family:var(--mono);font-size:11.5px;color:var(--psa-muted)">
+          评价依据:分析案例 #13 · 模型版本 <b style="color:var(--psa-ink-2)">3f7a21c9</b> · 引擎 bess-psa 0.1.0<br>
+          <b style="color:var(--psa-ink-2)">评审:RR-7 · 3 线程全部解决 · 签发 王雪梅 2026-07-10 15:58</b>
+        </div>
+        <div style="padding:0 14px 12px;font-size:11.5px;color:var(--psa-muted)">页脚引用评审请求号——监管追溯可从报告直达全部线程与回复。</div>
+      </div>
+      <div class="panel">
+        <div class="ph"><span class="t">评审请求列表</span></div>
+        <table>
+          <thead><tr><th>#</th><th>标题</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr><td class="num">RR-7</td><td>Rev 12 离气探测 PFD 修订</td><td><span class="st open"><i></i>评审中</span></td></tr>
+            <tr><td class="num">RR-6</td><td>Rev 9 初次交付基线</td><td><span style="color:#1B7F42;font-weight:700;font-size:11.5px">✓ 已签发 07-08</span></td></tr>
+            <tr><td class="num">RR-5</td><td>Rev 8 首轮送审</td><td><span style="color:var(--psa-danger);font-weight:700;font-size:11.5px">↩ 退回 07-08</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

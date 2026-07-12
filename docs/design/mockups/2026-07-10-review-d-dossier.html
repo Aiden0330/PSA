@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>方向 D · 签章文档式 — 冻结报告 + 会签页</title>
+<style>
+:root{--psa-chrome:#0E1A27;--psa-chrome-2:#142231;--psa-chrome-ink:#AEBCCB;--psa-chrome-ink-dim:#7C8B9C;
+--psa-bg:#EEF1F4;--psa-surface:#FFFFFF;--psa-soft:#F8FAFC;--psa-soft-2:#FAFBFC;--psa-line:#E6ECF2;
+--psa-line-2:#D7DEE6;--psa-line-strong:#CFD8E1;--psa-ink:#16202B;--psa-ink-2:#33415A;--psa-muted:#64748B;
+--psa-faint:#94A3B8;--psa-primary:#1F6FE0;--psa-primary-strong:#1559B8;--psa-primary-soft:#E6F1FB;
+--psa-amber:#D97706;--psa-teal:#0F766E;--psa-ok:#2EC26A;--psa-danger:#DC2626;--psa-danger-soft:#FEF2F2;
+--mono:'IBM Plex Mono',ui-monospace,monospace;--r:10px}
+*{box-sizing:border-box}body{margin:0;background:var(--psa-bg);color:var(--psa-ink);
+font:14px/1.6 -apple-system,'PingFang SC','Noto Sans SC',sans-serif}
+header{background:var(--psa-chrome);color:#fff;min-height:52px;display:flex;align-items:center;gap:14px;padding:0 16px}
+header .logo{width:28px;height:28px;border-radius:7px;background:#F0541E;display:flex;align-items:center;justify-content:center;font-size:15px}
+header .t{font-weight:600}
+header .tabs{display:flex;gap:2px;background:rgba(0,0,0,.28);padding:3px;border-radius:9px;margin-left:12px}
+header .tabs span{padding:5px 13px;border-radius:6px;font-size:12.5px;color:var(--psa-chrome-ink)}
+header .tabs .on{background:var(--psa-primary);color:#fff}
+header .who{margin-left:auto;font-size:12px;color:var(--psa-chrome-ink)}header .who b{color:#fff}
+.role{display:inline-block;border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:1px 9px;font-size:11px;margin-left:6px;color:#BFE3CF}
+.wrap{padding:18px;max-width:1300px;margin:0 auto}
+.note{font-size:11.5px;color:var(--psa-muted);background:var(--psa-primary-soft);border:1px solid #BFD7F5;border-radius:8px;padding:8px 12px;margin-bottom:14px}
+.bar{display:flex;align-items:center;gap:10px;background:var(--psa-surface);border:1px solid var(--psa-line);border-radius:var(--r);padding:9px 14px;margin-bottom:14px;flex-wrap:wrap}
+.bar .t{font-size:13.5px;font-weight:700}
+.hash{font-family:var(--mono);font-size:11px;font-weight:700;background:var(--psa-primary-soft);color:var(--psa-primary-strong);border:1px solid #BFD7F5;border-radius:5px;padding:1px 7px}
+.frozen{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;background:#EAF3FF;color:var(--psa-primary-strong);border:1px solid #BFD7F5;border-radius:99px;padding:2px 10px}
+.btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 13px;border-radius:8px;border:1px solid var(--psa-line-strong);background:var(--psa-surface);font-size:12.5px;cursor:pointer;color:var(--psa-ink-2)}
+.btn.ok{background:#1B7F42;border-color:#1B7F42;color:#fff;font-weight:600}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;align-items:start}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}}
+.doc{background:var(--psa-surface);border:1px solid var(--psa-line);border-radius:var(--r);padding:34px 44px;position:relative;box-shadow:0 1px 3px rgba(9,14,22,.06)}
+.doc .wm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:64px;font-weight:800;color:rgba(31,111,224,.055);transform:rotate(-24deg);letter-spacing:12px}
+.doc h2{font-size:18px;text-align:center;margin:0 0 2px;letter-spacing:2px}
+.doc .sub{text-align:center;font-size:11.5px;color:var(--psa-faint);font-family:var(--mono);margin-bottom:20px}
+.doc h3{font-size:14px;margin:20px 0 8px;padding-left:9px;border-left:3px solid var(--psa-primary)}
+.doc p{font-size:13px;color:var(--psa-ink-2);margin:6px 0}
+table{border-collapse:collapse;width:100%;font-size:12.3px;margin:8px 0}
+th{text-align:left;font-size:11px;color:var(--psa-muted);font-weight:600;padding:6px 10px;background:var(--psa-soft);border:1px solid var(--psa-line-2)}
+td{padding:6px 10px;border:1px solid var(--psa-line-2)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:11.8px}
+.anch{position:relative;background:#FFFBEB;outline:1px dashed #F5DFB8;cursor:pointer}
+.anch .pin{position:absolute;right:-9px;top:-9px;min-width:17px;height:17px;border-radius:99px;background:var(--psa-amber);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.anch.res{background:#F2FBF5;outline-color:#BFE9CD}.anch.res .pin{background:#1B7F42}
+.signpage{margin-top:26px;border-top:2px solid var(--psa-line-strong);padding-top:18px}
+.signpage h3{border:none;text-align:center;padding:0;letter-spacing:3px}
+.signgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--psa-line-strong)}
+.sg{border-right:1px solid var(--psa-line-strong);padding:12px 12px 14px;text-align:center}
+.sg:last-child{border-right:0}
+.sg .r{font-size:11.5px;color:var(--psa-muted);letter-spacing:2px}
+.sg .n{font-size:15px;font-weight:700;margin:10px 0 2px;font-family:'Kaiti SC','STKaiti',serif}
+.sg .d{font-family:var(--mono);font-size:10.5px;color:var(--psa-faint)}
+.sg .seal{display:inline-block;margin-top:6px;border:2px solid rgba(220,38,38,.65);color:rgba(220,38,38,.8);border-radius:6px;font-size:10px;padding:2px 8px;transform:rotate(-7deg);font-weight:700}
+.sg .empty{color:var(--psa-faint);font-size:12px;margin:12px 0}
+.panel{background:var(--psa-surface);border:1px solid var(--psa-line);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.ph{display:flex;align-items:center;padding:9px 14px;border-bottom:1px solid var(--psa-line);background:var(--psa-soft-2)}
+.ph .t{font-size:12px;font-weight:700;color:var(--psa-ink-2)}.ph .m{margin-left:auto;font-size:11px;color:var(--psa-faint)}
+.cm{padding:10px 14px;border-bottom:1px solid var(--psa-line);font-size:12.5px}
+.cm:last-child{border-bottom:0}
+.cm .au{font-weight:700;font-size:12px}
+.cm .tm{font-family:var(--mono);font-size:10.5px;color:var(--psa-faint);margin-left:6px}
+.cm .anchor-ref{font-family:var(--mono);font-size:10.5px;color:var(--psa-amber);font-weight:700}
+.cm.res .anchor-ref{color:#1B7F42}
+.cm .st{font-size:10.5px;font-weight:700}
+.footer-pv{font-family:var(--mono);font-size:11px;color:var(--psa-muted);border-top:1px dashed var(--psa-line-strong);margin-top:22px;padding-top:10px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🔥</div><div class="t">BESS PSA</div>
+  <div class="tabs"><span>总览</span><span>事件树（ETA）</span><span>故障树（FTA）</span><span class="on">报告 · 送审稿</span></div>
+  <div class="who">当前身份 <b>王雪梅</b><span class="role">评审人</span></div>
+</header>
+<div class="wrap">
+  <div class="note"><b>方向 D 的赌注:</b>评审面 = <b>报告本身</b>。送审即生成该版本的冻结报告预览(与正式导出同一渲染管线),
+  评审人在页边直接钉评论(锚到章节/表格行),末页是中式工程交付习惯的<b>编制/校核/审定/批准会签栏</b>——每格签章 = 一次认证签名入审计。
+  监管沟通零翻译成本:屏幕上看到的就是交付物。</div>
+
+  <div class="bar">
+    <span class="t">金坛梅山 100 MWh QRA 报告 · Rev 12 送审稿</span>
+    <span class="frozen">🧊 冻结于版本 <span class="hash" style="margin-left:2px">3f7a21c9</span></span>
+    <span style="font-size:11.5px;color:var(--psa-muted)">送审 张力群 07-10 14:05 · 案例 #10</span>
+    <span style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn">↩ 退回修改…</button>
+      <button class="btn ok" id="sign" onclick="doSign()">✍ 校核签章(王雪梅)</button>
+    </span>
+  </div>
+
+  <div class="grid">
+    <div class="doc">
+      <div class="wm">送审稿</div>
+      <h2>锂离子电池储能电站热失控定量风险评估报告</h2>
+      <div class="sub">BESS-QRA-2026-012 · Rev 12 · 模型版本 3f7a21c9 · 引擎 bess-psa 0.1.0</div>
+
+      <h3>5 · 屏障与数据分级</h3>
+      <table>
+        <thead><tr><th>屏障</th><th>PFD</th><th>分级</th><th>依据</th></tr></thead>
+        <tbody>
+          <tr class="anch res" onclick="void 0"><td>离气/VOC 探测联动停机</td><td class="num">0.05</td><td>B</td><td>Sandia SAND2024-0451 表 6(−20…55 ℃)<span class="pin">✓</span></td></tr>
+          <tr><td>BMS 主动切断</td><td class="num">0.10</td><td>C</td><td>EPRI 2023 BESS 失效数据库</td></tr>
+          <tr><td>电芯间热障(气凝胶隔板)</td><td class="num">0.30</td><td>C</td><td>UL 9540A 扩展试验推断</td></tr>
+          <tr class="anch" onclick="void 0"><td>舱级气体灭火(全氟己酮)</td><td class="num">9.6×10⁻²</td><td>—</td><td>挂载 FT-SUPP 顶事件(7 节点)<span class="pin">1</span></td></tr>
+          <tr><td>泄爆板(NFPA 68)</td><td class="num">0.20</td><td>D</td><td>筛查值,待改进清单</td></tr>
+        </tbody>
+      </table>
+
+      <h3>7 · 量化结果</h3>
+      <p>事件树 5 场景 22 序列,精确 Shannon 量化(共享事件与 CCF 组 G_DET 显式建模,非稀有事件近似):</p>
+      <table>
+        <thead><tr><th>后果等级</th><th>频率(/yr)</th><th>p05–p95</th></tr></thead>
+        <tbody>
+          <tr><td>≥III(舱级热失控扩展)累计</td><td class="num"><b>3.3×10⁻⁵</b></td><td class="num">1.1×10⁻⁵ – 8.7×10⁻⁵</td></tr>
+          <tr><td>C5(场址级多舱链锁)</td><td class="num">4.0×10⁻⁸</td><td class="num">6.2×10⁻⁹ – 1.9×10⁻⁷</td></tr>
+        </tbody>
+      </table>
+
+      <div class="signpage">
+        <h3>会 签 页</h3>
+        <div class="signgrid">
+          <div class="sg"><div class="r">编 制</div><div class="n">张力群</div><div class="d">2026-07-10 14:05</div><div class="seal">已签 · 审计 #214</div></div>
+          <div class="sg" id="check"><div class="r">校 核</div><div class="empty" id="checkEmpty">待 王雪梅 签章</div></div>
+          <div class="sg"><div class="r">审 定</div><div class="empty">待校核完成</div></div>
+          <div class="sg"><div class="r">批 准</div><div class="empty">待审定完成</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--psa-muted);margin-top:8px">每格签章 = 认证身份 + 时间 + 版本哈希写入只增审计;全部签毕 → 版本转「已签发」,正式导出解锁,水印移除。角色映射:编制=分析员,校核/审定=评审人,批准=管理员(小团队可配置合并后两级)。</div>
+      </div>
+
+      <div class="footer-pv">评价依据:分析案例 #10 · 模型版本 3f7a21c9 · 引擎 bess-psa 0.1.0 · 会签 编制 张力群 07-10 / 校核 <span id="ftr">—</span> / 审定 — / 批准 —</div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="ph"><span class="t">页边评论(锚定章节/表行)</span><span class="m">1 未解决</span></div>
+        <div class="cm res">
+          <span class="anchor-ref">§5 · B_OFFGAS 行</span> <span class="st" style="color:#1B7F42">✓ 已解决</span><br>
+          <span class="au">王雪梅</span><span class="tm">07-10 14:40</span> Sandia 依据请补测试温度范围。<br>
+          <span class="au">张力群</span><span class="tm">15:02</span> 已补 −20…55 ℃,evidence 已挂。
+        </div>
+        <div class="cm">
+          <span class="anchor-ref">§5 · B_SUPP 行</span> <span class="st" style="color:var(--psa-amber)">● 未解决</span><br>
+          <span class="au">王雪梅</span><span class="tm">15:31</span> FT 顶值与原手动 PFD 几乎相同,请在报告正文注明挂载 FTA 的目的(结构化依据而非数值改变);喷头堵塞 D 级值列入数据改进清单。
+        </div>
+        <div style="padding:10px 14px;display:flex;gap:8px">
+          <input style="flex:1;height:28px;border:1px solid var(--psa-line-strong);border-radius:7px;padding:0 9px;font-size:12px" placeholder="选中正文任意行后评论…">
+          <button class="btn" style="height:28px">钉评论</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph"><span class="t">签章即审计(只增)</span></div>
+        <div style="padding:10px 14px;font-family:var(--mono);font-size:11px;color:var(--psa-muted);line-height:2">
+          #214 send_review 张力群 07-10 14:05 3f7a21c9<br>
+          #215 comment 王雪梅 14:40 §5.B_OFFGAS<br>
+          #216 comment 王雪梅 15:31 §5.B_SUPP<br>
+          #217 reply 张力群 15:02 §5.B_OFFGAS<br>
+          #218 resolve 王雪梅 15:20 §5.B_OFFGAS<br>
+          <span id="aud" style="color:var(--psa-faint)">#219 sign_check 王雪梅 —(待签)</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph"><span class="t">历史签发文档</span></div>
+        <div style="padding:10px 14px;font-size:12.3px;line-height:2">
+          📄 Rev 9 · <span class="hash">ed188df9</span> · 会签齐 · 2026-07-08 · 正式 docx ×2<br>
+          📄 Rev 4(舟山)· <span class="hash">dae16c77</span> · 会签齐 · 06-28
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function doSign(){
+  if(!confirm('以 王雪梅(评审人)身份在「校核」栏签章?\n版本 3f7a21c9 · 2026-07-10 15:58 将写入只增审计 #219。\n提示:仍有 1 条未解决评论——签章将附带「保留意见」标记。'))return;
+  document.getElementById('check').innerHTML='<div class="r">校 核</div><div class="n">王雪梅</div><div class="d">2026-07-10 15:58</div><div class="seal">已签 · 审计 #219 · 保留意见</div>';
+  document.getElementById('ftr').textContent='王雪梅 07-10';
+  document.getElementById('aud').innerHTML='#219 sign_check 王雪梅 15:58 3f7a21c9 (保留意见:§5.B_SUPP)';
+  document.getElementById('aud').style.color='var(--psa-ink-2)';
+  document.getElementById('sign').disabled=true;
+}
+</script>
+</body>
+</html>
