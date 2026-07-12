@@ -215,6 +215,43 @@ export interface VersionDiff {
 export const diffProjectVersions = (uuid: string, from: number, to: number) =>
   jget<VersionDiff>(`/projects/${uuid}/diff?from=${from}&to=${to}`)
 
+// ── Phase 5 评审/签发(D-P5-5 方向 A)──
+// 评审动作离线无意义:失败显式抛错(detail-aware),绝不进 /api/saved 的 localStorage 回退家族。
+export interface ReviewInfo {
+  id: number
+  version_id: number
+  content_hash: string
+  state: 'in_review' | 'signed' | 'returned'
+  submitted_by: string
+  submitted_at: string
+  decided_by: string | null
+  decided_at: string | null
+  note: string | null
+}
+export interface ReviewComment { id: number; author: string; created_at: string; body: string }
+
+async function jpostReview<T>(path: string, body: unknown): Promise<T> {
+  const r = await fetch(`${BASE}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  if (!r.ok) {
+    let detail = ''
+    try { const d = await r.json(); detail = typeof d?.detail === 'string' ? d.detail : '' } catch {}
+    throw new Error(detail || `${path} → ${r.status}`)
+  }
+  return r.json()
+}
+
+export const listProjectReviews = (uuid: string) => jget<ReviewInfo[]>(`/projects/${uuid}/reviews`)
+export const submitReview = (uuid: string, versionId: number, note?: string) =>
+  jpostReview<ReviewInfo>(`/projects/${uuid}/reviews`, { version_id: versionId, note })
+export const signReview = (uuid: string, versionId: number, note?: string, password?: string) =>
+  jpostReview<ReviewInfo>(`/projects/${uuid}/reviews/${versionId}/sign`, { note, password })
+export const returnReview = (uuid: string, versionId: number, note: string) =>
+  jpostReview<ReviewInfo>(`/projects/${uuid}/reviews/${versionId}/return`, { note })
+export const listVersionComments = (uuid: string, versionId: number) =>
+  jget<ReviewComment[]>(`/projects/${uuid}/versions/${versionId}/comments`)
+export const addVersionComment = (uuid: string, versionId: number, body: string) =>
+  jpostReview<ReviewComment>(`/projects/${uuid}/versions/${versionId}/comments`, { body })
+
 export async function importMef(xml: string): Promise<{ model: any; fault_tree: string }> {
   const r = await fetch(`${BASE}/import/mef`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ xml }) })
   if (!r.ok) throw new Error(`mef import → ${r.status}`)
