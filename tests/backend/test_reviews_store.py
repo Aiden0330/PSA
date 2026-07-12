@@ -110,7 +110,7 @@ def test_return_requires_note():
 
 def test_submit_ghost_version_raises():
     store.ensure_project(PUUID, "P")
-    with pytest.raises(ValueError):
+    with pytest.raises(LookupError):                          # API 层转 400
         store.submit_review(PUUID, 12345)
 
 
@@ -135,5 +135,5 @@ def test_comments_roundtrip_and_audit():
     assert "review.comment" in _audit_actions()
     with pytest.raises(ValueError):
         store.add_review_comment(PUUID, v1["id"], "   ")
-    with pytest.raises(ValueError):
+    with pytest.raises(LookupError):
         store.add_review_comment(PUUID, 12345, "ghost")

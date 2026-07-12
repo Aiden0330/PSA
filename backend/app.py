@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel
 
 from backend import examples, schemas
 from psaengine.model.json_io import load_model_from_dict
@@ -344,6 +345,76 @@ def api_project_audit(puuid: str, limit: int = 200):
 def api_project_cases(puuid: str):
     from backend import store
     return store.list_cases(puuid)
+
+# ---- Phase 5 评审/签发(D-P5-5 方向 A):台账状态机 + 版本级评论 ----
+# 角色守卫属 auth 层(PSA_AUTH=local),落地时在此挂:送审=分析员+,签发/退回=评审人+。
+
+class ReviewSubmitBody(BaseModel):
+    version_id: int
+    note: str | None = None
+
+class ReviewDecideBody(BaseModel):
+    note: str | None = None
+    password: str | None = None   # 仅 PSA_AUTH=local 时校验(签发口令复核);off 模式忽略
+
+class ReviewCommentBody(BaseModel):
+    body: str
+
+@app.get("/api/projects/{puuid}/reviews")
+def api_reviews_list(puuid: str):
+    from backend import store
+    return store.list_reviews(puuid)
+
+@app.post("/api/projects/{puuid}/reviews")
+def api_review_submit(puuid: str, body: ReviewSubmitBody):
+    import sqlite3
+    from backend import store
+    try:
+        return store.submit_review(puuid, body.version_id, note=body.note)
+    except LookupError as e:
+        raise HTTPException(400, f"版本不存在:{e}")
+    except store.ReviewStateError as e:
+        raise HTTPException(409, f"评审状态冲突:{e}")
+    except sqlite3.IntegrityError:
+        raise HTTPException(409, "已有送审中版本(单项目同一时刻至多一个送审中)")
+
+@app.post("/api/projects/{puuid}/reviews/{vid}/sign")
+def api_review_sign(puuid: str, vid: int, body: ReviewDecideBody):
+    from backend import store
+    try:
+        return store.sign_review(puuid, vid, note=body.note)
+    except LookupError as e:
+        raise HTTPException(400, f"版本不存在:{e}")
+    except store.ReviewStateError:
+        raise HTTPException(409, "仅送审中的版本可签发")
+
+@app.post("/api/projects/{puuid}/reviews/{vid}/return")
+def api_review_return(puuid: str, vid: int, body: ReviewDecideBody):
+    from backend import store
+    try:
+        return store.return_review(puuid, vid, note=body.note or "")
+    except LookupError as e:
+        raise HTTPException(400, f"版本不存在:{e}")
+    except store.ReviewStateError:
+        raise HTTPException(409, "仅送审中的版本可退回")
+    except ValueError:
+        raise HTTPException(422, "退回必须填写理由(证据链要求)")
+
+@app.get("/api/projects/{puuid}/versions/{vid}/comments")
+def api_version_comments(puuid: str, vid: int):
+    from backend import store
+    return store.list_review_comments(puuid, vid)
+
+@app.post("/api/projects/{puuid}/versions/{vid}/comments")
+def api_version_comment_add(puuid: str, vid: int, body: ReviewCommentBody):
+    from backend import store
+    try:
+        cid = store.add_review_comment(puuid, vid, body.body)
+    except LookupError as e:
+        raise HTTPException(400, f"版本不存在:{e}")
+    except ValueError:
+        raise HTTPException(422, "评论内容不能为空")
+    return next(c for c in store.list_review_comments(puuid, vid) if c["id"] == cid)
 
 @app.get("/api/schema/project-document/1.0")
 def api_project_document_schema():

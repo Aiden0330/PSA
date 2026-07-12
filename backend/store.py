@@ -283,6 +283,12 @@ def list_cases(puuid: str) -> list[dict]:
 # ── Phase 5 reviews:评审/签发状态机(D-P5-5 方向 A)──
 # 草稿 = 无行;in_review → signed(终态,触发器护住)| returned → 重新送审回转同一行。
 # 单项目至多一个 in_review 由部分唯一索引保证(违反 → IntegrityError,API 层转 409)。
+# 异常约定:LookupError=版本不存在(400)· ReviewStateError=状态冲突(409)·
+# 裸 ValueError=输入校验(422)。
+
+
+class ReviewStateError(ValueError):
+    """Transition not allowed from the version's current review state."""
 
 _REVIEW_SELECT = ("SELECT r.id, r.version_id, v.content_hash, r.state, r.submitted_by,"
                   " r.submitted_at, r.decided_by, r.decided_at, r.note"
@@ -294,7 +300,7 @@ def _require_version_hash(cx: sqlite3.Connection, puuid: str, version_id: int) -
     r = cx.execute("SELECT content_hash FROM versions WHERE project_uuid=? AND id=?",
                    (puuid, version_id)).fetchone()
     if r is None:
-        raise ValueError(f"version {version_id} not found in project")
+        raise LookupError(f"version {version_id} not found in project")
     return r["content_hash"]
 
 
@@ -315,9 +321,9 @@ def submit_review(puuid: str, version_id: int, note: str | None = None) -> dict:
         h = _require_version_hash(cx, puuid, version_id)
         row = _review_row(cx, puuid, version_id)
         if row is not None and row["state"] == "signed":
-            raise ValueError("signed version cannot be resubmitted")
+            raise ReviewStateError("signed version cannot be resubmitted")
         if row is not None and row["state"] == "in_review":
-            raise ValueError("version is already in review")
+            raise ReviewStateError("version is already in review")
         if row is None:
             cx.execute("INSERT INTO reviews(project_uuid,version_id,state,submitted_by,"
                        "submitted_at,note) VALUES(?,?,'in_review',?,?,?)",
@@ -337,7 +343,7 @@ def sign_review(puuid: str, version_id: int, note: str | None = None) -> dict:
         h = _require_version_hash(cx, puuid, version_id)
         row = _review_row(cx, puuid, version_id)
         if row is None or row["state"] != "in_review":
-            raise ValueError("only an in-review version can be signed")
+            raise ReviewStateError("only an in-review version can be signed")
         cx.execute("UPDATE reviews SET state='signed', decided_by=?, decided_at=?, note=?"
                    " WHERE id=?", (actor(), _now(), note, row["id"]))
         record_audit(cx, "review.sign", project_uuid=puuid, version_id=version_id,
@@ -353,7 +359,7 @@ def return_review(puuid: str, version_id: int, note: str) -> dict:
         h = _require_version_hash(cx, puuid, version_id)
         row = _review_row(cx, puuid, version_id)
         if row is None or row["state"] != "in_review":
-            raise ValueError("only an in-review version can be returned")
+            raise ReviewStateError("only an in-review version can be returned")
         cx.execute("UPDATE reviews SET state='returned', decided_by=?, decided_at=?, note=?"
                    " WHERE id=?", (actor(), _now(), note, row["id"]))
         record_audit(cx, "review.return", project_uuid=puuid, version_id=version_id,
