@@ -264,7 +264,10 @@ export function EtaWorkbench(
   )
 }
 
-const etaToolbar: CSSProperties = { minHeight: 46, flexShrink: 0, background: 'var(--psa-soft-2)', borderBottom: '1px solid var(--psa-line-2)', display: 'flex', alignItems: 'center', padding: '0 14px', gap: 10, flexWrap: 'wrap' }
+// padding 上下 8px 是有意的:ribbon 用 flex-wrap,窄视口/出现滚动条时会换行;若上下 padding 为 0,
+// 换行后第一行按钮会紧贴顶部深色 header(gap=0)。8px 上下留白 + rowGap 让单行/多行都有呼吸空间
+// (单行时 minHeight 46 − 16 padding = 30 恰好容纳按钮,视觉与原先一致)。与 FTA 工具栏口径统一。
+const etaToolbar: CSSProperties = { minHeight: 46, flexShrink: 0, background: 'var(--psa-soft-2)', borderBottom: '1px solid var(--psa-line-2)', display: 'flex', alignItems: 'center', padding: '8px 14px', columnGap: 10, rowGap: 8, flexWrap: 'wrap' }
 const ribbonSelect: CSSProperties = { height: 30, border: '1px solid var(--psa-line-strong)', borderRadius: 7, padding: '0 8px', fontSize: 12.5, color: 'var(--psa-ink)', background: 'var(--psa-surface)' }
 const ribbonDiv: CSSProperties = { width: 1, height: 22, background: 'var(--psa-line-2)' }
 const etaTabsRow: CSSProperties = { minHeight: 42, flexShrink: 0, background: 'var(--psa-bg)', borderBottom: '1px solid var(--psa-line-2)', display: 'flex', alignItems: 'flex-end', padding: '0 12px', gap: 3, flexWrap: 'wrap' }
