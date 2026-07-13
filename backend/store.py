@@ -196,7 +196,13 @@ def ensure_project(puuid: str, name: str) -> bool:
 
 def create_version(puuid: str, doc: ProjectDocument, sidecar: dict | None = None, *,
                    origin: str = "save", message: str | None = None) -> dict:
-    """Idempotent by content hash (D6): same content => the existing version."""
+    """Idempotent by content hash (D6): same content => the existing version.
+
+    P3 concurrency probe (2026-07-12) surfaced a check-then-insert race here:
+    two threads can both miss the SELECT and both attempt the INSERT, and the
+    loser previously crashed with IntegrityError instead of returning the
+    winner's row. Caught and folded into the idempotent-hit path — concurrent
+    identical saves must be safe, not just sequential ones."""
     h = content_hash(doc)
     with _conn() as cx:
         row = cx.execute("SELECT id FROM versions WHERE project_uuid=? AND content_hash=?",
@@ -205,12 +211,17 @@ def create_version(puuid: str, doc: ProjectDocument, sidecar: dict | None = None
             return {"id": row["id"], "content_hash": h, "created": False}
         parent = cx.execute("SELECT id FROM versions WHERE project_uuid=? ORDER BY id DESC LIMIT 1",
                             (puuid,)).fetchone()
-        cur = cx.execute(
-            "INSERT INTO versions(project_uuid,content_hash,parent_version_id,canonical_json,"
-            "sidecar_json,created_at,actor,origin,message) VALUES(?,?,?,?,?,?,?,?,?)",
-            (puuid, h, parent["id"] if parent else None, canonical_json(doc),
-             json.dumps(sidecar, ensure_ascii=False) if sidecar is not None else None,
-             _now(), actor(), origin, message))
+        try:
+            cur = cx.execute(
+                "INSERT INTO versions(project_uuid,content_hash,parent_version_id,canonical_json,"
+                "sidecar_json,created_at,actor,origin,message) VALUES(?,?,?,?,?,?,?,?,?)",
+                (puuid, h, parent["id"] if parent else None, canonical_json(doc),
+                 json.dumps(sidecar, ensure_ascii=False) if sidecar is not None else None,
+                 _now(), actor(), origin, message))
+        except sqlite3.IntegrityError:
+            row = cx.execute("SELECT id FROM versions WHERE project_uuid=? AND content_hash=?",
+                             (puuid, h)).fetchone()
+            return {"id": row["id"], "content_hash": h, "created": False}
         vid = cur.lastrowid
         cx.execute("UPDATE projects SET modified_at=? WHERE uuid=?", (_now(), puuid))
         record_audit(cx, "version.auto_pin" if origin == "auto_pin" else "version.create",
