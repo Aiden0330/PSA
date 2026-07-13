@@ -81,6 +81,17 @@ CREATE TABLE IF NOT EXISTS review_comments(
   project_uuid TEXT NOT NULL REFERENCES projects(uuid),
   version_id INTEGER NOT NULL REFERENCES versions(id),
   author TEXT NOT NULL, created_at TEXT NOT NULL, body TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS accounts(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  pw_hash TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('admin','analyst','reviewer')),
+  display_name TEXT, created_at TEXT NOT NULL,
+  disabled INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS sessions(
+  token TEXT PRIMARY KEY,
+  account_id INTEGER NOT NULL REFERENCES accounts(id),
+  created_at TEXT NOT NULL, expires_at TEXT NOT NULL);
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit_log
   BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_log
@@ -278,6 +289,134 @@ def list_cases(puuid: str) -> list[dict]:
         rows = cx.execute("SELECT * FROM analysis_cases WHERE project_uuid=?"
                           " ORDER BY id DESC", (puuid,)).fetchall()
         return [dict(r) for r in rows]
+
+
+# ── Phase 5 auth:accounts(argon2id)+ sessions(规格 §4.1,B2)──
+# 安全钉定:sessions.token 列存 sha256(原始 token)—— 备份=库文件拷贝(ADR-4),
+# 库泄露不得等于会话劫持;原始 token(secrets.token_urlsafe(32),256 bit)只发给客户端。
+# verify_credentials 对 未知用户/错口令/停用 一律 None(枚举防御,未知用户走 dummy_verify
+# 等时垫片);真实原因只进审计。TTL 12h,消耗过半即滑动续期(写库有界)。
+
+_SESSION_TTL_HOURS = 12
+_ROLES = ("admin", "analyst", "reviewer")
+
+
+def _token_hash(token: str) -> str:
+    import hashlib
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def create_account(username: str, password: str, role: str,
+                   display_name: str | None = None) -> dict:
+    """建账户(argon2id 哈希)。重名 → IntegrityError;弱口令/坏角色 → ValueError。"""
+    from backend.auth import passwords
+    if role not in _ROLES:
+        raise ValueError(f"role must be one of {_ROLES}")
+    if not username or not username.strip():
+        raise ValueError("username required")
+    pw_hash = passwords.hash_password(password)          # 长度门在哈希层(单点)
+    with _conn() as cx:
+        cx.execute("INSERT INTO accounts(username,pw_hash,role,display_name,created_at)"
+                   " VALUES(?,?,?,?,?)", (username, pw_hash, role, display_name, _now()))
+        record_audit(cx, "account.create",
+                     details={"username": username, "role": role})
+    return {"username": username, "role": role, "display_name": display_name}
+
+
+def verify_credentials(username: str, password: str) -> Optional[dict]:
+    """成功 → 身份 dict;未知用户/错口令/停用账户一律 None(响应时间同为 argon2 主导)。"""
+    from backend.auth import passwords
+    with _conn() as cx:
+        row = cx.execute("SELECT * FROM accounts WHERE username=?", (username,)).fetchone()
+    if row is None:
+        passwords.dummy_verify()                          # 等时垫片:防用户名枚举
+        return None
+    if not passwords.verify_password(row["pw_hash"], password):
+        return None
+    if row["disabled"]:
+        return None                                       # 校验后才拒绝 → 耗时与错口令同级
+    if passwords.needs_rehash(row["pw_hash"]):            # 参数演进时透明升级
+        with _conn() as cx:
+            cx.execute("UPDATE accounts SET pw_hash=? WHERE id=?",
+                       (passwords.hash_password(password), row["id"]))
+    return {"account_id": row["id"], "username": row["username"], "role": row["role"],
+            "display_name": row["display_name"]}
+
+
+def set_password(username: str, new_password: str) -> None:
+    from backend.auth import passwords
+    pw_hash = passwords.hash_password(new_password)
+    with _conn() as cx:
+        cur = cx.execute("UPDATE accounts SET pw_hash=? WHERE username=?", (pw_hash, username))
+        if cur.rowcount == 0:
+            raise LookupError(f"no account {username}")
+        record_audit(cx, "account.set_password", details={"username": username})
+
+
+def set_account_disabled(username: str, disabled: bool) -> None:
+    with _conn() as cx:
+        cur = cx.execute("UPDATE accounts SET disabled=? WHERE username=?",
+                         (1 if disabled else 0, username))
+        if cur.rowcount == 0:
+            raise LookupError(f"no account {username}")
+        record_audit(cx, "account.disable" if disabled else "account.enable",
+                     details={"username": username})
+        if disabled:                                      # 停用即撤销全部在途会话
+            cx.execute("DELETE FROM sessions WHERE account_id="
+                       "(SELECT id FROM accounts WHERE username=?)", (username,))
+
+
+def list_accounts() -> list[dict]:
+    with _conn() as cx:
+        rows = cx.execute("SELECT id,username,role,display_name,created_at,disabled"
+                          " FROM accounts ORDER BY id").fetchall()
+        return [dict(r) for r in rows]
+
+
+def create_session(username: str) -> str:
+    """开会话,返回原始 token(唯一一次出现;库里只有它的 sha256)。"""
+    import secrets
+    from datetime import timedelta
+    token = secrets.token_urlsafe(32)
+    with _conn() as cx:
+        acc = cx.execute("SELECT id FROM accounts WHERE username=? AND disabled=0",
+                         (username,)).fetchone()
+        if acc is None:
+            raise LookupError(f"no active account {username}")
+        now = datetime.fromisoformat(_now())
+        cx.execute("INSERT INTO sessions(token,account_id,created_at,expires_at)"
+                   " VALUES(?,?,?,?)",
+                   (_token_hash(token), acc["id"], _now(),
+                    (now + timedelta(hours=_SESSION_TTL_HOURS)).isoformat(timespec="seconds")))
+    return token
+
+
+def get_session(token: str) -> Optional[dict]:
+    """token → 身份;过期即删(懒清理);剩余寿命 < TTL/2 → 滑动续期。"""
+    from datetime import timedelta
+    th = _token_hash(token)
+    with _conn() as cx:
+        row = cx.execute(
+            "SELECT s.token AS th, s.expires_at, a.id AS account_id, a.username, a.role,"
+            " a.display_name, a.disabled FROM sessions s JOIN accounts a ON a.id=s.account_id"
+            " WHERE s.token=?", (th,)).fetchone()
+        if row is None:
+            return None
+        now = datetime.fromisoformat(_now())
+        if datetime.fromisoformat(row["expires_at"]) <= now or row["disabled"]:
+            cx.execute("DELETE FROM sessions WHERE token=?", (th,))
+            return None
+        remaining = datetime.fromisoformat(row["expires_at"]) - now
+        if remaining < timedelta(hours=_SESSION_TTL_HOURS / 2):
+            cx.execute("UPDATE sessions SET expires_at=? WHERE token=?",
+                       ((now + timedelta(hours=_SESSION_TTL_HOURS)).isoformat(timespec="seconds"), th))
+        return {"account_id": row["account_id"], "username": row["username"],
+                "role": row["role"], "display_name": row["display_name"]}
+
+
+def delete_session(token: str) -> None:
+    with _conn() as cx:
+        cx.execute("DELETE FROM sessions WHERE token=?", (_token_hash(token),))
 
 
 # ── Phase 5 reviews:评审/签发状态机(D-P5-5 方向 A)──
