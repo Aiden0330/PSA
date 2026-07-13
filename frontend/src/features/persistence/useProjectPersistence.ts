@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { deleteSaved, listSaved, saveWorkspace, wasSavedOffline } from '../../api'
+import { SaveConflictError, deleteSaved, listSaved, saveWorkspace, wasSavedOffline } from '../../api'
 import type { SavedItem } from '../../api'
 import { serializeProject } from '../../project'
 import type { ProjectEta, ProjectPayload } from '../../project'
@@ -24,6 +24,9 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   const [archiveLocal, setArchiveLocal] = useState(false)
   const [projectUuid, setProjectUuid] = useState('')
   const [loading, setLoading] = useState(false)      // 读档进行中(下拉禁用,防止值回弹误导)
+  // D-P5-4 乐观并发:当前已知的服务器版本哈希(保存/读档时更新),下次保存原样带回。
+  const [lastVersionHash, setLastVersionHash] = useState<string | undefined>(undefined)
+  const [conflict, setConflict] = useState<{ serverHash: string; baseHash: string; name: string; payload: ProjectPayload } | null>(null)
   const [fmeaRows, setFmeaRows] = useState<FmeaRow[]>(() => loadRows())
   const [fmeaMapping, setFmeaMapping] = useState<MappingConfig>(() => loadMapping())
 
@@ -46,29 +49,39 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
 
   const refreshList = async () => { setSaved(await listSaved()); setArchiveLocal(wasSavedOffline()) }
   const captureUuid = (rec: unknown) => {
-    const pu = (rec as { version?: { project_uuid?: string } })?.version?.project_uuid
-    if (pu) setProjectUuid(pu)
+    const v = (rec as { version?: { project_uuid?: string; content_hash?: string } })?.version
+    if (v?.project_uuid) setProjectUuid(v.project_uuid)
+    if (v?.content_hash) setLastVersionHash(v.content_hash)
   }
 
-  // 保存项目:已载入存档(savedId 命中)→ 原地更新(沿用原名, 不再追问);否则新建并记住其 id
+  // 保存项目:已载入存档(savedId 命中)→ 原地更新(沿用原名, 不再追问);否则新建并记住其 id。
+  // 原地更新带上 lastVersionHash(D-P5-4)——服务器版本已前进则 409,弹冲突对话而非静默覆盖。
   const onSaveWorkspace = async () => {
     if (!etModel) return
     const payload = buildPayload()
     const existing = saved.find((s) => s.id === savedId)
-    if (savedId && existing) {
-      captureUuid(await saveWorkspace(existing.name, payload, savedId))
-    } else {
-      const at = etaTabs.find((t) => t.key === activeKey)
-      const dflt = (at ? etaDisplayName(at, etModel) : '') || etModel.initEvent || 'ETA 项目'
-      const name = window.prompt('项目存档名称', dflt)
-      if (!name) return
-      const rec = await saveWorkspace(name, payload)
-      setSavedId(rec.id)
-      captureUuid(rec)
+    try {
+      if (savedId && existing) {
+        captureUuid(await saveWorkspace(existing.name, payload, savedId, lastVersionHash))
+      } else {
+        const at = etaTabs.find((t) => t.key === activeKey)
+        const dflt = (at ? etaDisplayName(at, etModel) : '') || etModel.initEvent || 'ETA 项目'
+        const name = window.prompt('项目存档名称', dflt)
+        if (!name) return
+        const rec = await saveWorkspace(name, payload)
+        setSavedId(rec.id)
+        captureUuid(rec)
+      }
+      await refreshList()
+    } catch (e) {
+      if (e instanceof SaveConflictError) {
+        setConflict({ serverHash: e.serverHash, baseHash: e.baseHash, name: existing?.name ?? '', payload })
+        return
+      }
+      throw e
     }
-    await refreshList()
   }
-  // 另存为新项目:总是新建一份副本, 并把当前项目切换为该副本
+  // 另存为新项目:总是新建一份副本, 并把当前项目切换为该副本(新建不带 base_version_hash,不可能冲突)
   const onSaveAs = async () => {
     if (!etModel) return
     const at = etaTabs.find((t) => t.key === activeKey)
@@ -80,6 +93,27 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     captureUuid(rec)
     await refreshList()
   }
+
+  // ── D-P5-4 冲突对话三路径:查看 diff(调用方负责切页)/ 另存副本 / 确认覆盖 ──
+  const resolveConflictOverwrite = async () => {
+    if (!conflict) return
+    const name = saved.find((s) => s.id === savedId)?.name ?? conflict.name
+    captureUuid(await saveWorkspace(name, conflict.payload, savedId))   // 不带 base → 强制覆盖(现行为)
+    setConflict(null)
+    await refreshList()
+  }
+  const resolveConflictSaveAsCopy = async () => {
+    if (!conflict) return
+    const base = saved.find((s) => s.id === savedId)?.name || conflict.name || 'ETA 项目'
+    const name = window.prompt('另存为新项目名称(避免覆盖冲突)', base + ' 副本')
+    setConflict(null)
+    if (!name) return
+    const rec = await saveWorkspace(name, conflict.payload)
+    setSavedId(rec.id)
+    captureUuid(rec)
+    await refreshList()
+  }
+  const dismissConflict = () => setConflict(null)
   // 读取项目存档:完整还原全部 ETA(替换当前所有页签)。兼容旧版单 ETA 存档。
   // savedId 乐观置位:受控下拉在 await 期间不回弹到「—」;失败则回退并亮错。
   const loadProject = async (id: string) => {
@@ -94,6 +128,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
         return
       }
       setProjectUuid(proj.projectUuid ?? '')
+      setLastVersionHash(proj.versionHash)
       P().load(proj.tabs, proj.activeKey, proj.checkedKeys, proj.userFts ?? EMPTY_FTS)
       applyProjectFmea(proj)
     } catch (e: any) {
@@ -123,13 +158,14 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     if (!savedId) return
     const name = saved.find((s) => s.id === savedId)?.name ?? savedId
     if (!window.confirm(`删除项目存档「${name}」?存档删除不可撤销(版本库中的历史版本仍保留)。`)) return
-    await deleteSaved(savedId); setSavedId(''); setProjectUuid(''); await refreshList()
+    await deleteSaved(savedId); setSavedId(''); setProjectUuid(''); setLastVersionHash(undefined); await refreshList()
   }
 
   return {
-    saved, savedId, archiveLocal, projectUuid, loading,
+    saved, savedId, archiveLocal, projectUuid, loading, conflict,
     fmeaRows, fmeaMapping, persistFmeaRows, persistFmeaMapping,
     buildPayload, onSaveWorkspace, onSaveAs, loadProject, onExportFile, onImportFile, onDeleteSaved,
+    resolveConflictOverwrite, resolveConflictSaveAsCopy, dismissConflict,
   }
 }
 

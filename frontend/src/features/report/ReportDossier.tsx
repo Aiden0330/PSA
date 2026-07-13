@@ -5,6 +5,7 @@ import type { CaseInfo, ReviewComment, ReviewInfo, VersionDiff, VersionInfo } fr
 import { Icon } from '../../components/icons'
 import { CONSEQUENCES, consDef, toEngineRequest } from '../../eventtree'
 import { useActiveEta } from '../../stores/useActiveEta'
+import { useAuthStore } from '../../stores/authStore'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
 
 const mono = 'var(--psa-font-mono)'
@@ -21,6 +22,11 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const pu = persistence.projectUuid
+  // 前端呈现层的角色感知(后端 B3 已实际守卫,这里只是不呈现无权限操作)。
+  // identity===null(off 模式/未知)一律视为全权 —— off 模式单用户即全权(约束 #0)。
+  const role = useAuthStore((s) => s.identity?.role ?? null)
+  const canSubmitReview = role === null || role === 'analyst' || role === 'admin'
+  const canDecideReview = role === null || role === 'reviewer' || role === 'admin'
 
   const refresh = () => {
     if (!pu) { setVersions([]); setCases([]); setReviews([]); return }
@@ -54,7 +60,9 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
   // ── Phase 5 台账签发(D-P5-5 方向 A):送审/签发/退回 + 版本评论 ──
   const [signTarget, setSignTarget] = useState<VersionInfo | null>(null)
   const [signNote, setSignNote] = useState('')
+  const [signPassword, setSignPassword] = useState('')
   const [actBusy, setActBusy] = useState(false)
+  const isLocalAuth = useAuthStore((s) => s.identity?.mode === 'local')
   const doAction = async (fn: () => Promise<unknown>) => {
     setActBusy(true); setErr(null)
     try { await fn(); refresh() } catch (e: any) { setErr(String(e?.message ?? e)) }
@@ -69,9 +77,10 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
   const onConfirmSign = () => {
     if (!pu || !signTarget) return
     const t = signTarget
+    const pw = signPassword
     setSignTarget(null)
-    doAction(() => signReview(pu, t.id, signNote.trim() || undefined))
-    setSignNote('')
+    doAction(() => signReview(pu, t.id, signNote.trim() || undefined, pw || undefined))
+    setSignNote(''); setSignPassword('')
   }
   const artifacts = (c: CaseInfo): { format?: string; sha256?: string } => {
     try { return typeof c.artifacts_json === 'string' ? JSON.parse(c.artifacts_json) : (c.artifacts_json ?? {}) } catch { return {} }
@@ -201,7 +210,7 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
               [...versions].sort((a, b) => b.id - a.id).map((v, idx) => {
                 const rv = reviewByVersion(v.id)
                 const isLatest = idx === 0
-                const canSubmit = isLatest && (!rv || rv.state === 'returned')
+                const canSubmit = isLatest && (!rv || rv.state === 'returned') && canSubmitReview
                 return (
                   <div key={v.id} style={{ padding: '7px 10px', borderBottom: '1px solid var(--psa-line)', fontSize: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -221,12 +230,12 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
                       )}
                       <span style={{ marginLeft: 'auto', fontFamily: mono, fontSize: 10.5, color: 'var(--psa-faint)' }}>{v.created_at.slice(0, 19).replace('T', ' ')}</span>
                     </div>
-                    {(canSubmit || rv?.state === 'in_review') && (
+                    {(canSubmit || (rv?.state === 'in_review' && canDecideReview)) && (
                       <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
                         {canSubmit && (
                           <button className="psa-btn" disabled={actBusy} onClick={() => onSubmitReview(v)}>送审</button>
                         )}
-                        {rv?.state === 'in_review' && (
+                        {rv?.state === 'in_review' && canDecideReview && (
                           <>
                             <button className="psa-btn psa-btn--primary" disabled={actBusy} onClick={() => { setSignTarget(v); setSignNote('') }}>签发…</button>
                             <button className="psa-btn" disabled={actBusy} onClick={() => onReturnReview(v)}>退回…</button>
@@ -347,11 +356,20 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
               value={signNote}
               onChange={(e) => setSignNote(e.target.value)}
               placeholder="签发意见(可选,入审计)"
-              style={{ width: '100%', fontSize: 12, marginBottom: 12, boxSizing: 'border-box' }}
+              style={{ width: '100%', fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }}
             />
+            {isLocalAuth && (
+              <input
+                type="password"
+                value={signPassword}
+                onChange={(e) => setSignPassword(e.target.value)}
+                placeholder="当前账户口令(签发口令复核,必填)"
+                style={{ width: '100%', fontSize: 12, marginBottom: 12, boxSizing: 'border-box' }}
+              />
+            )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="psa-btn" onClick={() => setSignTarget(null)}>取消</button>
-              <button className="psa-btn psa-btn--primary" disabled={actBusy} onClick={onConfirmSign}>确认签发</button>
+              <button className="psa-btn psa-btn--primary" disabled={actBusy || (isLocalAuth && !signPassword)} onClick={onConfirmSign}>确认签发</button>
             </div>
           </div>
         </div>

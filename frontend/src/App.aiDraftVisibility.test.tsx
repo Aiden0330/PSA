@@ -9,6 +9,7 @@ import { draftAiModel } from './api'
 import type { AiDraftResponse } from './aiDraft'
 import { resetViewStore, useViewStore } from './stores/viewStore'
 import { resetProjectStore } from './stores/projectStore'
+import { resetAuthStore } from './stores/authStore'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 ;(globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver = class {
@@ -19,7 +20,14 @@ import { resetProjectStore } from './stores/projectStore'
 
 const emptyFts = { model_data: { parameters: [] }, fault_trees: [] }
 
-vi.mock('./api', () => ({
+vi.mock('./api', () => {
+  class StatusError extends Error {
+    status: number
+    constructor(status: number, message?: string) { super(message); this.status = status }
+  }
+  return {
+  StatusError,
+  getMe: vi.fn().mockResolvedValue({ mode: 'off', username: 'root', role: 'admin', display_name: null }),
   getExamples: vi.fn().mockResolvedValue([]),
   getModel: vi.fn().mockResolvedValue({
     model: {
@@ -65,7 +73,8 @@ vi.mock('./api', () => ({
   quantifyEventTree: vi.fn(),
   importanceEventTree: vi.fn(),
   exportReport: vi.fn(),
-}))
+  }
+})
 
 let root: Root | null = null
 let host: HTMLDivElement | null = null
@@ -172,6 +181,7 @@ afterEach(() => {
   localStorage.clear()
   resetViewStore()
   resetProjectStore()
+  resetAuthStore()
 })
 
 describe('App AI draft visibility', () => {

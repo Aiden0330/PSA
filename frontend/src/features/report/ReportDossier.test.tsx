@@ -93,8 +93,10 @@ describe('ReportDossier 台账签发(D-P5-5 方向 A)', () => {
     await click('签发…')
     expect(host!.textContent).toContain('eeee3333ffff')     // 弹窗展示完整哈希
     expect(host!.textContent).toContain('只增审计')
+    // off 模式(authStore identity 默认 null)不渲染口令复核输入 —— 签发口令复核是 local 模式专属
+    expect(host!.textContent).not.toContain('签发口令复核')
     await click('确认签发')
-    expect(signReview).toHaveBeenCalledWith('pu-1', 3, undefined)
+    expect(signReview).toHaveBeenCalledWith('pu-1', 3, undefined, undefined)
   })
 
   it('退回行带理由徽章;已签发行无动作按钮', async () => {

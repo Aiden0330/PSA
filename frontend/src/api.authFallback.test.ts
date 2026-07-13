@@ -7,7 +7,6 @@ import { AuthRequiredError, deleteSaved, listSaved, loadSaved, saveWorkspace, wa
  * 网络不可达 / 其余 HTTP 错误 → 维持既有 localStorage 回退(off 模式语义逐位不变)。
  */
 
-const okJson = (data: unknown) => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) })
 const status = (code: number) => Promise.resolve({ ok: false, status: code, json: () => Promise.resolve({}) })
 
 beforeEach(() => localStorage.clear())

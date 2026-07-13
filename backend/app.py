@@ -243,7 +243,13 @@ def api_saved_get(sid: str):
     except KeyError:
         raise HTTPException(404, f"no saved workspace {sid}")
     # ADR-2:附带该存档对应的稳定项目 UUID(前端报告钉扎/案例查询用)
-    rec["project_uuid"] = store.legacy_project_uuid(sid)
+    puuid = store.legacy_project_uuid(sid)
+    rec["project_uuid"] = puuid
+    # D-P5-4 乐观并发基线:读档时附带当前最新版本哈希,前端下次保存原样带回
+    # base_version_hash;非 v2 载荷等场景下版本库可能为空,此时不附带该字段。
+    versions = store.list_versions(puuid)
+    if versions:
+        rec["version_hash"] = versions[-1]["content_hash"]
     return rec
 
 @app.delete("/api/saved/{sid}")

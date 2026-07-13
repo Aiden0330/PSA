@@ -14,9 +14,13 @@ import { computeSummaries, computeAggregateTotals } from './features/eta/summari
 import { ProjectCockpit } from './features/home/ProjectCockpit'
 import { ProjectDrawer } from './features/shell/ProjectDrawer'
 import { CommandPalette } from './features/shell/CommandPalette'
+import { LoginWall } from './features/shell/LoginWall'
+import { AccountsPanel } from './features/shell/AccountsPanel'
+import { SaveConflictDialog } from './features/shell/SaveConflictDialog'
 import { useViewStore } from './stores/viewStore'
 import type { MainTab } from './stores/viewStore'
 import { useActiveEta } from './stores/useActiveEta'
+import { useAuthStore } from './stores/authStore'
 
 // 启动关键路径(总览/ETA)不携带重库:FTA(reactflow)、参数库/FMEA(ag-grid)、
 // 结果图(echarts)等页签按需分块加载 —— 新窗口只解析 ETA 所需代码(性能报障修复 2026-07-09)
@@ -31,13 +35,32 @@ function TabFallback() {
   return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--psa-faint)', fontSize: 13, background: '#fff' }}>载入模块…</div>
 }
 
+const ROLE_LABEL: Record<string, string> = { admin: '管理员', analyst: '分析员', reviewer: '评审人' }
+
 const TAB_LABELS: [MainTab, string][] = [
   ['home', '总览'], ['bess', '事件树（ETA）'], ['ft', '故障树（FTA）'], ['params', '参数库 / CCF'],
   ['library', '参考库'], ['cons', '后果'], ['fmea', 'FMEA'], ['report', '报告'],
 ]
 
-/** App 壳(蓝图 §三):Provider/路由/全局 chrome;工作台与业务态在 features/。 */
+/**
+ * 认证门(Phase 5 B4):PSA_AUTH=off 恒 needsLogin=false(约束 #0,含离线单文件 ——
+ * getMe() 网络层异常时 authStore 同样保持 needsLogin=false,见 stores/authStore.ts);
+ * local 模式未登录时,AppShell 及其数据获取 effects 一律不挂载,避免任何预登录网络噪音。
+ */
 export default function App() {
+  const status = useAuthStore((s) => s.status)
+  const needsLogin = useAuthStore((s) => s.needsLogin)
+  useEffect(() => { void useAuthStore.getState().refresh() }, [])
+
+  if (status === 'loading') {
+    return <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--psa-bg)', color: 'var(--psa-faint)', fontSize: 13 }}>加载中…</div>
+  }
+  if (needsLogin) return <LoginWall />
+  return <AppShell />
+}
+
+/** App 壳(蓝图 §三):Provider/路由/全局 chrome;工作台与业务态在 features/。 */
+function AppShell() {
   const tab = useViewStore((s) => s.tab)
   const setTab = useViewStore((s) => s.setTab)
   const drawerOpen = useViewStore((s) => s.drawerOpen)
@@ -47,9 +70,12 @@ export default function App() {
 
   const [scenarios, setScenarios] = useState<ScenarioItem[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [accountsOpen, setAccountsOpen] = useState(false)
   const { lib, bump } = useLibrary()
   const example = useExampleModel()
   const persistence = useProjectPersistence(setError, bump)
+  const identity = useAuthStore((s) => s.identity)
+  const doLogout = useAuthStore((s) => s.logout)
 
   const summaries = computeSummaries(etaTabs, activeKey, checkedKeys, etaPfds)
   const aggregateTotals = computeAggregateTotals(etaTabs, checkedKeys, etaPfds)
@@ -110,7 +136,18 @@ export default function App() {
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
           <button onClick={() => setPaletteOpen(true)} title="命令板(⌘K / Ctrl+K)" style={kbdBtn}>⌘K</button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--psa-chrome-ink)' }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--psa-ok)', boxShadow: '0 0 6px var(--psa-ok)' }} />引擎就绪</div>
-          <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--psa-chrome-2)', color: 'var(--psa-chrome-ink)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,.12)' }}>ZL</div>
+          {identity?.mode === 'local' && identity.role === 'admin' && (
+            <button onClick={() => setAccountsOpen(true)} title="账户管理" style={kbdBtn}>账户</button>
+          )}
+          <div
+            title={identity ? `${identity.display_name ?? identity.username} · ${ROLE_LABEL[identity.role] ?? identity.role}${identity.mode === 'local' ? '' : '(单用户模式)'}` : ''}
+            style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--psa-chrome-2)', color: 'var(--psa-chrome-ink)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,.12)' }}
+          >
+            {(identity?.display_name ?? identity?.username ?? '?').slice(0, 2).toUpperCase()}
+          </div>
+          {identity?.mode === 'local' && (
+            <button onClick={() => { void doLogout() }} title="登出" style={kbdBtn}>登出</button>
+          )}
         </div>
       </header>
 
@@ -174,6 +211,8 @@ export default function App() {
       </footer>
 
       <CommandPalette scenarios={scenarios} summaries={summaries} persistence={persistence} onOpenScenario={openScenario} />
+      <SaveConflictDialog persistence={persistence} onGoToDiff={() => setTab('report')} />
+      {accountsOpen && <AccountsPanel onClose={() => setAccountsOpen(false)} />}
     </div>
   )
 }

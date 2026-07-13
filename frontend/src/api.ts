@@ -149,7 +149,20 @@ export async function importanceEventTree(req: any): Promise<EtImportance> {
 }
 
 export interface SavedItem { id: string; name: string; saved_at: string }
-export interface SavedRecord { id: string; name: string; saved_at: string; payload: any }
+export interface SavedRecord { id: string; name: string; saved_at: string; payload: any; version_hash?: string }
+
+// D-P5-4 乐观并发:保存时带 base_version_hash,服务器最新版本与之不一致 → 409
+// (不覆盖,双方版本俱在)。UI 弹三路径:查看 diff / 另存副本 / 确认覆盖。
+export class SaveConflictError extends Error {
+  serverHash: string
+  baseHash: string
+  constructor(serverHash: string, baseHash: string) {
+    super('版本冲突:他人已保存了更新的版本')
+    this.name = 'SaveConflictError'
+    this.serverHash = serverHash
+    this.baseHash = baseHash
+  }
+}
 
 // ── 修复项 ①(ADR-4 盲区地雷):认证失败 ≠ 后端不可达 ──
 // 401/403 意味着后端活着但拒绝了你 —— 此时静默写 localStorage 会让用户以为存到了服务器。
@@ -196,16 +209,21 @@ export async function loadSaved(id: string): Promise<SavedRecord> {
     return lsLoad(id) // 本地无此 id 时 lsLoad 自身抛「不存在」并向上传播(混合模式非目标)
   }
 }
-export async function saveWorkspace(name: string, payload: any, id?: string): Promise<SavedItem> {
+export async function saveWorkspace(name: string, payload: any, id?: string, baseVersionHash?: string): Promise<SavedItem> {
   try {
     // id 省略 → 后端新建; 传入 → 原地更新该存档(JSON.stringify 会丢弃 undefined 的 id 键)
-    const r = await savedFetch('/saved', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, payload, id }) })
+    const r = await savedFetch('/saved', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, payload, id, base_version_hash: baseVersionHash }) })
+    if (r.status === 409) {
+      let detail: { server_hash?: string; base_hash?: string } = {}
+      try { detail = (await r.json())?.detail ?? {} } catch { /* body 不是预期形状时仍抛冲突 */ }
+      throw new SaveConflictError(detail.server_hash ?? '', detail.base_hash ?? baseVersionHash ?? '')
+    }
     if (!r.ok) throw new Error(`save → ${r.status}`)
     const data = (await r.json()) as SavedItem
     _savedOffline = false
     return data
   } catch (e) {
-    if (e instanceof AuthRequiredError) throw e
+    if (e instanceof AuthRequiredError || e instanceof SaveConflictError) throw e
     _savedOffline = true
     return lsSave(name, payload, id)
   }
@@ -275,6 +293,52 @@ export const listVersionComments = (uuid: string, versionId: number) =>
   jget<ReviewComment[]>(`/projects/${uuid}/versions/${versionId}/comments`)
 export const addVersionComment = (uuid: string, versionId: number, body: string) =>
   jpostReview<ReviewComment>(`/projects/${uuid}/versions/${versionId}/comments`, { body })
+
+// ── Phase 5 认证(ADR-4 修复项 ①②③ / B4)──
+// getMe() 401 ⟺ local 模式且未登录(off 模式恒 200,见 backend/auth/routes.py::me)。
+// 关键区分(约束 #0):fetch 本身 reject(离线单文件/无后端)≠ HTTP 401 —— 前者绝不能
+// 弹登录墙(单文件模式压根没有后端可登录),只有确凿的 401 响应才是"需要登录"。
+// 因此 StatusError 携带 status,authStore 据 e.status===401 精确判定,网络异常一律放行。
+export class StatusError extends Error {
+  status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'StatusError'
+    this.status = status
+  }
+}
+async function jgetStatus<T>(path: string): Promise<T> {
+  const r = await fetch(`${BASE}${path}`)   // 网络层异常原样上抛(无 status)→ 调用方视为"未知,放行"
+  if (!r.ok) {
+    let detail = ''
+    try { const d = await r.json(); detail = typeof d?.detail === 'string' ? d.detail : '' } catch {}
+    throw new StatusError(r.status, detail || `${path} → ${r.status}`)
+  }
+  return r.json()
+}
+
+export interface Identity {
+  mode: 'off' | 'local'
+  username: string
+  role: 'admin' | 'analyst' | 'reviewer'
+  display_name: string | null
+}
+export const getMe = () => jgetStatus<Identity>('/auth/me')
+export const login = (username: string, password: string) =>
+  jpostReview<Identity>('/auth/login', { username, password })
+export async function logout(): Promise<void> {
+  await fetch(`${BASE}/auth/logout`, { method: 'POST' })
+}
+
+// ── Phase 5 账户管理(admin only,B4 管理面)──
+export interface AccountInfo { id: number; username: string; role: string; display_name: string | null; created_at: string; disabled: number }
+export const listAccounts = () => jgetStatus<AccountInfo[]>('/admin/accounts')
+export const createAccount = (username: string, password: string, role: string, displayName?: string) =>
+  jpostReview<AccountInfo>('/admin/accounts', { username, password, role, display_name: displayName })
+export async function setAccountDisabled(username: string, disabled: boolean): Promise<void> {
+  const r = await fetch(`${BASE}/admin/accounts/${username}/disable?disabled=${disabled}`, { method: 'POST' })
+  if (!r.ok) throw new Error(`disable account → ${r.status}`)
+}
 
 export async function importMef(xml: string): Promise<{ model: any; fault_tree: string }> {
   const r = await fetch(`${BASE}/import/mef`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ xml }) })
