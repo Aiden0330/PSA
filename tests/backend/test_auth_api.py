@@ -100,17 +100,19 @@ def test_me_unauthenticated_401_and_logout_invalidates(monkeypatch):
 
 
 def test_session_identity_flows_into_audit_actor(monkeypatch):
-    """证据链核心:带会话 cookie 的评审动作,审计 actor = 认证身份而非 OS 用户。"""
+    """证据链核心:带会话 cookie 的评审动作,审计 actor = 认证身份而非 OS 用户。
+    用 admin(兼具送审+签发权,B3 后 submit=analyst+ / sign=reviewer+)以单一身份贯穿。"""
     monkeypatch.setenv("PSA_AUTH", "local")
-    store.create_account("wang", "review-pw-1", "reviewer", display_name="王雪梅")
+    store.create_account("wang", "review-pw-1", "admin", display_name="王雪梅")
     store.ensure_project(PUUID, "P")
     v = store.create_version(PUUID, *to_canonical(_payload(), PUUID))
     c = _client()
     c.post("/api/auth/login", json={"username": "wang", "password": "review-pw-1"})
     assert c.post(f"/api/projects/{PUUID}/reviews",
                   json={"version_id": v["id"], "note": "送审"}).status_code == 200
+    # server 模式签发需口令复核(B3)
     assert c.post(f"/api/projects/{PUUID}/reviews/{v['id']}/sign",
-                  json={"note": "同意"}).status_code == 200
+                  json={"note": "同意", "password": "review-pw-1"}).status_code == 200
     audit = {e["action"]: e["actor"] for e in store.list_audit(PUUID)}
     expected = f"wang@bess-psa/{store.engine_version()}"
     assert audit["review.submit"] == expected
@@ -136,7 +138,7 @@ def test_audit_rows_carry_auth_mode_marker(monkeypatch):
     assert json.loads(off_row["details_json"])["auth"] == "off"
 
     monkeypatch.setenv("PSA_AUTH", "local")
-    store.create_account("wang", "review-pw-1", "reviewer")
+    store.create_account("wang", "review-pw-1", "analyst")     # 送审 = analyst+
     v = store.create_version(PUUID, *to_canonical(_payload(), PUUID))
     c = _client()
     c.post("/api/auth/login", json={"username": "wang", "password": "review-pw-1"})

@@ -1,6 +1,6 @@
 from __future__ import annotations
 import os
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -33,6 +33,7 @@ app.add_middleware(CORSMiddleware, allow_origins=_cors_origins, allow_credential
 # Phase 5 auth(B2):登录/登出/身份端点 + 会话身份贯通中间件。
 # off 模式:中间件不 set → actor() 回退 OS 用户(约束 #0 逐位不变);/api/auth/me 报 mode。
 from backend.auth.routes import router as _auth_router, SESSION_COOKIE as _SESSION_COOKIE
+from backend.auth.guards import require_role, require_authenticated, ANALYST, REVIEWER, ANY_ROLE, ADMIN
 
 app.include_router(_auth_router)
 
@@ -40,12 +41,14 @@ app.include_router(_auth_router)
 @app.middleware("http")
 async def _session_identity_middleware(request, call_next):
     token = None
+    request.state.identity = None
     if _is_server_mode():
         raw = request.cookies.get(_SESSION_COOKIE)
         if raw:
             from backend import store
             ident = store.get_session(raw)
             if ident:
+                request.state.identity = ident      # 守卫读它(role);不重复查库
                 token = store.set_current_actor(ident["username"])
     try:
         return await call_next(request)
@@ -66,7 +69,7 @@ def api_model(eid: str):
         raise HTTPException(404, f"unknown example {eid}")
 
 @app.post("/api/quantify", response_model=schemas.QuantifyResponse)
-def api_quantify(req: schemas.QuantifyRequest):
+def api_quantify(req: schemas.QuantifyRequest, _=Depends(require_role(*ANALYST))):
     model = load_model_from_dict(req.model)
     try:
         an = Analysis(model, fault_tree=req.fault_tree,
@@ -94,7 +97,7 @@ def api_quantify(req: schemas.QuantifyRequest):
         post=post)
 
 @app.post("/api/event-tree/quantify", response_model=schemas.EtQuantifyResponse)
-def api_event_tree_quantify(req: schemas.EtQuantifyRequest):
+def api_event_tree_quantify(req: schemas.EtQuantifyRequest, _=Depends(require_role(*ANALYST))):
     """ROADMAP A: 前端序列化事件树 → 引擎精确否定定量(跨屏障共享事件精确)。"""
     from backend.et_builder import build_model_from_request
     from psaengine.eta.sequence import quantify_event_tree
@@ -125,7 +128,7 @@ def _pin_case(project_uuid: str, project_payload, kind: str, name_hint: str | No
 
 
 @app.post("/api/report")
-def api_report(req: schemas.ReportRequest, format: str = "docx"):
+def api_report(req: schemas.ReportRequest, format: str = "docx", _=Depends(require_role(*ANALYST))):
     """由当前 ETA 重算 → 生成 Word/PDF/CSV 报告下载。"""
     import base64
     from backend.et_builder import build_model_from_request
@@ -180,7 +183,7 @@ def api_report(req: schemas.ReportRequest, format: str = "docx"):
                     headers={"Content-Disposition": f'attachment; filename="qra_report.{ext}"'})
 
 @app.post("/api/import/mef")
-def api_import_mef(req: schemas.MefImportRequest):
+def api_import_mef(req: schemas.MefImportRequest, _=Depends(require_role(*ANALYST))):
     """上传 MEF/Open-PSA XML → 解析为模型(与 /api/model/{id} 同形, 供前端载入)。"""
     import tempfile, os
     from psaengine.model.mef_xml import load_mef_xml
@@ -210,8 +213,19 @@ def api_saved_list():
     return storage.list_workspaces()
 
 @app.post("/api/saved")
-def api_saved_create(req: schemas.SaveWorkspaceRequest):
-    from backend import storage
+def api_saved_create(req: schemas.SaveWorkspaceRequest, _=Depends(require_role(*ANALYST))):
+    from backend import storage, store
+    # D-P5-4 乐观并发:base 非空且与服务器最新版本不一致 → 409(不覆盖),前端选路
+    # (查看双方 diff / 另存副本 / 确认覆盖)。版本库内容寻址已保底双方版本俱在,409 只是让
+    # 冲突可见,不是防丢。base 为空(单用户/首存/客户端未传)→ 不检查(现行为,约束 #0)。
+    if req.base_version_hash and req.id:
+        puuid = store.legacy_project_uuid(req.id)
+        versions = store.list_versions(puuid)
+        if versions:
+            latest = versions[-1]["content_hash"]
+            if latest != req.base_version_hash:
+                raise HTTPException(409, {"message": "版本冲突:他人已保存了更新的版本",
+                                          "server_hash": latest, "base_hash": req.base_version_hash})
     rec = storage.save_workspace(req.name, req.payload, sid=req.id)
     # ADR-2 绞杀者双写:v2 载荷 → canonical 版本(幂等);失败不影响旧行为(非 v2 载荷等)。
     try:
@@ -242,7 +256,7 @@ def api_saved_delete(sid: str):
     return {"ok": True}
 
 @app.post("/api/event-tree/uncertainty")
-def api_event_tree_uncertainty(req: schemas.EtUncertaintyRequest):
+def api_event_tree_uncertainty(req: schemas.EtUncertaintyRequest, _=Depends(require_role(*ANALYST))):
     """事件树蒙特卡洛不确定性带(C1–C5 的 p05/p50/p95 + 点估计)。"""
     from backend.et_builder import build_model_from_request
     from psaengine.eta.uncertainty import event_tree_uncertainty
@@ -258,7 +272,7 @@ def api_event_tree_uncertainty(req: schemas.EtUncertaintyRequest):
     return res
 
 @app.post("/api/event-tree/importance")
-def api_event_tree_importance(req: schemas.EtQuantifyRequest):
+def api_event_tree_importance(req: schemas.EtQuantifyRequest, _=Depends(require_role(*ANALYST))):
     """扰动法屏障级 FV/RAW 重要度(按后果)。"""
     from backend.et_builder import build_model_from_request
     from psaengine.eta.uncertainty import barrier_importance_exact
@@ -409,7 +423,7 @@ def api_reviews_list(puuid: str):
     return store.list_reviews(puuid)
 
 @app.post("/api/projects/{puuid}/reviews")
-def api_review_submit(puuid: str, body: ReviewSubmitBody):
+def api_review_submit(puuid: str, body: ReviewSubmitBody, _=Depends(require_role(*ANALYST))):
     import sqlite3
     from backend import store
     try:
@@ -422,20 +436,28 @@ def api_review_submit(puuid: str, body: ReviewSubmitBody):
         raise HTTPException(409, "已有送审中版本(单项目同一时刻至多一个送审中)")
 
 @app.post("/api/projects/{puuid}/reviews/{vid}/sign")
-def api_review_sign(puuid: str, vid: int, body: ReviewDecideBody):
+def api_review_sign(puuid: str, vid: int, body: ReviewDecideBody,
+                    identity=Depends(require_role(*REVIEWER))):
     from backend import store
+    role = None
+    if identity is not None:                       # server 模式:签发口令复核 + 角色快照
+        if not body.password or store.verify_credentials(identity["username"], body.password) is None:
+            raise HTTPException(403, "签发口令复核失败:请输入当前账户口令以确认签发")
+        role = identity["role"]
     try:
-        return store.sign_review(puuid, vid, note=body.note)
+        return store.sign_review(puuid, vid, note=body.note, actor_role=role)
     except LookupError as e:
         raise HTTPException(400, f"版本不存在:{e}")
     except store.ReviewStateError:
         raise HTTPException(409, "仅送审中的版本可签发")
 
 @app.post("/api/projects/{puuid}/reviews/{vid}/return")
-def api_review_return(puuid: str, vid: int, body: ReviewDecideBody):
+def api_review_return(puuid: str, vid: int, body: ReviewDecideBody,
+                      identity=Depends(require_role(*REVIEWER))):
     from backend import store
+    role = identity["role"] if identity is not None else None
     try:
-        return store.return_review(puuid, vid, note=body.note or "")
+        return store.return_review(puuid, vid, note=body.note or "", actor_role=role)
     except LookupError as e:
         raise HTTPException(400, f"版本不存在:{e}")
     except store.ReviewStateError:
@@ -449,7 +471,8 @@ def api_version_comments(puuid: str, vid: int):
     return store.list_review_comments(puuid, vid)
 
 @app.post("/api/projects/{puuid}/versions/{vid}/comments")
-def api_version_comment_add(puuid: str, vid: int, body: ReviewCommentBody):
+def api_version_comment_add(puuid: str, vid: int, body: ReviewCommentBody,
+                            _=Depends(require_role(*ANY_ROLE))):
     from backend import store
     try:
         cid = store.add_review_comment(puuid, vid, body.body)
@@ -459,6 +482,40 @@ def api_version_comment_add(puuid: str, vid: int, body: ReviewCommentBody):
         raise HTTPException(422, "评论内容不能为空")
     return next(c for c in store.list_review_comments(puuid, vid) if c["id"] == cid)
 
+# ---- Phase 5 账户管理(admin only;B4 管理面据此)----
+
+class AccountCreateBody(BaseModel):
+    username: str
+    password: str
+    role: str
+    display_name: str | None = None
+
+@app.get("/api/admin/accounts")
+def api_admin_accounts_list(_=Depends(require_role(*ADMIN))):
+    from backend import store
+    return store.list_accounts()
+
+@app.post("/api/admin/accounts")
+def api_admin_account_create(body: AccountCreateBody, _=Depends(require_role(*ADMIN))):
+    import sqlite3
+    from backend import store
+    try:
+        return store.create_account(body.username, body.password, body.role,
+                                    display_name=body.display_name)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except sqlite3.IntegrityError:
+        raise HTTPException(409, f"用户名已存在:{body.username}")
+
+@app.post("/api/admin/accounts/{username}/disable")
+def api_admin_account_disable(username: str, disabled: bool = True, _=Depends(require_role(*ADMIN))):
+    from backend import store
+    try:
+        store.set_account_disabled(username, disabled)
+    except LookupError:
+        raise HTTPException(404, f"无此账户:{username}")
+    return {"username": username, "disabled": disabled}
+
 @app.get("/api/schema/project-document/1.0")
 def api_project_document_schema():
     """ADR-1: 规范 ProjectDocument 的 JSON Schema(严格,additionalProperties:false)。
@@ -467,7 +524,7 @@ def api_project_document_schema():
     return ProjectDocument.model_json_schema()
 
 @app.post("/api/ai/draft-model", response_model=schemas.AiDraftResponse)
-def api_ai_draft_model(req: schemas.AiDraftRequest):
+def api_ai_draft_model(req: schemas.AiDraftRequest, _=Depends(require_role(*ANALYST))):
     """LLM 生成 ETA/FTA 草案。只返回待审核草案;不直接写入项目。
     生成即落 ai_drafts 溯源表(4b2);带 project_uuid 时并记 ai.draft 审计。"""
     from backend import ai_draft, store
@@ -485,7 +542,7 @@ def api_ai_draft_model(req: schemas.AiDraftRequest):
 
 
 @app.post("/api/ai/drafts/{rid}/applied")
-def api_ai_draft_applied(rid: int, body: schemas.AiDraftAppliedRequest):
+def api_ai_draft_applied(rid: int, body: schemas.AiDraftAppliedRequest, _=Depends(require_role(*ANALYST))):
     """4b2 应用回执:记录逐元素接受清单与状态(applied|rejected)+ ai.apply 审计。"""
     from backend import store
     try:

@@ -62,6 +62,7 @@ class SaveWorkspaceRequest(BaseModel):
     name: str
     payload: dict
     id: str | None = None      # 传入已有存档 id → 原地更新; 省略 → 新建
+    base_version_hash: str | None = None   # D-P5-4 乐观并发:客户端加载时的版本哈希
 
 class MefImportRequest(BaseModel):
     xml: str

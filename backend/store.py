@@ -503,8 +503,11 @@ def submit_review(puuid: str, version_id: int, note: str | None = None) -> dict:
         return _review_joined(cx, puuid, version_id)  # type: ignore[return-value]
 
 
-def sign_review(puuid: str, version_id: int, note: str | None = None) -> dict:
-    """送审中 → 已签发(终态)。签发人身份/时间/版本哈希入只增审计(报告页脚同源)。"""
+def sign_review(puuid: str, version_id: int, note: str | None = None,
+                actor_role: str | None = None) -> dict:
+    """送审中 → 已签发(终态)。签发人身份/时间/版本哈希入只增审计(报告页脚同源)。
+    actor_role(domain-review finding-3):签发时角色快照进审计 —— 授权依据不得依赖
+    可变的 accounts 表,须可从只增链重建。"""
     with _conn() as cx:
         h = _require_version_hash(cx, puuid, version_id)
         row = _review_row(cx, puuid, version_id)
@@ -513,12 +516,13 @@ def sign_review(puuid: str, version_id: int, note: str | None = None) -> dict:
         cx.execute("UPDATE reviews SET state='signed', decided_by=?, decided_at=?, note=?"
                    " WHERE id=?", (actor(), _now(), note, row["id"]))
         record_audit(cx, "review.sign", project_uuid=puuid, version_id=version_id,
-                     details={"content_hash": h, "note": note})
+                     details={"content_hash": h, "note": note, "role": actor_role})
         return _review_joined(cx, puuid, version_id)  # type: ignore[return-value]
 
 
-def return_review(puuid: str, version_id: int, note: str) -> dict:
-    """送审中 → 退回(note 必填 —— 退回理由是证据链的一部分)。"""
+def return_review(puuid: str, version_id: int, note: str,
+                  actor_role: str | None = None) -> dict:
+    """送审中 → 退回(note 必填 —— 退回理由是证据链的一部分)。role 同 sign_review 快照。"""
     if not note or not str(note).strip():
         raise ValueError("return requires a note")
     with _conn() as cx:
@@ -529,7 +533,7 @@ def return_review(puuid: str, version_id: int, note: str) -> dict:
         cx.execute("UPDATE reviews SET state='returned', decided_by=?, decided_at=?, note=?"
                    " WHERE id=?", (actor(), _now(), note, row["id"]))
         record_audit(cx, "review.return", project_uuid=puuid, version_id=version_id,
-                     details={"content_hash": h, "note": note})
+                     details={"content_hash": h, "note": note, "role": actor_role})
         return _review_joined(cx, puuid, version_id)  # type: ignore[return-value]
 
 
