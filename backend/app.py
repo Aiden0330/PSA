@@ -16,7 +16,18 @@ class UTF8JSONResponse(JSONResponse):
 
 
 app = FastAPI(title="BESS PSA", default_response_class=UTF8JSONResponse)
-app.add_middleware(CORSMiddleware, allow_origins=["*"],
+
+# 修复项 ③(ADR-4):CORS 收紧。off 模式保持 "*"(本地/离线开发不变,约束 #0);
+# server 模式走 PSA_CORS_ORIGINS 白名单(逗号分隔,默认空=仅同源)。
+# 注:凭据请求(cookie)下 CORS 规范禁止 "*" + credentials 并存 —— server 模式必走
+# 白名单,天然一致;off 模式无 cookie,"*" 无害。
+from backend.auth import is_server_mode as _is_server_mode
+
+if _is_server_mode():
+    _cors_origins = [o.strip() for o in os.environ.get("PSA_CORS_ORIGINS", "").split(",") if o.strip()]
+else:
+    _cors_origins = ["*"]
+app.add_middleware(CORSMiddleware, allow_origins=_cors_origins, allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 
 @app.get("/api/examples")
