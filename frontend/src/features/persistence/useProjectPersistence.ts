@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { SaveConflictError, deleteSaved, listSaved, saveWorkspace, wasSavedOffline } from '../../api'
+import { AuthRequiredError, SaveConflictError, deleteSaved, listSaved, saveWorkspace, wasSavedOffline } from '../../api'
 import type { SavedItem } from '../../api'
-import { serializeProject } from '../../project'
+import { deserializeProject, serializeProject } from '../../project'
 import type { ProjectEta, ProjectPayload } from '../../project'
 import { buildProjectFile, downloadProjectFile } from '../../projectFile'
 import { getOverlay, mergeOverlay } from '../../libraryStore'
-import { loadProjectArchive, importProjectText, EMPTY_FTS } from './projectIo'
+import { loadProjectArchive, importProjectText, projectToTabs, EMPTY_FTS } from './projectIo'
+import { clearSessionDraft, peekSessionDraft, stageSessionDraft } from './sessionDraft'
+import type { SessionDraftMeta } from './sessionDraft'
 import { composeEta } from '../../stores/derived'
 import { etaDisplayName, useActiveEta } from '../../stores/useActiveEta'
 import { loadRows, saveRows } from '../../fmeaStore'
@@ -27,6 +29,11 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   // D-P5-4 乐观并发:当前已知的服务器版本哈希(保存/读档时更新),下次保存原样带回。
   const [lastVersionHash, setLastVersionHash] = useState<string | undefined>(undefined)
   const [conflict, setConflict] = useState<{ serverHash: string; baseHash: string; name: string; payload: ProjectPayload } | null>(null)
+  // 会话过期(local 模式,401)暂存的草稿元信息;内容留在 localStorage,这里只镜像name/时间供 UI 显示。
+  const [sessionDraft, setSessionDraft] = useState<SessionDraftMeta | null>(() => {
+    const d = peekSessionDraft()
+    return d ? { name: d.name, at: d.at } : null
+  })
   const [fmeaRows, setFmeaRows] = useState<FmeaRow[]>(() => loadRows())
   const [fmeaMapping, setFmeaMapping] = useState<MappingConfig>(() => loadMapping())
 
@@ -60,14 +67,22 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     if (!etModel) return
     const payload = buildPayload()
     const existing = saved.find((s) => s.id === savedId)
+    // name 在 try 外解出:catch 分支(冲突/会话过期暂存)也要用到用户刚输入的名称 ——
+    // 塞进 try 内的 else 分支会块作用域丢失,暂存草稿就会挂错名字(曾经的真实 bug)。
+    let name: string
+    if (savedId && existing) {
+      name = existing.name
+    } else {
+      const at = etaTabs.find((t) => t.key === activeKey)
+      const dflt = (at ? etaDisplayName(at, etModel) : '') || etModel.initEvent || 'ETA 项目'
+      const prompted = window.prompt('项目存档名称', dflt)
+      if (!prompted) return
+      name = prompted
+    }
     try {
       if (savedId && existing) {
-        captureUuid(await saveWorkspace(existing.name, payload, savedId, lastVersionHash))
+        captureUuid(await saveWorkspace(name, payload, savedId, lastVersionHash))
       } else {
-        const at = etaTabs.find((t) => t.key === activeKey)
-        const dflt = (at ? etaDisplayName(at, etModel) : '') || etModel.initEvent || 'ETA 项目'
-        const name = window.prompt('项目存档名称', dflt)
-        if (!name) return
         const rec = await saveWorkspace(name, payload)
         setSavedId(rec.id)
         captureUuid(rec)
@@ -75,7 +90,15 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
       await refreshList()
     } catch (e) {
       if (e instanceof SaveConflictError) {
-        setConflict({ serverHash: e.serverHash, baseHash: e.baseHash, name: existing?.name ?? '', payload })
+        setConflict({ serverHash: e.serverHash, baseHash: e.baseHash, name, payload })
+        return
+      }
+      if (e instanceof AuthRequiredError) {
+        // 会话过期(local 模式):编辑仍在内存里,但显式暂存一份 + 明确告知,
+        // 绝不让保存动作静默失败(那样用户会误以为已存到服务器)。
+        stageSessionDraft(name, payload, savedId)
+        setSessionDraft({ name, at: new Date().toISOString() })
+        onError('登录已过期,本次保存未写入服务器 —— 你的编辑仍在,已额外暂存一份草稿到本机;请重新登录后点「恢复草稿」。')
         return
       }
       throw e
@@ -88,10 +111,21 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     const base = saved.find((s) => s.id === savedId)?.name || (at ? etaDisplayName(at, etModel) : '') || 'ETA 项目'
     const name = window.prompt('另存为新项目名称', base + ' 副本')
     if (!name) return
-    const rec = await saveWorkspace(name, buildPayload())
-    setSavedId(rec.id)
-    captureUuid(rec)
-    await refreshList()
+    const payload = buildPayload()
+    try {
+      const rec = await saveWorkspace(name, payload)
+      setSavedId(rec.id)
+      captureUuid(rec)
+      await refreshList()
+    } catch (e) {
+      if (e instanceof AuthRequiredError) {
+        stageSessionDraft(name, payload, '')
+        setSessionDraft({ name, at: new Date().toISOString() })
+        onError('登录已过期,本次「另存为」未写入服务器 —— 你的编辑仍在,已额外暂存一份草稿到本机;请重新登录后点「恢复草稿」。')
+        return
+      }
+      throw e
+    }
   }
 
   // ── D-P5-4 冲突对话三路径:查看 diff(调用方负责切页)/ 另存副本 / 确认覆盖 ──
@@ -114,6 +148,23 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     await refreshList()
   }
   const dismissConflict = () => setConflict(null)
+
+  // ── 会话过期草稿(规格 §9 验收):重新登录后显式恢复,不自动覆盖用户正在看的内容 ──
+  const restoreSessionDraft = () => {
+    const d = peekSessionDraft()
+    if (!d) { setSessionDraft(null); return }
+    const proj = deserializeProject(d.payload, d.name)
+    const tabs = projectToTabs(proj)
+    const restoredActiveKey = tabs.some((t) => t.key === proj.activeKey) ? proj.activeKey : (tabs[0]?.key ?? '')
+    if (!tabs.length) { onError('暂存草稿不含任何 ETA,已丢弃。'); clearSessionDraft(); setSessionDraft(null); return }
+    setSavedId(d.savedId)
+    P().load(tabs, restoredActiveKey, proj.checkedKeys, proj.userFts ?? EMPTY_FTS)
+    applyProjectFmea(proj)
+    clearSessionDraft()
+    setSessionDraft(null)
+  }
+  const discardSessionDraft = () => { clearSessionDraft(); setSessionDraft(null) }
+
   // 读取项目存档:完整还原全部 ETA(替换当前所有页签)。兼容旧版单 ETA 存档。
   // savedId 乐观置位:受控下拉在 await 期间不回弹到「—」;失败则回退并亮错。
   const loadProject = async (id: string) => {
@@ -162,10 +213,11 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   }
 
   return {
-    saved, savedId, archiveLocal, projectUuid, loading, conflict,
+    saved, savedId, archiveLocal, projectUuid, loading, conflict, sessionDraft,
     fmeaRows, fmeaMapping, persistFmeaRows, persistFmeaMapping,
     buildPayload, onSaveWorkspace, onSaveAs, loadProject, onExportFile, onImportFile, onDeleteSaved,
     resolveConflictOverwrite, resolveConflictSaveAsCopy, dismissConflict,
+    restoreSessionDraft, discardSessionDraft,
   }
 }
 

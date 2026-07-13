@@ -158,6 +158,16 @@ function AppShell() {
         </div>
       )}
 
+      {persistence.sessionDraft && (
+        <div style={draftBar}>
+          <span>会话过期时暂存的草稿「{persistence.sessionDraft.name}」({persistence.sessionDraft.at.slice(0, 19).replace('T', ' ')})—— 重新登录后可恢复,不会自动覆盖当前内容。</span>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button onClick={persistence.restoreSessionDraft} className="psa-btn psa-btn--primary" style={{ height: 24, fontSize: 11.5 }}>恢复草稿</button>
+            <button onClick={() => { if (window.confirm('丢弃暂存草稿?此操作不可撤销。')) persistence.discardSessionDraft() }} className="psa-btn" style={{ height: 24, fontSize: 11.5 }}>丢弃</button>
+          </div>
+        </div>
+      )}
+
       <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
         <ProjectDrawer persistence={persistence} />
         {/* 懒页签统一挂起点:总览/ETA 为即时组件,其余页签首次进入时按需拉块 */}
@@ -222,3 +232,4 @@ const tabBtn = (active: boolean): CSSProperties => ({ background: active ? 'var(
 const drawerBtn: CSSProperties = { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.28)', color: 'var(--psa-chrome-ink)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 7, cursor: 'pointer' }
 const kbdBtn: CSSProperties = { height: 26, padding: '0 9px', background: 'rgba(0,0,0,.28)', color: 'var(--psa-chrome-ink)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontFamily: 'var(--psa-font-mono)' }
 const errBar: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px', background: 'var(--psa-danger-soft)', color: 'var(--psa-danger-strong)', fontSize: 12.5, borderBottom: '1px solid rgba(220,38,38,.2)', flexShrink: 0 }
+const draftBar: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px', background: 'var(--psa-primary-soft)', color: 'var(--psa-primary-strong)', fontSize: 12.5, borderBottom: '1px solid rgba(37,99,235,.2)', flexShrink: 0 }
