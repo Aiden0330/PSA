@@ -27,9 +27,18 @@ actor 会话身份 / CORS 收紧);乐观并发 409 冲突流 + 前端三路径�
 | **B4** | **Sonnet 5**(`frontend-dev` 子代理) | 登录页 + 角色感知 UI + 409 冲突三路径对话 |
 | **B5** | **Opus / Haiku** | 探针 P1/P3 + 验收回归 + closeout(bundle + check + ROADMAP) |
 
-**B2 安全常量**(Fable 实施时钉定,勿在 B1 猜):argon2id time_cost/memory_cost/parallelism
-(默认取 argon2-cffi 的 RFC 9106 推荐)· 会话 token 熵(`secrets.token_urlsafe(32)`)·
-cookie 标志(HttpOnly + SameSite=Lax + Secure 当 TLS)· 会话 TTL + 滑动续期策略。
+**B2 安全常量(已钉定,2026-07-12 Fable 批次)**:
+- argon2id 用 argon2-cffi **库默认**(25.1.0:t=3、m=64 MiB、p=4、16B 盐)——随库演进,
+  `check_needs_rehash` 在成功登录时透明升级旧哈希;口令最短 8 字符(长度是底线,不推复杂度规则)。
+- 会话 token = `secrets.token_urlsafe(32)`(256 bit);**库中只存 sha256(token)**——
+  备份=库文件拷贝(ADR-4),库泄露不得等于会话劫持(对规格 §4.1 DDL 的语义细化)。
+- Cookie `psa_session`:HttpOnly + SameSite=Lax + Secure 跟随请求 scheme(反代终结 TLS 时
+  `uvicorn --proxy-headers`)+ Max-Age=TTL。
+- TTL 12h,消耗过半滑动续期(写库有界);过期懒删;**停用账户即撤销全部在途会话**。
+- 枚举防御:未知用户走 dummy-hash 等时校验;未知/错口令/停用一律 401「用户名或口令错误」,
+  真实原因只进审计(`auth.login_failed`);登录限速留 future(内网 3-10 人)。
+- 引导:`python -m backend.auth.create_account <user> --role admin`(口令 getpass 交互,
+  **绝不走 argv**——ps/shell 历史泄漏)。
 **B2 完成后强制 `domain-reviewer`(fable)轻扫** actor/签发身份进报告页脚的口径。
 
 ## 2 · 模式脚手架(B1,Opus · `backend/auth/mode.py` 新建)

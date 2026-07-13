@@ -150,26 +150,48 @@ export async function importanceEventTree(req: any): Promise<EtImportance> {
 
 export interface SavedItem { id: string; name: string; saved_at: string }
 export interface SavedRecord { id: string; name: string; saved_at: string; payload: any }
+
+// ── 修复项 ①(ADR-4 盲区地雷):认证失败 ≠ 后端不可达 ──
+// 401/403 意味着后端活着但拒绝了你 —— 此时静默写 localStorage 会让用户以为存到了服务器。
+// 规则:AuthRequiredError 从 /api/saved 家族直接上抛(UI 弹登录);只有网络层异常
+// (fetch reject)与其余 HTTP 错误(后端不可达/降级语义)才走 localStorage 回退。
+export class AuthRequiredError extends Error {
+  status: number
+  constructor(status: number) {
+    super(status === 403 ? '无权限(403):当前账户不能执行此操作' : '未登录(401):请登录后重试;本次操作未写入服务器,也不会伪装为离线存档')
+    this.name = 'AuthRequiredError'
+    this.status = status
+  }
+}
+
+async function savedFetch(path: string, init?: RequestInit): Promise<Response> {
+  const r = await fetch(`${BASE}${path}`, init)   // 网络异常原样上抛 → 调用方回退
+  if (r.status === 401 || r.status === 403) throw new AuthRequiredError(r.status)
+  return r
+}
+
 export async function listSaved(): Promise<SavedItem[]> {
   try {
-    const r = await fetch(`${BASE}/saved`)
+    const r = await savedFetch('/saved')
     if (!r.ok) throw new Error(`/saved → ${r.status}`)
     const data = (await r.json()) as SavedItem[]
     _savedOffline = false
     return data
-  } catch {
+  } catch (e) {
+    if (e instanceof AuthRequiredError) throw e
     _savedOffline = true
     return lsList()
   }
 }
 export async function loadSaved(id: string): Promise<SavedRecord> {
   try {
-    const r = await fetch(`${BASE}/saved/${id}`)
+    const r = await savedFetch(`/saved/${id}`)
     if (!r.ok) throw new Error(`/saved/${id} → ${r.status}`)
     const data = (await r.json()) as SavedRecord
     _savedOffline = false
     return data
-  } catch {
+  } catch (e) {
+    if (e instanceof AuthRequiredError) throw e
     _savedOffline = true
     return lsLoad(id) // 本地无此 id 时 lsLoad 自身抛「不存在」并向上传播(混合模式非目标)
   }
@@ -177,22 +199,24 @@ export async function loadSaved(id: string): Promise<SavedRecord> {
 export async function saveWorkspace(name: string, payload: any, id?: string): Promise<SavedItem> {
   try {
     // id 省略 → 后端新建; 传入 → 原地更新该存档(JSON.stringify 会丢弃 undefined 的 id 键)
-    const r = await fetch(`${BASE}/saved`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, payload, id }) })
+    const r = await savedFetch('/saved', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, payload, id }) })
     if (!r.ok) throw new Error(`save → ${r.status}`)
     const data = (await r.json()) as SavedItem
     _savedOffline = false
     return data
-  } catch {
+  } catch (e) {
+    if (e instanceof AuthRequiredError) throw e
     _savedOffline = true
     return lsSave(name, payload, id)
   }
 }
 export async function deleteSaved(id: string): Promise<void> {
   try {
-    const r = await fetch(`${BASE}/saved/${id}`, { method: 'DELETE' })
+    const r = await savedFetch(`/saved/${id}`, { method: 'DELETE' })
     if (!r.ok) throw new Error(`delete → ${r.status}`)
     _savedOffline = false
-  } catch {
+  } catch (e) {
+    if (e instanceof AuthRequiredError) throw e
     _savedOffline = true
     lsDelete(id) // 本地无此 id 时 lsDelete 自身抛「不存在」并向上传播
   }
