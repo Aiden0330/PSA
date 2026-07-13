@@ -30,6 +30,30 @@ else:
 app.add_middleware(CORSMiddleware, allow_origins=_cors_origins, allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 
+# Phase 5 auth(B2):登录/登出/身份端点 + 会话身份贯通中间件。
+# off 模式:中间件不 set → actor() 回退 OS 用户(约束 #0 逐位不变);/api/auth/me 报 mode。
+from backend.auth.routes import router as _auth_router, SESSION_COOKIE as _SESSION_COOKIE
+
+app.include_router(_auth_router)
+
+
+@app.middleware("http")
+async def _session_identity_middleware(request, call_next):
+    token = None
+    if _is_server_mode():
+        raw = request.cookies.get(_SESSION_COOKIE)
+        if raw:
+            from backend import store
+            ident = store.get_session(raw)
+            if ident:
+                token = store.set_current_actor(ident["username"])
+    try:
+        return await call_next(request)
+    finally:
+        if token is not None:
+            from backend import store
+            store.reset_current_actor(token)
+
 @app.get("/api/examples")
 def api_examples():
     return examples.list_examples()

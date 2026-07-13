@@ -130,7 +130,26 @@ def engine_version() -> str:
         return "0.0.0"
 
 
+# 修复项 ②(ADR-4):server 模式下审计/版本/案例的"谁"= 会话身份。
+# 请求中间件解析 cookie 后 set;actor() 优先读它,空则回退 OS 用户(off 模式逐位不变)。
+from contextvars import ContextVar
+
+_current_actor: ContextVar[Optional[str]] = ContextVar("psa_current_actor", default=None)
+
+
+def set_current_actor(username: str):
+    """进入请求上下文:此后本请求内的 actor() 以该认证身份记。返回 reset 用 token。"""
+    return _current_actor.set(username)
+
+
+def reset_current_actor(token) -> None:
+    _current_actor.reset(token)
+
+
 def actor() -> str:
+    ident = _current_actor.get()
+    if ident:
+        return f"{ident}@bess-psa/{engine_version()}"
     try:
         user = getpass.getuser()
     except Exception:
