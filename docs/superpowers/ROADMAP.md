@@ -50,11 +50,11 @@
   PROMPT_VERSION 2026-07-09-p1),真模型首跑 + 金例 Batch 首提为**用户持 key 的运营步**,runbook 交付
   (`docs/design/ai-live-run-runbook.md`)。收口:fe vitest 全绿、py 240、`make check` 绿、bundle 2.73MB。
   账本缺口 #2(house/边界)/#3(后处理)UI 落地;#8 分析设置面板成形。
-- **下一步**:Phase 5 多用户——**须先 blindspot-pass + interview-me**(认证/实时同步/CRDT 无仓库先例;
-  「并发编辑 vs 共享项目+评审工作流」的取舍决定架构量级)→ 认证 → 服务端权威 → Yjs/Loro 再评估 →
-  评审工作流。**约束 #0(用户确认 2026-07-10):单用户模式不降级** —— 离线单文件(file:// 无后端)与
-  本地单用户(make run,无登录)永久保留且仍为默认;认证是部署开关(PSA_AUTH 类),多用户为同一
-  存储上的叠加层而非代码分叉;单机 SQLite 项目可经 canonical 层无损迁入共享服务器。**GitHub 远程仍待建**(CI 与 CUDD Linux 任务未激活;Phase 4 全部提交仍仅在本机)。
+- **Phase 5 状态(2026-07-12 起)**:✅ **已全部完成**(见下方两条 2026-07-12 详细收口
+  条目)——评审/签发工作流 + 认证层(本地账户/三角色/乐观并发/迁移)均已实施,
+  约束 #0(单用户不降级)全程未破。**下一步**:**GitHub 远程仍待建**(CI 与 CUDD
+  Linux 任务未激活;全部提交仍仅在本机,~60+ commits)——这是当前唯一的用户阻塞项;
+  其余候选见 §5 待办清单(D 项 CUDD CI、Phase 6 候选:CRDT 实时并发/OIDC/项目级 ACL)。
   背景跟进:FTA 三栏响应式(task_bee07b95)、手改值清置信快照含 IE 字段(task_7dcd9495)。
 - **Phase 5 设计收口(2026-07-10~12)**:blindspot 报告(`145db9e`,领地实况:actor=OS 用户、
   CORS \*、api.ts 401 静默回退地雷、LWW 但版本库保双方)→ interview 锁定 D-P5-1..4
@@ -81,6 +81,37 @@
   project.create→version.create→review.submit→review.sign→review.comment,console 零错误。
   剩余(auth 层,另排期):修复项 1-3(api.ts 401 地雷/actor 会话身份/CORS 白名单)+
   accounts/sessions + 三角色守卫 + 签发口令复核 + 409 冲突对话。
+- **Phase 5 认证层落地,Phase 5 全部收官(2026-07-12,规格 5 批)**:`e0e6c6c`..`ac83512`
+  (18 commits,跨 Opus/Fable/Sonnet 按批次切模型,安全关键簇钉在 Fable)。B1(Opus):
+  `PSA_AUTH=off|local` 唯一判据模块 + CORS 白名单(off 模式恒 `*`,约束 #0)。
+  B2(**Fable**,安全关键):argon2id 账户(库默认参数 + `check_needs_rehash` 透明升级)+
+  会话(库中只存 `sha256(token)`,256-bit token,12h TTL 滑动续期,停用即撤销在途会话,
+  未知用户走等时 dummy-hash 防枚举)+ provider 抽象(local 是第一个实现,预留 OIDC)+
+  actor contextvar 贯通(server 模式签发人=会话身份,off 模式=OS 用户不变)+ api.ts
+  `AuthRequiredError`(401/403 显式登录提示,**绝不**回退 localStorage;网络不可达才回退,
+  地雷排除)。domain-reviewer 轻扫 PASS(0 blocker;落码:每行审计携带 `auth:off|local`
+  标记区分认证/OS-用户行、签发行禁删触发器;3 项文档化决定含"off 模式签发=自审非独立
+  评审,正式提交须 local 模式")。B3(Opus):三角色路由守卫(`require_role`,off 模式
+  透明放行)+ 签发口令复核 + 签发/退回审计快照 role(移交自 domain-review)+
+  `base_version_hash` 乐观并发 409。B4(**Sonnet**,主会话直做未走子代理):App.tsx
+  拆认证门(`App`)+ 应用壳(`AppShell`)——local 未登录时壳与壳内**全部**数据获取
+  effect 一律不挂载(零预登录网络噪音);`needsLogin` 严格取 `getMe()` 确凿 401
+  (`StatusError`),网络异常/离线单文件永不触发(约束 #0 最易踩的坑);409 冲突三路径
+  对话(查看 diff/另存副本/确认覆盖);ReportDossier 送审/签发/退回按钮角色呈现层隐藏
+  (`identity===null` 失败开放=全权,off 模式不变);精简账户管理面。B5(Sonnet):
+  探针 P1(LWW 事实固化为回归:工作区头覆灭但版本库双方俱在)/P3(SQLite 并发写
+  基准:10 写者×20 次,1211 writes/s,p50=1.2ms,零锁错误,给"单进程够用"一个实测
+  数)——**P3 强撞车变体意外揪出 `create_version` 的真竞态**(check-then-insert 在
+  并发下让后到者崩溃而非幂等退让,违反 ADR-2 D6 承诺)→ 当场修(捕获
+  IntegrityError→按幂等命中处理)+ 16 线程 Barrier 回归;补上规格 §9 点名但 B4
+  漏做的**会话过期草稿暂存**(`sessionDraft.ts` 纯模块 + `useProjectPersistence` 接线 +
+  App 顶部横幅恢复/丢弃)——自查时又抓到一个真 bug(新项目首存分支里用户输入的名字
+  活在 catch 摸不到的块作用域,草稿会存成兜底名)当场修;**迁移验收**用手搭
+  Phase-5-前三表库证明"拷 db 文件就是迁移"确实成立(uuid 派生身份 + 内容哈希版本 +
+  `_conn()` 幂等重跑全量 DDL 三者合力,零专门导入代码)。收口:py 255→307、
+  fe 218→239,bundle 2.75MB,off 模式回归全程绿(每批次都跑)。**Phase 5 至此全部
+  完成**:共享项目+评审签发工作流 + 本地账户认证 + 三角色 + 乐观并发全部落地,
+  单用户/离线模式逐位未降级。
 
 ---
 
