@@ -41,6 +41,18 @@ actor 会话身份 / CORS 收紧);乐观并发 409 冲突流 + 前端三路径�
   **绝不走 argv**——ps/shell 历史泄漏)。
 **B2 完成后强制 `domain-reviewer`(fable)轻扫** actor/签发身份进报告页脚的口径。
 
+**domain-review 结论(2026-07-12,PASS,0 blocker)**——已落码:finding-1 每行审计
+details 注入 `auth: off|local` 标记(同链区分 OS 用户行与认证行);finding-7 签发行禁删
+触发器(对称硬化)。**移交 B3**:finding-3 签发/退回审计 details 须快照 `role`
+(签发授权依据不得依赖可变的 accounts 表;display_name 若上页脚也须签发时快照)。
+**文档化决定**(不改码):finding-2 actor 后缀 `@bess-psa/<ver>` = 记录时工具版本,
+与页脚"引擎"字段(计算时版本)可合法不同 —— 报告附录须写明;finding-4 off 模式签发
+身份 = 环境派生 OS 用户且 submitter==signer(自审非独立评审)—— 方法学文档规定
+**正式对外提交须 PSA_AUTH=local**(桌面工具惯例 RS 同为 OS 戳,可辩护);finding-5
+login_failed 审计记录尝试用户名,只增日志不可事后涂抹(误把口令输进用户名框即永久
+留痕)—— 接受该风险并记录于此,project_uuid=NULL 使其不出现在任何项目过滤读面;
+finding-6 **B3 守卫落地前不得部署 local 模式**(端点未被门禁,签发会记为守护进程 OS 用户)。
+
 ## 2 · 模式脚手架(B1,Opus · `backend/auth/mode.py` 新建)
 
 ```python
@@ -145,6 +157,8 @@ FastAPI 依赖:`require_role(*roles)` → server 模式校验 current_identity.r
 - 账户管理 = admin only
 - 签发口令复核:sign 端点已预留 `password` 字段(app.py:366)→ server 模式二次校验
   当前用户口令,off 忽略。
+- **domain-review finding-3(移交项)**:签发/退回的审计 details 快照会话 `role`
+  ——"签发人当时持评审人角色"必须可从只增链重建,不得依赖可变的 accounts 表。
 矩阵测试:analyst 不可签发(403)、reviewer 不可改模型(403)、admin 可建账户。
 
 ### 5.2 乐观并发 409(修复项延伸,D-P5-4)

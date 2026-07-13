@@ -99,6 +99,9 @@ CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_log
 CREATE TRIGGER IF NOT EXISTS reviews_signed_final BEFORE UPDATE ON reviews
   WHEN OLD.state='signed'
   BEGIN SELECT RAISE(ABORT, 'signed review is final'); END;
+CREATE TRIGGER IF NOT EXISTS reviews_signed_no_delete BEFORE DELETE ON reviews
+  WHEN OLD.state='signed'
+  BEGIN SELECT RAISE(ABORT, 'signed review is final'); END;
 """
 
 
@@ -164,10 +167,15 @@ def legacy_project_uuid(sid: str) -> str:
 def record_audit(cx: sqlite3.Connection, action: str, *, project_uuid: str | None = None,
                  version_id: int | None = None, entity_uuid: str | None = None,
                  details: dict | None = None) -> None:
+    # domain-review 2026-07-12 finding-1:每行审计携带认证模式标记 —— OS 用户行(off/
+    # 迁移前历史)与认证账户行在同一追踪链里必须可区分,否则监管读 provenance 会误判。
+    from backend.auth.mode import auth_mode
+    d = dict(details or {})
+    d.setdefault("auth", auth_mode())
     cx.execute("INSERT INTO audit_log(ts,actor,action,project_uuid,version_id,entity_uuid,details_json)"
                " VALUES(?,?,?,?,?,?,?)",
                (_now(), actor(), action, project_uuid, version_id, entity_uuid,
-                json.dumps(details or {}, ensure_ascii=False)))
+                json.dumps(d, ensure_ascii=False)))
 
 
 def ensure_project(puuid: str, name: str) -> bool:

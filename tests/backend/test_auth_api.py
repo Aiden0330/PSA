@@ -126,6 +126,37 @@ def test_forged_or_stale_cookie_is_anonymous(monkeypatch):
     assert c.get("/api/auth/me").status_code == 401
 
 
+def test_audit_rows_carry_auth_mode_marker(monkeypatch):
+    """domain-review finding-1:同一追踪链里 OS 用户行与认证账户行必须可区分 ——
+    每行审计 details 携带 auth: off|local 标记(增量注入,off 模式 actor 逐位不变)。"""
+    import json
+    monkeypatch.delenv("PSA_AUTH", raising=False)
+    store.ensure_project(PUUID, "P")
+    off_row = store.list_audit(PUUID)[-1]
+    assert json.loads(off_row["details_json"])["auth"] == "off"
+
+    monkeypatch.setenv("PSA_AUTH", "local")
+    store.create_account("wang", "review-pw-1", "reviewer")
+    v = store.create_version(PUUID, *to_canonical(_payload(), PUUID))
+    c = _client()
+    c.post("/api/auth/login", json={"username": "wang", "password": "review-pw-1"})
+    c.post(f"/api/projects/{PUUID}/reviews", json={"version_id": v["id"]})
+    submit_row = next(e for e in store.list_audit(PUUID) if e["action"] == "review.submit")
+    assert json.loads(submit_row["details_json"])["auth"] == "local"
+
+
+def test_signed_review_row_cannot_be_deleted(monkeypatch):
+    """domain-review finding-7:签发行禁删(对称硬化)—— 审计行本就只增,评审行补齐。"""
+    import sqlite3 as _sq
+    import pytest as _pytest
+    store.ensure_project(PUUID, "P")
+    v = store.create_version(PUUID, *to_canonical(_payload(), PUUID))
+    store.submit_review(PUUID, v["id"])
+    store.sign_review(PUUID, v["id"])
+    with store._conn() as cx, _pytest.raises(_sq.DatabaseError, match="final"):
+        cx.execute("DELETE FROM reviews WHERE project_uuid=?", (PUUID,))
+
+
 def test_disabled_account_sessions_revoked(monkeypatch):
     monkeypatch.setenv("PSA_AUTH", "local")
     store.create_account("wang", "review-pw-1", "reviewer")
