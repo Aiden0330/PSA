@@ -130,6 +130,29 @@
   (逐初因精确模式/完整 LFT 集成)。py 326、benchmark 24/24、fe 246、bundle 2.75MB。
   preview 实测:Σ=7×10⁻⁴ 精确、AND(f,f)→400 点名割集、console 零错误。
 
+- **Explorer 壳重设计 + 多项目(2026-07-13~14,R1–R5 五批四模型)**:规格
+  `2026-07-13-explorer-redesign.md`,mockup 8 页两轮用户反馈定稿(树保留瘦身/4·5 不合并/
+  画布主导可缩放/ETA 直角走线)。R2 多项目状态层(Fable):方案 C 绞杀者——顶层字段**就是**
+  活动项目,非活动项目整槽停放(undo 历史/pfds/身份/FMEA 随槽迁移),隔离结构给定,
+  8 锁测;聚焦≠重载(保未存编辑)。R3 壳替换(Opus):MenuBar/ExplorerTree/StatusBar,
+  auth 门不动;踩 useSyncExternalStore 快照契约(fresh-array 选择器无限渲染 → 稳定切片
+  +useMemo)。R4 逐页迁移(sonnet·frontend-dev 三只后台子代理,串行防冲突):ETA 画布
+  缩放平移(useCanvasZoom 纯数学 16 测:钳位/fit/指针不动点;React onWheel passive 陷阱
+  → 原生非 passive 监听)、FTA 页(zoom 工具组/结果坞折叠/⚙ 设置弹出)、五页换皮;
+  R4b 撞会话上限零损失重启;协调者门禁纠正:`tsc --noEmit` 比构建的 `tsc -b` 松,漏 4 错
+  (f3c5921 清账,后续门禁一律 tsc -b)。Vite 依赖缓存损坏伪象(双 React → 白屏
+  "Invalid hook call")清 .vite 重启根治——**非代码回归**。R5 组合总览(Opus 实现、
+  Fable 落审):`GET /api/portfolio` 数字**只取已钉扎案例**绝不现算,无案例=「未量化」;
+  矩阵频带/评级与报告矩阵同源(risk_placement 复用 _freq_band/_risk_level);
+  review_state 锚**最新版本**防旧签发误读。**domain-reviewer 轻扫抓 F1 真错误**
+  (uncertainty 案例真实形状 {"point","bands"},只读 consequences 会把已量化显示成
+  "未量化"——反保守,且测试夹具伪造形状遮蔽)+ 5 项裁决全落:双读 point、场景口径
+  披露(脚注可见,不藏 tooltip)、"数字非当前版本"琥珀徽章(不靠肉眼比对哈希)、
+  open_review 字段(在审行钉旧版本时队列不消失,"看不见还能签"堵死)、25 格金表
+  双侧镜像锁(单侧锁只防单侧漂移)、列名弃"C≥3"缩写用公式(与单项目"≥III"=C4+C5
+  异口径)。py 169+、fe 276、bundle 重建。**开口子记账**:聚合范围钉扎(案例只覆盖
+  单棵事件树,跨项目排序须按勾选集合并导出——F2 最小披露已做,聚合钉扎为候选)。
+
 ---
 
 ### 0.1 上一基线:2026-06-30(Windows,历史记录)

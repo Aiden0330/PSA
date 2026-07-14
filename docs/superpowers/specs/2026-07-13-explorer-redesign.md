@@ -1,6 +1,7 @@
 # Explorer 重设计(shell-A 工程座舱 + 多项目)实施规格
 
-*2026-07-13 · 状态:实施中(R1-R2 Fable / R3 Opus / R4 sonnet·frontend-dev / R5 Opus)·
+*2026-07-13 · 状态:**已完成**(2026-07-14 R1–R5 全部落地,收口与偏离见 §6)·
+分工实录:R1-R2 Fable / R3 Opus / R4 sonnet·frontend-dev ×3 / R5 Opus 实现 + Fable 落审 ·
 mockups:`docs/design/mockups/2026-07-13-explorer-*.html`(v2,用户两轮反馈定稿:
 树保留并瘦身;4/5 不合并;ETA/FTA 画布主导可缩放;ETA 直角走线 = 现有 EtCanvas 制式)*
 
@@ -125,3 +126,24 @@ saved 列表/conflict/sessionDraft 维持 hook 级(conflict 瞬态;sessionDraft 
 - R2 是唯一高风险批:任何隔离缺陷 = 跨项目数据串染(溯源违规级)。锁测优先于功能。
 - 渐进可回退:R2 落地后旧壳照常工作(API 面未变)——R3 前随时可停;R4 每页独立。
 - 已知不做:项目间拖拽复制 ETA、双项目并排视图(记 ROADMAP 候选)。
+
+## 6 · 收口记录与规格偏离(2026-07-14,R1–R5 全部落地)
+
+实现相对本规格的偏离,均有意为之:
+
+1. **§4 "≥III 累计"未采用,列名为公式 "C3+C4+C5 /yr"**(domain-review 裁决 1b):
+   单项目页已有 "≥III 累计" = C4+C5(危险等级口径,CONS_GRADE C3→II);组合页若用
+   近同形词而数字差一个通常占主导的 C3 项,跨页必被追问。等级映射是代码常量、
+   未随案例钉扎,故组合页整体不使用等级口径——列名直接用公式,表脚注可见声明。
+2. **/api/portfolio 响应超出 §4 形状**:+`open_review`(在审行可能钉在旧版本,
+   仅按最新版锚定会"看不见还能签"——domain-review 裁决 2)、+`latest_case.scenario`
+   (F2 口径披露)、+`saved_id`(uuid→存档反查,组合页直达项目)、
+   +`latest_case.risk`(cells/worst,后端 risk_placement 给定落格,前端零阈值)。
+3. **uncertainty 案例的双读**(F1):真实钉扎形状为 `{"point","bands"}`,
+   `portfolio()` 读 `consequences|point`(同一确定性频率口径)。
+4. **R4c 报告页仅背景 token 化**:§3 "送审/签发/退回移入 ribbon" 未执行——P5-5
+   用户钦点台账签发式且刚过评审,操作留在台账行内;如需 ribbon 版另立任务。
+5. **StatusBar "◉ 引擎在线"** 由独立会话移除(0b53ca1),规格 §0 该条就此闭合。
+
+开口子(候选,记 ROADMAP):聚合范围钉扎——案例只覆盖导出时激活的单棵事件树,
+跨项目排序的严格口径应支持按勾选集合并导出;现以脚注+场景列披露(F2 最小修法)。
