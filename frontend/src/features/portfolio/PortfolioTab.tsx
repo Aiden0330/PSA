@@ -8,7 +8,7 @@ import type { ProjectPersistence } from '../persistence/useProjectPersistence'
  * 多项目组合总览(R3 骨架;R5 接 /api/portfolio 换成按钉扎案例的风险数字 + 组合矩阵 + 评审队列)。
  * 现阶段:项目库列表(uuid/名/版本数),点击一行 = 打开该项目对应存档(若存在)。
  */
-export function PortfolioTab({ persistence }: { persistence: ProjectPersistence }) {
+export function PortfolioTab(_props: { persistence: ProjectPersistence }) {   // R5 起消费 persistence(打开项目/评审队列跳转)
   const [projects, setProjects] = useState<ProjectInfo[]>([])
   const [err, setErr] = useState<string | null>(null)
   useEffect(() => { listProjects().then(setProjects).catch((e) => setErr(String(e?.message ?? e))) }, [])

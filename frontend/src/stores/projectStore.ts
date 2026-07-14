@@ -147,7 +147,7 @@ export const useProjectStore = create<ProjectStore>()((set) => {
     fmeaMapping: freshMapping(),
 
     setIdentity: (patch) => set((s) => ({ identity: { ...s.identity, ...patch } })),
-    setFmea: (rows, mapping) => set((s) => ({
+    setFmea: (rows, mapping) => set(() => ({
       ...(rows !== undefined ? { fmeaRows: rows } : {}),
       ...(mapping !== undefined ? { fmeaMapping: mapping } : {}),
     })),

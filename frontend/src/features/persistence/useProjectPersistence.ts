@@ -229,7 +229,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   }
 
   return {
-    saved, savedId: pendingId || savedId, archiveLocal, projectUuid, loading, conflict, sessionDraft,
+    saved, savedId: pendingId || savedId, archiveLocal, projectUuid, lastVersionHash, loading, conflict, sessionDraft,
     fmeaRows, fmeaMapping, persistFmeaRows, persistFmeaMapping,
     buildPayload, onSaveWorkspace, onSaveAs, loadProject, onExportFile, onImportFile, onDeleteSaved,
     resolveConflictOverwrite, resolveConflictSaveAsCopy, dismissConflict,

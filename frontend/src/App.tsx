@@ -20,7 +20,6 @@ import { LoginWall } from './features/shell/LoginWall'
 import { AccountsPanel } from './features/shell/AccountsPanel'
 import { SaveConflictDialog } from './features/shell/SaveConflictDialog'
 import { useViewStore } from './stores/viewStore'
-import type { MainTab } from './stores/viewStore'
 import { useActiveEta } from './stores/useActiveEta'
 import { useAuthStore } from './stores/authStore'
 
