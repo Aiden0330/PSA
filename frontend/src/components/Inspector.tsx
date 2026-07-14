@@ -12,6 +12,9 @@ interface Props {
   onSetTop: (id: string) => void
   onDelete: (id: string) => void
   onRenameNode: (oldId: string, newId: string) => void
+  /** 初因频率树模式:暴露参数量纲切换(频率初因 /yr ↔ 使能概率);频率值不钳位到 ≤1。 */
+  frequencyMode?: boolean
+  onSetParamKind?: (id: string, kind: 'probability' | 'frequency') => void
 }
 
 const GATE_OPS = ['and', 'or', 'atleast', 'not', 'xor']
@@ -35,7 +38,7 @@ function NameField({ id, onRename }: { id: string; onRename: (oldId: string, new
   )
 }
 
-export function Inspector({ model, ftName, selected, onUpdateNode, onUpdateParam, onSetTop, onDelete, onRenameNode }: Props) {
+export function Inspector({ model, ftName, selected, onUpdateNode, onUpdateParam, onSetTop, onDelete, onRenameNode, frequencyMode, onSetParamKind }: Props) {
   if (!selected) {
     return (
       <div style={{ padding: 14, color: 'var(--psa-muted)', fontSize: 12, lineHeight: 1.6 }}>
@@ -94,6 +97,31 @@ export function Inspector({ model, ftName, selected, onUpdateNode, onUpdateParam
             <span className="psa-num" style={{ fontSize: 11.5, color: 'var(--psa-ink-2)' }}>
               {(node.args ?? []).join(', ') || '—（拖拽连线添加）'}
             </span>
+          </div>
+        </>
+      ) : frequencyMode ? (
+        <>
+          {/* 初因频率树:量纲显式可切,频率(/yr)不钳位到 ≤1(频率不是概率) */}
+          <div style={fieldRow}>
+            <span style={fieldLabel}>量纲</span>
+            <select value={param?.kind === 'frequency' ? 'frequency' : 'probability'} style={{ fontSize: 12 }}
+              onChange={(e) => onSetParamKind?.(node.param_ref ?? node.id, e.target.value as 'probability' | 'frequency')}>
+              <option value="frequency">频率初因(/yr)</option>
+              <option value="probability">使能概率</option>
+            </select>
+          </div>
+          <div style={fieldRow}>
+            <span style={fieldLabel}>{param?.kind === 'frequency' ? '频率(/yr)' : '使能概率'}</span>
+            {param?.kind === 'frequency' ? (
+              <input type="number" step="1e-4" min={0} value={param?.value ?? 0} style={{ width: 110 }}
+                onChange={(e) => onUpdateParam(node.param_ref ?? node.id, Math.max(0, +e.target.value))} />
+            ) : (
+              <input type="number" step="0.001" min={0} max={1} value={param?.value ?? 0} style={{ width: 110 }}
+                onChange={(e) => onUpdateParam(node.param_ref ?? node.id, Math.min(1, Math.max(0, +e.target.value)))} />
+            )}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--psa-faint)', marginBottom: 6, lineHeight: 1.5 }}>
+            规则:每个最小割集恰好一个「频率初因」,其余为使能概率(违规量化时会明确报错)。
           </div>
         </>
       ) : (

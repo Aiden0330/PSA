@@ -1,13 +1,13 @@
 import { Suspense, lazy, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { quantify } from '../../api'
+import { quantify, ftFrequency } from '../../api'
 import type { ScenarioItem, LibraryData } from '../../api'
 import { EventTreeEditor } from '../../components/EventTreeEditor'
 import type { EtaSummary } from '../../components/EventTreeEditor'
 import { AiDraftPanel } from '../../components/AiDraftPanel'
 import { Icon } from '../../components/icons'
 import { newBlankEta, addFe, branchLeaf, setConsequence, CONSEQUENCES, consLevel } from '../../eventtree'
-import { attachStarterFt } from '../../model'
+import { attachStarterFt, sharedIeBarrierEvents } from '../../model'
 import { duplicateProjectEta } from '../../project'
 import { buildScenarioTab } from '../persistence/scenarioLoader'
 import { getTemplate, listTemplates, templateToEtaModel } from '../templates/etaTemplates'
@@ -98,17 +98,28 @@ export function EtaWorkbench(
   const onEditInitFt = () => {
     if (!etModel) return
     const hasFt = (etFtsModel.fault_trees ?? []).some((f: any) => f.name === '__init__')
-    if (!hasFt) P().setEtaFts(activeKey, attachStarterFt(etFtsModel, '__init__', etModel.initFreq))
+    // 种子 = 单频率事件 = 当前手动值 → 挂树瞬间 F 与切换前逐位一致(迁移零意外)
+    if (!hasFt) P().setEtaFts(activeKey, attachStarterFt(etFtsModel, '__init__', etModel.initFreq, 'frequency'))
     setInitFtOpen(true)
   }
   const onInitFtClose = async () => {
     setInitFtOpen(false)
     const active = P().present.etas.find((e) => e.key === P().activeKey)
     if (!active || active.model.initFreqSource !== 'ft') return
+    // 独立性护栏(规格 2026-07-13 §1):初因树与屏障树共享基本事件 ⇒ 可分离量化
+    // (F_IE × P_path)的独立性假设不成立,方向可能非保守 —— 拒绝并解释,绝不静默近似。
+    const shared = sharedIeBarrierEvents(active.fts)
+    if (shared.length) {
+      onError(`初因树与屏障故障树共享基本事件(${shared.join(', ')}):独立性假设不成立,初因频率未更新。请把共享逻辑移入屏障树,或为初因使用独立事件。`)
+      return
+    }
     try {
-      const top = (await quantify(active.fts, '__init__')).probability
-      P().setEtaPfd(active.key, INIT_FREQ_KEY, top)            // 派生量入缓存,不进内容历史
-    } catch {}
+      // 频率通道(每割集恰好一个频率事件,F = Σ 率×Π使能概率)—— 不是概率端点
+      const { frequency } = await ftFrequency(active.fts, '__init__')
+      P().setEtaPfd(active.key, INIT_FREQ_KEY, frequency)      // 派生量入缓存,不进内容历史
+    } catch (e: any) {
+      onError(String(e?.message ?? e))                          // 规则违规等 400:响亮,不静默
+    }
   }
   const onAttachFt = (idx: number) => { if (etModel) P().attachFt(activeKey, idx) }
   const onDetachFt = (idx: number) => { if (etModel) P().detachFt(activeKey, idx) }
@@ -257,6 +268,7 @@ export function EtaWorkbench(
             pfd={etModel?.initFreq}
             libComponents={lib?.component_failure_rates ?? []}
             onClose={onInitFtClose}
+            frequencyMode
           />
         </Suspense>
       )}

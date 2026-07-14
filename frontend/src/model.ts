@@ -29,11 +29,33 @@ export function getFt(m: ModelJson, name: string): FaultTreeJson {
   return m.fault_trees.find((f) => f.name === name) ?? m.fault_trees[0]
 }
 
-export function addBasic(m: ModelJson, ftName: string, value = 0.1): ModelJson {
-  const nm = clone(m), ft = getFt(nm, ftName), id = uid('BE')
+export function addBasic(m: ModelJson, ftName: string, value = 0.1, kind: 'probability' | 'frequency' = 'probability'): ModelJson {
+  const nm = clone(m), ft = getFt(nm, ftName), id = uid(kind === 'frequency' ? 'F' : 'BE')
   ft.nodes.push({ id, basic: true, param_ref: id })
-  nm.model_data.parameters.push({ id, kind: 'probability', value })
+  nm.model_data.parameters.push({ id, kind, value })
   return nm
+}
+/** 切换参数量纲(频率初因 /yr ↔ 使能概率)——仅初因树(频率模式)编辑面暴露。 */
+export function setParamKind(m: ModelJson, id: string, kind: 'probability' | 'frequency'): ModelJson {
+  const nm = clone(m)
+  const p = nm.model_data.parameters.find((x) => x.id === id)
+  if (p) p.kind = kind
+  return nm
+}
+/** 初因树与其余树共享的基本事件参数(独立性护栏;非空 ⇒ 可分离量化假设不成立)。 */
+export function sharedIeBarrierEvents(m: ModelJson, ieName = '__init__'): string[] {
+  const refsOf = (name: string) => new Set(
+    (m.fault_trees.find((f) => f.name === name)?.nodes ?? [])
+      .filter((n) => n.basic).map((n) => n.param_ref ?? n.id))
+  const ie = refsOf(ieName)
+  const shared = new Set<string>()
+  for (const f of m.fault_trees) {
+    if (f.name === ieName) continue
+    for (const n of f.nodes) {
+      if (n.basic && ie.has(n.param_ref ?? n.id)) shared.add(n.param_ref ?? n.id)
+    }
+  }
+  return [...shared].sort()
 }
 export function addGate(m: ModelJson, ftName: string, op: string, k = 2): ModelJson {
   const nm = clone(m), ft = getFt(nm, ftName), id = uid('G')
@@ -94,7 +116,8 @@ export function setCcf(m: ModelJson, groups: CcfGroupJson[]): ModelJson {
 }
 
 /** 为某 ETA 屏障在 fts 中建启动故障树(名=feId, OR 门 + 1 基本事件=当前 PFD)。 */
-export function attachStarterFt(fts: ModelJson, feId: string, failProb: number): ModelJson {
+export function attachStarterFt(fts: ModelJson, feId: string, failProb: number,
+                                kind: 'probability' | 'frequency' = 'probability'): ModelJson {
   const nm = clone(fts)
   const beId = feId + '_BE'
   nm.fault_trees = nm.fault_trees.filter((f) => f.name !== feId)
@@ -103,7 +126,8 @@ export function attachStarterFt(fts: ModelJson, feId: string, failProb: number):
     { id: feId, op: 'or', args: [beId] },
   ] })
   nm.model_data.parameters = nm.model_data.parameters.filter((p) => p.id !== beId)
-  nm.model_data.parameters.push({ id: beId, kind: 'probability', value: failProb })
+  // 初因树(kind='frequency')种子 = 单频率事件 = 当前手动值 → F 与切换前逐位一致,迁移零意外
+  nm.model_data.parameters.push({ id: beId, kind, value: failProb })
   return nm
 }
 

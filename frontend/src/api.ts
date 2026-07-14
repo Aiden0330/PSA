@@ -366,6 +366,23 @@ export interface QuantifyOptions {
   boundary_condition_set?: string
   post_rules?: unknown[]
 }
+// ── 初因事件故障树频率(规格 2026-07-13):每割集一频率规则,违规 → 后端 400 中文 detail 原样上抛 ──
+export interface FreqCutSet { events: string[]; order: number; frequency: number; initiator: string }
+export interface FtFrequencyResult { frequency: number; cutsets: FreqCutSet[] }
+export async function ftFrequency(model: any, fault_tree: string): Promise<FtFrequencyResult> {
+  const r = await fetch(`${BASE}/ft/frequency`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, fault_tree }),
+  })
+  if (!r.ok) {
+    let detail = ''
+    try { const d = await r.json(); detail = typeof d?.detail === 'string' ? d.detail : '' } catch {}
+    throw new Error(detail || `ft frequency → ${r.status}`)
+  }
+  return r.json()
+}
+
 export async function quantify(model: any, fault_tree: string, method = 'exact',
                                opts: QuantifyOptions = {}): Promise<QuantifyResult> {
   const r = await fetch(`${BASE}/quantify`, {

@@ -178,7 +178,10 @@ export function EtInspector(
                   挂载/编辑初始事件 FTA
                 </button>
                 <div style={{ fontSize: 11, color: 'var(--psa-muted)' }}>
-                  顶事件概率（已量化）= <span style={{ fontFamily: 'var(--psa-font-mono)', color: 'var(--psa-ink)' }}>{formatEtaNumber(model.initFreq)}</span> /yr
+                  初因频率(已量化)F = <span style={{ fontFamily: 'var(--psa-font-mono)', color: 'var(--psa-ink)' }}>{formatEtaNumber(model.initFreq)}</span> /yr
+                </div>
+                <div style={{ fontSize: 10.5, color: 'var(--psa-faint)', marginTop: 3, lineHeight: 1.5 }}>
+                  F = Σ 割集(初因率 × Π 使能概率);每个最小割集恰好一个频率事件,违规会明确报错。
                 </div>
               </div>
             )}
