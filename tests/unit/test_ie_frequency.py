@@ -159,3 +159,10 @@ def test_review_f4_negative_rate_rejected_at_source():
     p = Parameter("R", "rate", -1e-3, mttr=8.0)
     with pytest.raises(ValueError, match=">= 0"):
         p.unavailability()
+
+
+def test_review_r1_negative_time_params_rejected_at_source():
+    """R-1(round-2 残留):λ≥0 但时间参数为负 → q<0 走同一条静默吞没门,同样源头拒绝。"""
+    for kwargs in ({"mttr": -8.0}, {"test_interval": -100.0}, {"mission_time": -24.0}):
+        with pytest.raises(ValueError, match="< 0"):
+            Parameter("R", "rate", 1e-3, **kwargs).unavailability()

@@ -40,6 +40,10 @@ class Parameter:
                 q = lam * self.mission_time
             else:
                 raise ValueError(f"rate {self.id} needs mttr|test_interval|mission_time")
+            if q < 0:
+                # review R-1(round-2):负 mttr/test_interval/mission_time 得负 q,
+                # 会被频率通道的 cutoff≥0 过滤静默吞成 F=0 —— 与负 λ 同门,源头拒绝。
+                raise ValueError(f"rate {self.id}: computed q={q} < 0 (negative time parameter?)")
             return min(q, 1.0)
         if self.kind == "frequency":
             # 量纲护栏(规格 2026-07-13 §2.1):频率(/yr)不是概率,误入概率通道必须响亮——

@@ -50,6 +50,25 @@ like other nodes in ETA … make sure initial events can be built through FTA or
 4. **收口**:verify-psa(py+benchmark+fe+preview 实测)、bundle、ROADMAP、
    对标账本新行(initiating-event fault trees ✅ at-parity;完整序列级 LFT 集成记 future)。
 
+## 2.5 · engine-review 结论(两轮,2026-07-13)
+
+**Round-1 FAIL(6 项)→ 整改(cedacf9)→ Round-2 PASS。** 已修:F1 非相干门(NOT/XOR)
+静默错数(曾 +67% 无警告,UI 可达)→ 引擎在**规范化后**的图上拒绝(只拒逻辑上活的
+非相干,house 常量消解掉的分支不误伤——审查确认比原始树扫描语义更优);F2 `limit_order`
+先截断后校验(规则逃逸+头条静默低估)→ **整体移除**(截断咬的是头条数字本身,与概率
+通道不同);F3 独立性 lint 双侧化 + onFtEdited 不再吞错;F4/R-1 负 λ 与负时间参数
+(mttr/test_interval/mission_time → q<0)均源头拒绝;F5 保守性归因更正(见 §1 与模块
+docstring:共享**初因**才超算,共享使能精确);F6 规则定义在最小化后割集(吸收不改函数)。
+
+**已知限制(诚实记录):**
+- **Load-time 独立性残留(review F3/R-2)**:lint 在两条编辑路径(初因树/屏障树模态关闭)
+  生效;**已保存的**共享事件项目载入后、触碰任一模态前,序列量化沿用陈旧 composed F_IE
+  且无警告。将来补 compose 时或载入时 lint。
+- Σ-of-MCS 对共享初因保守(可超物理上界,非稀有使能域);逐初因精确模式记对标账本。
+- 频率参数进 MEF 导出(`save_mef_xml`)会撞 unavailability 护栏——MEF 目前只进不出,
+  出货 MEF 导出时频率参数需专门映射(review 提示的潜雷)。
+- 陈旧客户端若仍发 `limit_order`,pydantic 忽略额外字段 → 得到未截断(更大、保守)的 F。
+
 ## 3 · 验收
 
 - 引擎锚点全过;既有 benchmark 24/24 不变;概率通道对频率参数响亮拒绝(新护栏测试)。
