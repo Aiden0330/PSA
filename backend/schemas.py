@@ -27,6 +27,23 @@ class QuantifyResponse(BaseModel):
     # 4a3:应用了 post_rules 时的统计与后处理列表 REA/MCUB 估计(未用规则时缺省 None,旧契约不变)
     post: Optional[dict[str, Any]] = None
 
+# ── 初因事件故障树频率量化(规格 2026-07-13;与 QuantifyRequest 同口径的独立端点)──
+class FtFrequencyRequest(BaseModel):
+    model: dict[str, Any]
+    fault_tree: str
+    cutoff: float = 0.0
+    limit_order: Optional[int] = None
+
+class FreqCutSetOut(BaseModel):
+    events: list[str]
+    order: int
+    frequency: float
+    initiator: str                     # 该割集中唯一的频率事件(每割集一频率规则)
+
+class FtFrequencyResponse(BaseModel):
+    frequency: float                   # /yr,Σ 割集频率
+    cutsets: list[FreqCutSetOut]
+
 class FuncEventIn(BaseModel):
     id: str
     pfd: Optional[float] = None

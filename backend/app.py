@@ -96,6 +96,24 @@ def api_quantify(req: schemas.QuantifyRequest, _=Depends(require_role(*ANALYST))
         importance=an.importance(measures=["fv", "raw", "birnbaum"]),
         post=post)
 
+@app.post("/api/ft/frequency", response_model=schemas.FtFrequencyResponse)
+def api_ft_frequency(req: schemas.FtFrequencyRequest, _=Depends(require_role(*ANALYST))):
+    """初因事件故障树 → 频率(/yr)。每割集恰好一个频率事件(kind=frequency),
+    其余为使能概率;F = Σ 割集频率。规则违规/量纲错误 → 400(响亮,绝不静默近似)。"""
+    from psaengine.quantify.frequency import FrequencyRuleError, fault_tree_frequency
+    model = load_model_from_dict(req.model)
+    try:
+        r = fault_tree_frequency(model, req.fault_tree,
+                                 cutoff=req.cutoff, limit_order=req.limit_order)
+    except FrequencyRuleError as e:
+        raise HTTPException(400, f"频率树规则违规:{e}")
+    except KeyError as e:
+        raise HTTPException(400, f"故障树不存在:{e}")
+    except ValueError as e:
+        raise HTTPException(400, f"频率量化失败:{e}")
+    return r
+
+
 @app.post("/api/event-tree/quantify", response_model=schemas.EtQuantifyResponse)
 def api_event_tree_quantify(req: schemas.EtQuantifyRequest, _=Depends(require_role(*ANALYST))):
     """ROADMAP A: 前端序列化事件树 → 引擎精确否定定量(跨屏障共享事件精确)。"""
