@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>重设计 · 多项目组合总览</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--c1:#16a34a;--c2:#65a30d;--c3:#d97706;--c4:#ea580c;--c5:#dc2626;
+--gA:#16a34a;--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--warn:#b45309;--dng:#dc2626}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.menu{display:flex;gap:2px;padding:4px 10px;background:#fff;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink2)}
+.menu span{padding:3px 9px;border-radius:6px;cursor:default}.menu span:hover{background:var(--soft)}
+.ribbon{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 9px;font-size:12px;color:var(--ink2);cursor:default}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+.tag{font-size:10.5px;padding:2px 7px;border-radius:5px;background:var(--soft);color:var(--ink2);font-family:var(--mono)}
+.view{margin-left:auto;font-size:11px;color:var(--faint)}
+main{flex:1;display:flex;min-height:0}
+.tree{width:248px;background:#fff;border-right:1px solid var(--line);overflow:auto;padding:8px 6px;font-size:12px;flex-shrink:0}
+.tree .grp{font-size:10.5px;font-weight:600;letter-spacing:.4px;color:var(--faint);padding:8px 8px 3px}
+.tree .it{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;color:var(--ink2);white-space:nowrap;overflow:hidden}
+.tree .it:hover{background:var(--soft)}.tree .it.on{background:#e6f2f0;color:var(--acc);font-weight:600}
+.tree .it .n{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint);flex-shrink:0}
+.tree .prj{font-weight:600;color:var(--ink)}
+.tree .sub{padding-left:22px}
+.tree .sub2{padding-left:34px}
+.dot{width:8px;height:8px;border-radius:3px;flex-shrink:0}
+.st{font-size:9.5px;font-weight:700;border-radius:4px;padding:0 5px;flex-shrink:0}
+.st.rev{background:#fff7ed;color:var(--warn)}.st.sig{background:#f0fdf4;color:var(--c1)}.st.dft{background:var(--soft);color:var(--faint)}
+.center{flex:1;display:flex;flex-direction:column;min-width:0}
+.ch{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid var(--line);background:var(--soft);gap:8px}
+.ch b{font-size:12px;color:var(--ink2);white-space:nowrap}.ch .meta{font-size:11px;color:var(--faint);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th{font-size:10.5px;color:var(--faint);text-align:left;font-weight:600;letter-spacing:.3px;padding:5px 10px;border-bottom:1px solid var(--line);background:var(--soft);position:sticky;top:0;z-index:1}
+td{padding:4.5px 10px;border-bottom:1px solid #f1f5f9;color:var(--ink2)}
+tr:hover td{background:#fafcff}
+.r{text-align:right}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600}
+.chip .sq{width:10px;height:10px;border-radius:3px}
+.gr{display:inline-block;width:16px;height:16px;border-radius:4px;color:#fff;font-size:10px;font-weight:700;text-align:center;line-height:16px}
+.scroll{overflow:auto;min-height:0}
+.insp{padding:10px 12px;overflow:auto;font-size:12px}
+.insp .f{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dashed #eef2f7}
+.insp .f b{color:var(--muted);font-weight:500;flex-shrink:0}
+.insp .f span{text-align:right}
+.status{display:flex;gap:16px;align-items:center;padding:4px 12px;background:#fff;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.status .num{color:var(--ink2)}
+.note{position:fixed;right:10px;top:8px;font-size:10.5px;color:var(--faint);background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:2px 8px;z-index:9}
+.mx{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;padding:10px}
+.mx div{height:20px;border-radius:3px;opacity:.92;position:relative;font-size:9px;color:var(--ink2);text-align:center;line-height:20px;font-family:var(--mono)}
+.bar{height:8px;border-radius:4px;background:var(--soft);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--acc)}
+</style></head><body>
+<div class="note">Explorer 重设计 1/8:多项目组合总览 — 项目库并排风险画像(本页即「查看多个项目」的核心)</div>
+<div class="menu"><span>文件</span><span>编辑</span><span>模型</span><span>分析</span><span>数据</span><span>评审</span><span>报告</span><span>帮助</span>
+  <span style="margin-left:auto;color:var(--faint)">金坛梅山 100 MWh QRA · <span class="num">v14 · 3f7a21c9</span> · 已保存 · 王雪梅(评审人)</span></div>
+<div class="ribbon"><span class="btn pri">＋ 新建项目</span><span class="btn">⌲ 导入 .psaproj</span><span class="btn">↻ 全部重算</span>
+  <span class="sep"></span><span class="btn">☑ 纳入对比:3/3</span><span class="btn">↥ 组合报告</span>
+  <span class="view">视图:多项目组合总览</span></div>
+<main>
+  <nav class="tree">
+    <div class="grp">项目库(3)· 多项目</div>
+    <div class="it prj">▾ 金坛梅山 100 MWh<span class="st rev">送审中</span><span class="n">v14</span></div>
+      <div class="it sub">▦ 项目总览</div>
+      <div class="grp sub" style="padding-top:4px">事件树(5)</div>
+      <div class="it sub"><span class="dot" style="background:var(--c3)"></span>电芯内短路<span class="n">1.2e-2</span></div>
+      <div class="it sub"><span class="dot" style="background:var(--c2)"></span>过充 / BMS 失效<span class="n">3.4e-3</span></div>
+      <div class="it sub"><span class="dot" style="background:var(--c3)"></span>液冷泄漏 → 外短<span class="n">FT⚡8.0e-3</span></div>
+      <div class="it sub"><span class="dot" style="background:var(--c1)"></span>外部火源/邻舱辐射<span class="n">2.0e-4</span></div>
+      <div class="it sub"><span class="dot" style="background:var(--c1)"></span>机械损伤 / 进水<span class="n">5.0e-4</span></div>
+      <div class="grp sub" style="padding-top:4px">故障树(4)</div>
+      <div class="it sub">└ BMS 切断/隔离(挂载)<span class="n">3 BE</span></div>
+      <div class="it sub">└ 离气联动(挂载)<span class="n">5 BE</span></div>
+      <div class="it sub">└ __init__ 初因树(液冷泄漏)<span class="n">2F+1Q</span></div>
+      <div class="it sub">我的接触器失效树<span class="n">自建</span></div>
+      <div class="grp sub" style="padding-top:4px">数据与分析</div>
+      <div class="it sub">参数库 / CCF<span class="n">23+2 组</span></div>
+      <div class="it sub">后果定义 C1–C5</div>
+      <div class="it sub">FMEA / RPN<span class="n">36 行</span></div>
+      <div class="it sub">报告与证据链<span class="n">#23</span></div>
+    <div class="it prj">▸ 如东风光储 200 MWh<span class="st dft">草稿</span><span class="n">v7</span></div>
+    <div class="it prj">▸ 舟山海岛微网 20 MWh<span class="st sig">已签发</span><span class="n">v4</span></div>
+    <div class="grp">全局</div>
+    <div class="it on">▦ 多项目组合总览</div>
+    <div class="it">参考库(41 器件/51 屏障/8 初因)</div>
+  </nav>
+  <section class="center">
+    <div style="flex:1;display:grid;grid-template-columns:1fr 300px;grid-template-rows:minmax(0,1fr) minmax(0,.9fr);gap:8px;padding:8px;min-height:0">
+      <div class="panel" style="grid-row:span 2">
+        <div class="ch"><b>项目库 — 风险画像并排</b><span class="meta">3 项目 · 全部纳入对比 · 点行切换活动项目</span></div>
+        <div class="scroll"><table>
+          <tr><th>☑</th><th>项目</th><th class="r">容量</th><th class="r">ETA</th><th class="r">≥III 累计 /yr</th><th class="r">C5 /yr</th><th>评审</th><th>版本</th><th>评级</th></tr>
+          <tr style="background:#e6f2f0"><td>☑</td><td><b>金坛梅山储能电站</b></td><td class="num r">100 MWh</td><td class="num r">5</td><td class="num r">3.30e-5</td><td class="num r">4.0e-8</td><td><span class="st rev">送审中</span></td><td class="num">v14·3f7a21c9</td><td><span class="gr" style="background:var(--gC)">B</span></td></tr>
+          <tr><td>☑</td><td>如东风光储一体化</td><td class="num r">200 MWh</td><td class="num r">3</td><td class="num r">8.90e-5</td><td class="num r">2.1e-7</td><td><span class="st dft">草稿</span></td><td class="num">v7·77ab19e2</td><td><span class="gr" style="background:var(--gC)">B</span></td></tr>
+          <tr><td>☑</td><td>舟山海岛微网</td><td class="num r">20 MWh</td><td class="num r">2</td><td class="num r">1.10e-5</td><td class="num r">6.0e-9</td><td><span class="st sig">已签发</span></td><td class="num">v4·dae16c77</td><td><span class="gr" style="background:var(--gA)">A</span></td></tr>
+        </table>
+        <div class="ch" style="border-top:1px solid var(--line)"><b>≥III 累计频率对比(勾选项目)</b><span class="meta">条形 = /yr,对数感知</span></div>
+        <div style="padding:10px 14px;display:grid;gap:8px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:110px">金坛梅山</span><div class="bar" style="flex:1"><i style="width:37%"></i></div><span class="num" style="width:70px;text-align:right">3.30e-5</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:110px">如东风光储</span><div class="bar" style="flex:1"><i style="width:100%;background:var(--c4)"></i></div><span class="num" style="width:70px;text-align:right">8.90e-5</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:110px">舟山微网</span><div class="bar" style="flex:1"><i style="width:12%;background:var(--c1)"></i></div><span class="num" style="width:70px;text-align:right">1.10e-5</span></div>
+          <div style="font-size:10.5px;color:var(--faint)">如东 ≥III 主导因素:D 级参数 ×6(未校核)+ 无泄爆屏障 —— 点行进入其 ETA 工作台</div>
+        </div></div>
+      </div>
+      <div class="panel">
+        <div class="ch"><b>组合风险矩阵</b><span class="meta">●金坛 ▲如东 ■舟山</span></div>
+        <div class="mx">
+          <div style="background:#fecaca"></div><div style="background:#fecaca"></div><div style="background:#fde68a"></div><div style="background:#fde68a"></div><div style="background:#fde68a"></div>
+          <div style="background:#fecaca"></div><div style="background:#fde68a"></div><div style="background:#fde68a">●▲</div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0"></div>
+          <div style="background:#fde68a"></div><div style="background:#fde68a"></div><div style="background:#bbf7d0">■</div><div style="background:#bbf7d0">●</div><div style="background:#bbf7d0"></div>
+          <div style="background:#fde68a"></div><div style="background:#bbf7d0"></div><div style="background:#bbf7d0">▲</div><div style="background:#bbf7d0">●</div><div style="background:#bbf7d0"></div>
+        </div>
+        <div style="padding:0 12px 10px;font-size:11px;color:var(--muted)">组合最劣格:<b style="color:#b45309">B 区(如东 · III 档)</b></div>
+      </div>
+      <div class="panel">
+        <div class="ch"><b>检视器 — 金坛梅山</b><span class="meta">uuid a94a05e6</span></div>
+        <div class="insp">
+          <div class="f"><b>评审状态</b><span><span class="st rev">送审中</span> 3f7a21c9 · 待 王雪梅</span></div>
+          <div class="f"><b>≥III 累计</b><span class="num">3.30e-5 /yr(p95 8.7e-5)</span></div>
+          <div class="f"><b>最严重后果</b><span class="num">C5 4.0e-8 /yr</span></div>
+          <div class="f"><b>版本</b><span class="num">14 · 案例 23 · 审计 219 行</span></div>
+          <div class="f"><b>数据分级</b><span>B×2 · C×15 · D×6</span></div>
+          <div style="display:flex;gap:6px;margin-top:10px"><span class="btn pri">打开工作台</span><span class="btn">版本对比</span><span class="btn">评审台账</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="status"><span>◉ 引擎在线</span><span>py <span class="num">326✓</span></span><span>上次量化 <span class="num">96 ms</span></span><span>项目 <span class="num">3 · 活动:金坛梅山</span></span><span style="margin-left:auto">分析案例 <span class="num">#23</span> 已钉扎 · 版本 <span class="num">3f7a21c9</span></span></div>
+  </section>
+</main>
+</body></html>
