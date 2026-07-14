@@ -71,6 +71,12 @@ export function ParamLibrary({ model, onUpdateParam, onSetCcf }: Props) {
 
   return (
     <div style={{ padding: 16, overflowY: 'auto', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Page header(R4c:该页此前无统一标题,补一条,呼应 PortfolioTab.tsx 的既有写法) */}
+      <div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--exp-ink)', marginBottom: 4 }}>参数库 / CCF</div>
+        <div style={{ fontSize: 11.5, color: 'var(--exp-muted)' }}>{rows.length} 个基本事件参数 · {groups.length} 组共因失效(CCF)</div>
+      </div>
+
       {/* Parameter grid panel */}
       <div className="psa-panel" style={{ flex: 'none' }}>
         <div className="psa-ch">

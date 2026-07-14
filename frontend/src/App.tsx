@@ -137,7 +137,7 @@ function AppShell() {
         ) : tab === 'ft' ? (
           <FtaWorkbench lib={lib} ai={ai} persistence={persistence} example={example} />
         ) : tab === 'params' ? (
-          <div style={{ flex: 1, minHeight: 0, background: '#fff' }}>
+          <div style={{ flex: 1, minHeight: 0, background: 'var(--exp-bg)' }}>
             {example.model && (
               <ParamLibrary
                 model={example.model}
@@ -147,11 +147,11 @@ function AppShell() {
             )}
           </div>
         ) : tab === 'library' ? (
-          <div style={{ flex: 1, minHeight: 0, background: '#fff' }}>
+          <div style={{ flex: 1, minHeight: 0, background: 'var(--exp-bg)' }}>
             <ReferenceLibrary onLibraryChange={bump} />
           </div>
         ) : tab === 'cons' ? (
-          <div style={{ flex: 1, minHeight: 0, background: '#fff' }}>
+          <div style={{ flex: 1, minHeight: 0, background: 'var(--exp-bg)' }}>
             {etModel ? <ConsequencesTab model={etModel} onChange={writeEtModel} /> : <p style={{ padding: 16 }}>加载中…</p>}
           </div>
         ) : tab === 'fmea' ? (

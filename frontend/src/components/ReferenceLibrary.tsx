@@ -111,8 +111,14 @@ export function ReferenceLibrary({ onLibraryChange }: { onLibraryChange?: () => 
   return (
     <div style={{ padding: 16, overflowY: 'auto', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      {/* Page header(R4c:该页此前无统一标题,补一条,呼应 PortfolioTab.tsx 的既有写法) */}
+      <div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--exp-ink)', marginBottom: 4 }}>参考库</div>
+        <div style={{ fontSize: 11.5, color: 'var(--exp-muted)' }}>器件失效率 / 屏障有效性 / 初始事件频率 — 全局共享,随项目文件迁移</div>
+      </div>
+
+      {/* Toolbar(R4c:换皮为 ETA/FTA ribbon 配色,处理器不变) */}
+      <div style={{ display: 'flex', alignItems: 'center', columnGap: 10, rowGap: 8, flexWrap: 'wrap', padding: '8px 14px', background: 'var(--psa-surface)', borderBottom: '1px solid var(--psa-line-2)' }}>
         <button className="psa-btn" onClick={onExport}>
           <Icon name="download" size={13} /> 导出参考库
         </button>
