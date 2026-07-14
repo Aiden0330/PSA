@@ -28,6 +28,7 @@ ledger is the single place that answers "how far are we?" — keep it current.
 | **Analysis cases** (report + uncertainty + importance auto-pin) | ✅ 2026-07-09 | version hash + engine version + settings + results per run; audit actions; dossier ledgers |
 | **Model compare / diff** | ✅ 2026-07-09 | Identity-keyed structural diff over canonical versions + dossier compare view. tests/backend/test_diff.py |
 | CUDD backend correctness (coherent + non-coherent) | ✅ 2026-07-09 | dd.cudd built on macOS arm64, parity tests live (0 skipped); complement-mark cofactor fix + NOT/XOR/success-branch locks; 1000-event closed-form; iterative Shannon traversal (no recursion cap) |
+| **Initiating-event fault trees**(手动/FTA 双通道初因) | ✅ 2026-07-13 | fault_tree_frequency:每割集恰好一个频率事件,F=Σ 率×Π使能概率(与 RS/SAPHIRE 同法);双向量纲护栏(频率参数进概率通道 raise、非相干门 NOT/XOR 拒绝、limit_order 整体移除);engine-reviewer 两轮(round-1 FAIL 6 项→整改→round-2 PASS);spec 2026-07-13-ie-fault-tree-frequency.md。残留:load-time 独立性 lint、逐初因精确模式(见 Gaps #9) |
 
 ## Gaps (remaining)
 
@@ -36,6 +37,7 @@ ledger is the single place that answers "how far are we?" — keep it current.
 | 6b | CUDD CI job (Linux) + hybrid MCS-BDD fallback + 10k-event stress corpus | Reproducible scale proof in CI | Local macOS validation done 2026-07-09; CI inert until GitHub remote exists |
 | 7 | Exchange events; time-dependent Q(t) beyond core four; risk monitor | Long tail | Defer — not needed for BESS QRA near-term |
 | 8 | Boundary-condition / post-processing / CCF-per-barrier UI(engine+API done) | Analyst ergonomics | API-first shipped 2026-07-09; UI slot: analysis settings panel |
+| 9 | IE 频率逐初因精确模式 + 序列级 IE-树×路径全集成(共享事件跨 IE/屏障) | Σ-of-MCS 对共享初因保守可超物理上界(非稀有使能域);共享事件场景现被前端 lint 拒绝而非精确处理 | 对每初因的使能析取建 BDD(机器已有);完整 LFT 集成 = RS 序列割集法。2026-07-13 review F5 |
 
 ## Rules
 
