@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh"><head><meta charset="utf-8"><title>重设计 · ETA 工作台</title>
+<html lang="zh"><head><meta charset="utf-8"><title>重设计v2 · ETA 工作台</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 :root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
@@ -16,7 +16,7 @@
 .tag{font-size:10.5px;padding:2px 7px;border-radius:5px;background:var(--soft);color:var(--ink2);font-family:var(--mono)}
 .view{margin-left:auto;font-size:11px;color:var(--faint)}
 main{flex:1;display:flex;min-height:0}
-.tree{width:248px;background:#fff;border-right:1px solid var(--line);overflow:auto;padding:8px 6px;font-size:12px;flex-shrink:0}
+.tree{width:212px;background:#fff;border-right:1px solid var(--line);overflow:auto;padding:8px 6px;font-size:12px;flex-shrink:0}
 .tree .grp{font-size:10.5px;font-weight:600;letter-spacing:.4px;color:var(--faint);padding:8px 8px 3px}
 .tree .it{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;color:var(--ink2);white-space:nowrap;overflow:hidden}
 .tree .it:hover{background:var(--soft)}.tree .it.on{background:#e6f2f0;color:var(--acc);font-weight:600}
@@ -51,93 +51,83 @@ tr:hover td{background:#fafcff}
 .mx div{height:20px;border-radius:3px;opacity:.92;position:relative;font-size:9px;color:var(--ink2);text-align:center;line-height:20px;font-family:var(--mono)}
 .bar{height:8px;border-radius:4px;background:var(--soft);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--acc)}
+.zoom{position:absolute;right:10px;top:8px;display:flex;gap:4px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:3px;box-shadow:0 1px 4px rgba(15,23,42,.08);z-index:2}
+.zoom span{width:26px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:5px;font-size:12px;color:var(--ink2);cursor:default}
+.zoom span:hover{background:var(--soft)}.zoom .pct{width:auto;padding:0 7px;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.canvaswrap{position:relative;flex:1;min-height:0;overflow:hidden;background:radial-gradient(circle,#e8edf3 1px,transparent 1px);background-size:18px 18px}
 </style></head><body>
-<div class="note">Explorer 重设计 2/8:ETA 工作台 — 树图 + 密排序列表 + 坞式检视器(shell-A 主页面精修)</div>
+<div class="note">Explorer 重设计 2/8(v2):ETA 建模 — 画布为主(可缩放),序列表折叠于底部</div>
 <div class="menu"><span>文件</span><span>编辑</span><span>模型</span><span>分析</span><span>数据</span><span>评审</span><span>报告</span><span>帮助</span>
   <span style="margin-left:auto;color:var(--faint)">金坛梅山 100 MWh QRA · <span class="num">v14 · 3f7a21c9</span> · 已保存 · 王雪梅(评审人)</span></div>
 <div class="ribbon"><span class="btn pri">▶ 精确量化</span><span class="btn">σ 不确定性</span><span class="btn">Ⓘ 重要度</span><span class="btn">↥ 导出报告</span>
   <span class="sep"></span><span class="btn">＋ 屏障</span><span class="btn">⌁ 挂载 FTA</span><span class="btn">✎ AI 草案</span><span class="btn">⚙ 分析设置</span>
-  <span class="sep"></span><span class="tag">精确 BDD</span><span class="tag">Σ=IE ✓</span>
-  <span class="view">视图:ETA 工作台 · 电芯内短路</span></div>
+  <span class="view">视图:ETA · 电芯内短路(树内切换 ETA)</span></div>
 <main>
   <nav class="tree">
-    <div class="grp">项目库(3)· 多项目</div>
-    <div class="it prj">▾ 金坛梅山 100 MWh<span class="st rev">送审中</span><span class="n">v14</span></div>
-      <div class="it sub">▦ 项目总览</div>
-      <div class="grp sub" style="padding-top:4px">事件树(5)</div>
-      <div class="it sub on"><span class="dot" style="background:var(--c3)"></span>电芯内短路<span class="n">1.2e-2</span></div>
-      <div class="it sub"><span class="dot" style="background:var(--c2)"></span>过充 / BMS 失效<span class="n">3.4e-3</span></div>
-      <div class="it sub"><span class="dot" style="background:var(--c3)"></span>液冷泄漏 → 外短<span class="n">FT⚡8.0e-3</span></div>
-      <div class="it sub"><span class="dot" style="background:var(--c1)"></span>外部火源/邻舱辐射<span class="n">2.0e-4</span></div>
-      <div class="it sub"><span class="dot" style="background:var(--c1)"></span>机械损伤 / 进水<span class="n">5.0e-4</span></div>
-      <div class="grp sub" style="padding-top:4px">故障树(4)</div>
-      <div class="it sub">└ BMS 切断/隔离(挂载)<span class="n">3 BE</span></div>
-      <div class="it sub">└ 离气联动(挂载)<span class="n">5 BE</span></div>
-      <div class="it sub">└ __init__ 初因树(液冷泄漏)<span class="n">2F+1Q</span></div>
-      <div class="it sub">我的接触器失效树<span class="n">自建</span></div>
-      <div class="grp sub" style="padding-top:4px">数据与分析</div>
-      <div class="it sub">参数库 / CCF<span class="n">23+2 组</span></div>
-      <div class="it sub">后果定义 C1–C5</div>
-      <div class="it sub">FMEA / RPN<span class="n">36 行</span></div>
-      <div class="it sub">报告与证据链<span class="n">#23</span></div>
-    <div class="it prj">▸ 如东风光储 200 MWh<span class="st dft">草稿</span><span class="n">v7</span></div>
-    <div class="it prj">▸ 舟山海岛微网 20 MWh<span class="st sig">已签发</span><span class="n">v4</span></div>
+    <div class="grp">项目(3)</div>
+    <div class="it prj">▾ 金坛梅山 100 MWh<span class="st rev">送审中</span></div>
+      <div class="it sub">项目总览</div>
+      <div class="it sub">事件树<span class="n">5</span></div>
+      <div class="it sub2 on">· 电芯内短路</div>
+      <div class="it sub2">· 液冷泄漏→外短<span class="n">⚡FT</span></div>
+      <div class="it sub2" style="color:var(--faint)">…其余 3 个</div>
+      <div class="it sub">故障树<span class="n">4</span></div>
+      <div class="it sub">参数库 / CCF</div>
+      <div class="it sub">后果定义</div>
+      <div class="it sub">FMEA</div>
+      <div class="it sub">报告与证据链</div>
+    <div class="it prj">▸ 如东风光储 200 MWh<span class="st dft">草稿</span></div>
+    <div class="it prj">▸ 舟山海岛微网 20 MWh<span class="st sig">已签发</span></div>
     <div class="grp">全局</div>
-    <div class="it">▦ 多项目组合总览</div>
-    <div class="it">参考库(41 器件/51 屏障/8 初因)</div>
+    <div class="it">多项目组合总览</div>
+    <div class="it">参考库</div>
   </nav>
   <section class="center">
-    <div style="flex:1;display:grid;grid-template-columns:1fr 300px;grid-template-rows:minmax(0,1fr) minmax(0,1.1fr);gap:8px;padding:8px;min-height:0">
-      <div class="panel">
-        <div class="ch"><b>事件树 — 电芯内短路</b><span class="meta">IE 1.200e-2 /yr(手动)· 6 屏障 · 成功↑失败↓</span></div>
-        <div class="scroll" style="padding:8px 12px">
-          <svg viewBox="0 0 760 190" style="width:100%;min-width:680px">
-            <text x="4" y="16" font-size="11" fill="#334155">电芯内短路</text><rect x="0" y="22" width="86" height="20" rx="4" fill="#0f172a"/><text x="43" y="36" font-size="10" fill="#fff" text-anchor="middle">IE 1.2e-2</text>
-            <line x1="86" y1="32" x2="140" y2="32" stroke="#94a3b8"/>
-            <text x="150" y="14" font-size="10" fill="#64748b">离气探测</text><line x1="140" y1="32" x2="200" y2="18" stroke="#16a34a"/><line x1="140" y1="32" x2="200" y2="80" stroke="#dc2626"/>
-            <text x="210" y="20" font-size="10" fill="#16a34a">L0 95.0%</text>
-            <text x="212" y="66" font-size="10" fill="#64748b">BMS 切断</text><line x1="200" y1="80" x2="270" y2="60" stroke="#16a34a"/><line x1="200" y1="80" x2="270" y2="120" stroke="#dc2626"/>
-            <text x="278" y="62" font-size="10" fill="#65a30d">L1 4.5%</text>
-            <text x="282" y="108" font-size="10" fill="#64748b">电芯间热障</text><line x1="270" y1="120" x2="352" y2="100" stroke="#16a34a"/><line x1="270" y1="120" x2="352" y2="150" stroke="#dc2626"/>
-            <text x="360" y="102" font-size="10" fill="#d97706">L2 0.48%</text>
-            <text x="362" y="140" font-size="10" fill="#64748b">泄爆</text><line x1="352" y1="150" x2="430" y2="132" stroke="#16a34a"/><line x1="352" y1="150" x2="430" y2="168" stroke="#dc2626"/>
-            <text x="438" y="134" font-size="10" fill="#ea580c">L3</text>
-            <text x="440" y="160" font-size="10" fill="#64748b">舱间距</text><line x1="430" y1="168" x2="508" y2="154" stroke="#16a34a"/><line x1="430" y1="168" x2="508" y2="182" stroke="#dc2626"/>
-            <text x="516" y="156" font-size="10" fill="#ea580c">L4</text>
-            <text x="518" y="176" font-size="10" fill="#64748b">应急响应</text><line x1="508" y1="182" x2="590" y2="170" stroke="#16a34a"/><line x1="508" y1="182" x2="590" y2="188" stroke="#dc2626"/>
-            <text x="598" y="172" font-size="10" fill="#dc2626">L5</text><text x="598" y="190" font-size="10" fill="#dc2626">L6 全失败</text>
+    <div style="flex:1;display:flex;gap:8px;padding:8px;min-height:0">
+      <div class="panel" style="flex:1;min-width:0">
+        <div class="ch"><b>事件树画布 — 电芯内短路</b><span class="meta">IE 1.200e-2 /yr(手动)· 6 屏障 · 滚轮缩放 / 拖拽平移</span></div>
+        <div class="canvaswrap">
+          <div class="zoom"><span>⊖</span><span class="pct">100%</span><span>⊕</span><span title="适应窗口">⤢</span></div>
+          <svg viewBox="0 0 900 430" style="width:100%;height:100%">
+            <rect x="8" y="190" width="100" height="34" rx="6" fill="#0f172a"/><text x="58" y="211" font-size="12" fill="#fff" text-anchor="middle">IE 1.2e-2</text>
+            <line x1="108" y1="207" x2="170" y2="207" stroke="#94a3b8" stroke-width="1.5"/>
+            <text x="180" y="120" font-size="11" fill="#64748b">离气探测联动</text>
+            <line x1="170" y1="207" x2="260" y2="90" stroke="#16a34a" stroke-width="1.5"/><line x1="170" y1="207" x2="260" y2="290" stroke="#dc2626" stroke-width="1.5"/>
+            <rect x="264" y="76" width="118" height="28" rx="5" fill="#f0fdf4" stroke="#16a34a"/><text x="323" y="94" font-size="11" text-anchor="middle" fill="#166534">L0 单体排气 95%</text>
+            <text x="272" y="240" font-size="11" fill="#64748b">BMS 切断</text>
+            <line x1="260" y1="290" x2="360" y2="200" stroke="#16a34a" stroke-width="1.5"/><line x1="260" y1="290" x2="360" y2="352" stroke="#dc2626" stroke-width="1.5"/>
+            <rect x="364" y="186" width="118" height="28" rx="5" fill="#f7fee7" stroke="#65a30d"/><text x="423" y="204" font-size="11" text-anchor="middle" fill="#3f6212">L1 模组蔓延 4.5%</text>
+            <text x="372" y="320" font-size="11" fill="#64748b">电芯间热障</text>
+            <line x1="360" y1="352" x2="470" y2="286" stroke="#16a34a" stroke-width="1.5"/><line x1="360" y1="352" x2="470" y2="396" stroke="#dc2626" stroke-width="1.5"/>
+            <rect x="474" y="272" width="122" height="28" rx="5" fill="#fffbeb" stroke="#d97706"/><text x="535" y="290" font-size="11" text-anchor="middle" fill="#92400e">L2 簇级起火 0.48%</text>
+            <text x="482" y="372" font-size="11" fill="#64748b">泄爆 · 舱间距 · 应急</text>
+            <line x1="470" y1="396" x2="590" y2="356" stroke="#16a34a" stroke-width="1.5"/><line x1="470" y1="396" x2="590" y2="418" stroke="#dc2626" stroke-width="1.5"/>
+            <rect x="594" y="342" width="118" height="28" rx="5" fill="#fff7ed" stroke="#ea580c"/><text x="653" y="360" font-size="11" text-anchor="middle" fill="#9a3412">L3 箱级起火</text>
+            <rect x="594" y="404" width="150" height="28" rx="5" fill="#fef2f2" stroke="#dc2626"/><text x="669" y="422" font-size="11" text-anchor="middle" fill="#991b1b">L4–L6 …多舱/爆炸</text>
+            <text x="740" y="30" font-size="10" fill="#94a3b8">▦ 网格 = 平移区;节点可点选 → 右检视器</text>
           </svg>
-          <div style="font-size:10.5px;color:var(--faint);margin-top:4px">液冷泄漏 ETA 的初因为 <b>FT⚡ 频率树</b>(__init__:2 频率初因 + 1 使能,F=Σ 割集)——树中初因节点标 ⚡;本 ETA 为手动初因。</div>
         </div>
+        <div class="ch" style="border-top:1px solid var(--line)"><b>事故序列(7)· 折叠</b><span class="meta">Σ=IE ✓ · 点展开 ⌃ 或在此浏览前 3 行</span></div>
+        <div style="max-height:96px;overflow:auto"><table>
+          <tr><th>#</th><th>路径</th><th>末态</th><th>级</th><th class="r">频率 /yr</th><th class="r">占比</th></tr>
+          <tr><td class="num">L0</td><td>离气✓</td><td><span class="chip"><span class="sq" style="background:var(--c1)"></span>单体安全排气</span></td><td>0</td><td class="num r">1.140e-2</td><td class="num r">95.0%</td></tr>
+          <tr><td class="num">L1</td><td>离气✗ BMS✓</td><td><span class="chip"><span class="sq" style="background:var(--c2)"></span>模组内蔓延</span></td><td>I</td><td class="num r">5.400e-4</td><td class="num r">4.5%</td></tr>
+          <tr><td class="num">L2</td><td>离气✗ BMS✗ 热障✓</td><td><span class="chip"><span class="sq" style="background:var(--c3)"></span>Pack/簇级起火</span></td><td>II</td><td class="num r">5.700e-5</td><td class="num r">0.48%</td></tr>
+        </table></div>
       </div>
-      <div class="panel" style="grid-row:span 2">
-        <div class="ch"><b>检视器 — B_BMS</b><span class="meta">uuid …8f2c</span></div>
+      <div class="panel" style="width:290px;flex-shrink:0">
+        <div class="ch"><b>检视器 — B_BMS</b><span class="meta">…8f2c</span></div>
         <div class="insp">
           <div class="f"><b>名称</b><span>BMS 切断/隔离</span></div>
           <div class="f"><b>PFD(引擎)</b><span class="num">0.100</span></div>
-          <div class="f"><b>置信分级</b><span><span class="gr" style="background:var(--gC)">C</span> IEC 61508 SIL2 类比</span></div>
-          <div class="f"><b>挂载 FTA</b><span>传感 2oo3 ∨ 逻辑 ∨ 接触器</span></div>
-          <div class="f"><b>现场证据</b><span class="num">N=22 · k=0</span></div>
+          <div class="f"><b>分级/来源</b><span><span class="gr" style="background:var(--gC)">C</span> IEC 61508 SIL2</span></div>
+          <div class="f"><b>挂载 FTA</b><span>2oo3 ∨ 逻辑 ∨ 接触器</span></div>
           <div class="f"><b>重要度(C5)</b><span class="num">FV 0.31 · RAW 6.2</span></div>
-          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap"><span class="btn pri">编辑 FTA</span><span class="btn">贝叶斯更新</span><span class="btn">从参考库换源</span></div>
-          <div class="ch" style="margin:12px -12px 8px;border-top:1px solid var(--line)"><b>初始事件</b></div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><span class="btn pri">编辑 FTA</span><span class="btn">贝叶斯更新</span></div>
+          <div class="ch" style="margin:10px -12px 6px;border-top:1px solid var(--line)"><b>初始事件</b></div>
           <div class="f"><b>频率来源</b><span>◉手动 ○乘积 ○故障树⚡</span></div>
           <div class="f"><b>IE 频率</b><span class="num">1.200e-2 /yr</span></div>
-          <div class="f"><b>溯源</b><span><span class="gr" style="background:var(--gC)">C</span> EPRI 2023 电芯族</span></div>
         </div>
-      </div>
-      <div class="panel">
-        <div class="ch"><b>事故序列</b><span class="meta">7 序列 · Σ=1.200e-2 ✓ · 点行选中→检视器</span></div>
-        <div class="scroll"><table>
-          <tr><th>#</th><th>路径</th><th>末态</th><th>级</th><th class="r">频率 /yr</th><th class="r">占比</th><th class="r">p95</th></tr>
-          <tr><td class="num">L0</td><td>离气✓</td><td><span class="chip"><span class="sq" style="background:var(--c1)"></span>单体安全排气</span></td><td>0</td><td class="num r">1.140e-2</td><td class="num r">95.0%</td><td class="num r">1.9e-2</td></tr>
-          <tr><td class="num">L1</td><td>离气✗ BMS✓</td><td><span class="chip"><span class="sq" style="background:var(--c2)"></span>模组内蔓延</span></td><td>I</td><td class="num r">5.400e-4</td><td class="num r">4.5%</td><td class="num r">1.4e-3</td></tr>
-          <tr><td class="num">L2</td><td>离气✗ BMS✗ 热障✓</td><td><span class="chip"><span class="sq" style="background:var(--c3)"></span>Pack/簇级起火</span></td><td>II</td><td class="num r">5.700e-5</td><td class="num r">0.48%</td><td class="num r">2.1e-4</td></tr>
-          <tr style="background:#fff7ed"><td class="num">L3</td><td>… 泄爆✓</td><td><span class="chip"><span class="sq" style="background:var(--c4)"></span>箱级起火</span></td><td>III</td><td class="num r">5.400e-6</td><td class="num r">0.05%</td><td class="num r">2.7e-5</td></tr>
-          <tr><td class="num">L4</td><td>… 泄爆✗ 间距✓</td><td><span class="chip"><span class="sq" style="background:var(--c4)"></span>箱级+超压</span></td><td>III</td><td class="num r">2.700e-7</td><td class="num r">—</td><td class="num r">1.5e-6</td></tr>
-          <tr><td class="num">L5</td><td>… 间距✗ 应急✓</td><td><span class="chip"><span class="sq" style="background:var(--c5)"></span>多舱蔓延</span></td><td>IV</td><td class="num r">8.700e-8</td><td class="num r">—</td><td class="num r">5.2e-7</td></tr>
-          <tr><td class="num">L6</td><td>全失败</td><td><span class="chip"><span class="sq" style="background:var(--c5)"></span>爆炸+毒气</span></td><td>IV</td><td class="num r">3.600e-8</td><td class="num r">—</td><td class="num r">2.4e-7</td></tr>
-        </table></div>
       </div>
     </div>
     <div class="status"><span>◉ 引擎在线</span><span>py <span class="num">326✓</span></span><span>上次量化 <span class="num">96 ms</span></span><span>项目 <span class="num">3 · 活动:金坛梅山</span></span><span style="margin-left:auto">分析案例 <span class="num">#23</span> 已钉扎 · 版本 <span class="num">3f7a21c9</span></span></div>

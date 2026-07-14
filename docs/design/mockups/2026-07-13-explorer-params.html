@@ -16,7 +16,7 @@
 .tag{font-size:10.5px;padding:2px 7px;border-radius:5px;background:var(--soft);color:var(--ink2);font-family:var(--mono)}
 .view{margin-left:auto;font-size:11px;color:var(--faint)}
 main{flex:1;display:flex;min-height:0}
-.tree{width:248px;background:#fff;border-right:1px solid var(--line);overflow:auto;padding:8px 6px;font-size:12px;flex-shrink:0}
+.tree{width:212px;background:#fff;border-right:1px solid var(--line);overflow:auto;padding:8px 6px;font-size:12px;flex-shrink:0}
 .tree .grp{font-size:10.5px;font-weight:600;letter-spacing:.4px;color:var(--faint);padding:8px 8px 3px}
 .tree .it{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;color:var(--ink2);white-space:nowrap;overflow:hidden}
 .tree .it:hover{background:var(--soft)}.tree .it.on{background:#e6f2f0;color:var(--acc);font-weight:600}
@@ -51,6 +51,10 @@ tr:hover td{background:#fafcff}
 .mx div{height:20px;border-radius:3px;opacity:.92;position:relative;font-size:9px;color:var(--ink2);text-align:center;line-height:20px;font-family:var(--mono)}
 .bar{height:8px;border-radius:4px;background:var(--soft);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--acc)}
+.zoom{position:absolute;right:10px;top:8px;display:flex;gap:4px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:3px;box-shadow:0 1px 4px rgba(15,23,42,.08);z-index:2}
+.zoom span{width:26px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:5px;font-size:12px;color:var(--ink2);cursor:default}
+.zoom span:hover{background:var(--soft)}.zoom .pct{width:auto;padding:0 7px;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.canvaswrap{position:relative;flex:1;min-height:0;overflow:hidden;background:radial-gradient(circle,#e8edf3 1px,transparent 1px);background-size:18px 18px}
 </style></head><body>
 <div class="note">Explorer 重设计 4/8:参数库 / CCF — 全项目参数密排 + CCF 组编辑 + 检视器</div>
 <div class="menu"><span>文件</span><span>编辑</span><span>模型</span><span>分析</span><span>数据</span><span>评审</span><span>报告</span><span>帮助</span>
@@ -60,30 +64,23 @@ tr:hover td{background:#fafcff}
   <span class="view">视图:参数库 / CCF · 金坛梅山</span></div>
 <main>
   <nav class="tree">
-    <div class="grp">项目库(3)· 多项目</div>
-    <div class="it prj">▾ 金坛梅山 100 MWh<span class="st rev">送审中</span><span class="n">v14</span></div>
-      <div class="it sub">▦ 项目总览</div>
-      <div class="grp sub" style="padding-top:4px">事件树(5)</div>
-      <div class="it sub"><span class="dot" style="background:var(--c3)"></span>电芯内短路<span class="n">1.2e-2</span></div>
-      <div class="it sub"><span class="dot" style="background:var(--c2)"></span>过充 / BMS 失效<span class="n">3.4e-3</span></div>
-      <div class="it sub"><span class="dot" style="background:var(--c3)"></span>液冷泄漏 → 外短<span class="n">FT⚡8.0e-3</span></div>
-      <div class="it sub"><span class="dot" style="background:var(--c1)"></span>外部火源/邻舱辐射<span class="n">2.0e-4</span></div>
-      <div class="it sub"><span class="dot" style="background:var(--c1)"></span>机械损伤 / 进水<span class="n">5.0e-4</span></div>
-      <div class="grp sub" style="padding-top:4px">故障树(4)</div>
-      <div class="it sub">└ BMS 切断/隔离(挂载)<span class="n">3 BE</span></div>
-      <div class="it sub">└ 离气联动(挂载)<span class="n">5 BE</span></div>
-      <div class="it sub">└ __init__ 初因树(液冷泄漏)<span class="n">2F+1Q</span></div>
-      <div class="it sub">我的接触器失效树<span class="n">自建</span></div>
-      <div class="grp sub" style="padding-top:4px">数据与分析</div>
-      <div class="it sub on">参数库 / CCF<span class="n">23+2 组</span></div>
-      <div class="it sub">后果定义 C1–C5</div>
-      <div class="it sub">FMEA / RPN<span class="n">36 行</span></div>
-      <div class="it sub">报告与证据链<span class="n">#23</span></div>
-    <div class="it prj">▸ 如东风光储 200 MWh<span class="st dft">草稿</span><span class="n">v7</span></div>
-    <div class="it prj">▸ 舟山海岛微网 20 MWh<span class="st sig">已签发</span><span class="n">v4</span></div>
+    <div class="grp">项目(3)</div>
+    <div class="it prj">▾ 金坛梅山 100 MWh<span class="st rev">送审中</span></div>
+      <div class="it sub">项目总览</div>
+      <div class="it sub">事件树<span class="n">5</span></div>
+      <div class="it sub2">· 电芯内短路</div>
+      <div class="it sub2">· 液冷泄漏→外短<span class="n">⚡FT</span></div>
+      <div class="it sub2" style="color:var(--faint)">…其余 3 个</div>
+      <div class="it sub">故障树<span class="n">4</span></div>
+      <div class="it sub on">参数库 / CCF</div>
+      <div class="it sub">后果定义</div>
+      <div class="it sub">FMEA</div>
+      <div class="it sub">报告与证据链</div>
+    <div class="it prj">▸ 如东风光储 200 MWh<span class="st dft">草稿</span></div>
+    <div class="it prj">▸ 舟山海岛微网 20 MWh<span class="st sig">已签发</span></div>
     <div class="grp">全局</div>
-    <div class="it">▦ 多项目组合总览</div>
-    <div class="it">参考库(41 器件/51 屏障/8 初因)</div>
+    <div class="it">多项目组合总览</div>
+    <div class="it">参考库</div>
   </nav>
   <section class="center">
     <div style="flex:1;display:grid;grid-template-columns:1fr 300px;grid-template-rows:minmax(0,1.4fr) minmax(0,1fr);gap:8px;padding:8px;min-height:0">
