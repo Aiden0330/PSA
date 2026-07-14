@@ -68,8 +68,11 @@ def test_analyst_cannot_sign_reviewer_can(monkeypatch):
                    json={"password": "review-pw-1"}).status_code == 200
 
 
-def test_reviewer_cannot_run_analysis(monkeypatch):
+def test_reviewer_cannot_run_analysis(monkeypatch, tmp_path):
     monkeypatch.setenv("PSA_AUTH", "local")
+    # 存档写入隔离到 tmp:此前漏了这行,每次跑测试往真实 saved/ 目录塞一个「x」存档(污染 dev 数据)
+    import backend.storage as storage
+    monkeypatch.setattr(storage, "_DIR", str(tmp_path / "saved"))
     _seed_roles()
     cr = TestClient(app); _login(cr, "rex", "review-pw-1")
     # 评审人不可建模/量化/导报告/存档
