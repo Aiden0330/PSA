@@ -153,3 +153,38 @@
 
 .psa-field { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
 .psa-field > label, .psa-field > .k { width:auto; min-width:56px; font-size:11.5px; color:var(--psa-muted); }
+
+/* ── Explorer 重设计(R3)壳 tokens + 类:浅色工程座舱(shell-A 方向) ── */
+:root {
+  --exp-bg:#f1f5f9; --exp-line:#e2e8f0; --exp-soft:#f8fafc; --exp-acc:#0f766e;
+  --exp-ink:#0f172a; --exp-ink2:#334155; --exp-muted:#64748b; --exp-faint:#94a3b8;
+}
+.exp-menu { display:flex; align-items:center; gap:2px; padding:4px 10px; background:#fff;
+  border-bottom:1px solid var(--exp-line); font-size:12px; color:var(--exp-ink2); flex-shrink:0; }
+.exp-menu .m { position:relative; padding:4px 10px; border-radius:6px; cursor:pointer; user-select:none; }
+.exp-menu .m:hover, .exp-menu .m.open { background:var(--exp-soft); }
+.exp-menu .drop { position:absolute; left:0; top:100%; z-index:60; min-width:172px; background:#fff;
+  border:1px solid var(--exp-line); border-radius:8px; box-shadow:0 8px 24px rgba(15,23,42,.14); padding:4px; margin-top:2px; }
+.exp-menu .drop button { display:flex; width:100%; align-items:center; gap:8px; padding:6px 10px;
+  border:0; background:none; border-radius:6px; font-size:12.5px; color:var(--exp-ink2); cursor:pointer; text-align:left; }
+.exp-menu .drop button:hover:not(:disabled) { background:var(--exp-soft); color:var(--exp-acc); }
+.exp-menu .drop button:disabled { color:var(--exp-faint); cursor:default; }
+.exp-menu .drop .sep { height:1px; background:var(--exp-line); margin:4px 2px; }
+
+.exp-tree { width:212px; flex-shrink:0; background:#fff; border-right:1px solid var(--exp-line);
+  overflow:auto; padding:8px 6px; font-size:12px; }
+.exp-tree .grp { font-size:10.5px; font-weight:600; letter-spacing:.4px; color:var(--exp-faint); padding:8px 8px 3px; }
+.exp-tree .it { display:flex; align-items:center; gap:6px; padding:4px 8px; border-radius:6px; color:var(--exp-ink2);
+  white-space:nowrap; overflow:hidden; cursor:pointer; }
+.exp-tree .it:hover { background:var(--exp-soft); }
+.exp-tree .it.on { background:#e6f2f0; color:var(--exp-acc); font-weight:600; }
+.exp-tree .it .n { margin-left:auto; font-family:var(--psa-font-mono); font-size:10.5px; color:var(--exp-faint); flex-shrink:0; }
+.exp-tree .prj { font-weight:600; color:var(--exp-ink); }
+.exp-tree .sub { padding-left:20px; } .exp-tree .sub2 { padding-left:32px; }
+.exp-tree .st { font-size:9.5px; font-weight:700; border-radius:4px; padding:0 5px; flex-shrink:0; }
+.exp-tree .st.dft { background:var(--exp-soft); color:var(--exp-faint); }
+.exp-tree .st.arch { background:#eff6ff; color:#2563eb; }
+
+.exp-status { display:flex; gap:16px; align-items:center; padding:4px 12px; background:#fff;
+  border-top:1px solid var(--exp-line); font-size:11px; color:var(--exp-muted); flex-shrink:0; }
+.exp-status .num { color:var(--exp-ink2); font-family:var(--psa-font-mono); font-variant-numeric:tabular-nums; }

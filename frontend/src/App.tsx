@@ -12,7 +12,9 @@ import { useExampleModel } from './features/fta/useExampleModel'
 import { EtaWorkbench } from './features/eta/EtaWorkbench'
 import { computeSummaries, computeAggregateTotals } from './features/eta/summaries'
 import { ProjectCockpit } from './features/home/ProjectCockpit'
-import { ProjectDrawer } from './features/shell/ProjectDrawer'
+import { MenuBar } from './features/shell/MenuBar'
+import { ExplorerTree } from './features/shell/ExplorerTree'
+import { StatusBar } from './features/shell/StatusBar'
 import { CommandPalette } from './features/shell/CommandPalette'
 import { LoginWall } from './features/shell/LoginWall'
 import { AccountsPanel } from './features/shell/AccountsPanel'
@@ -21,6 +23,8 @@ import { useViewStore } from './stores/viewStore'
 import type { MainTab } from './stores/viewStore'
 import { useActiveEta } from './stores/useActiveEta'
 import { useAuthStore } from './stores/authStore'
+
+const PortfolioTab = lazy(() => import('./features/portfolio/PortfolioTab').then((m) => ({ default: m.PortfolioTab })))
 
 // 启动关键路径(总览/ETA)不携带重库:FTA(reactflow)、参数库/FMEA(ag-grid)、
 // 结果图(echarts)等页签按需分块加载 —— 新窗口只解析 ETA 所需代码(性能报障修复 2026-07-09)
@@ -34,13 +38,6 @@ const ReportDossier = lazy(() => import('./features/report/ReportDossier').then(
 function TabFallback() {
   return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--psa-faint)', fontSize: 13, background: '#fff' }}>载入模块…</div>
 }
-
-const ROLE_LABEL: Record<string, string> = { admin: '管理员', analyst: '分析员', reviewer: '评审人' }
-
-const TAB_LABELS: [MainTab, string][] = [
-  ['home', '总览'], ['bess', '事件树（ETA）'], ['ft', '故障树（FTA）'], ['params', '参数库 / CCF'],
-  ['library', '参考库'], ['cons', '后果'], ['fmea', 'FMEA'], ['report', '报告'],
-]
 
 /**
  * 认证门(Phase 5 B4):PSA_AUTH=off 恒 needsLogin=false(约束 #0,含离线单文件 ——
@@ -63,8 +60,6 @@ export default function App() {
 function AppShell() {
   const tab = useViewStore((s) => s.tab)
   const setTab = useViewStore((s) => s.setTab)
-  const drawerOpen = useViewStore((s) => s.drawerOpen)
-  const setDrawerOpen = useViewStore((s) => s.setDrawerOpen)
   const setPaletteOpen = useViewStore((s) => s.setPaletteOpen)
   const { etaTabs, activeKey, checkedKeys, etaPfds, etModel, writeEtModel, P } = useActiveEta()
 
@@ -74,8 +69,6 @@ function AppShell() {
   const { lib, bump } = useLibrary()
   const example = useExampleModel()
   const persistence = useProjectPersistence(setError, bump)
-  const identity = useAuthStore((s) => s.identity)
-  const doLogout = useAuthStore((s) => s.logout)
 
   const summaries = computeSummaries(etaTabs, activeKey, checkedKeys, etaPfds)
   const aggregateTotals = computeAggregateTotals(etaTabs, checkedKeys, etaPfds)
@@ -114,42 +107,8 @@ function AppShell() {
   }
 
   return (
-    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#eef1f4' }}>
-      <header style={hdr}>
-        <button onClick={() => setDrawerOpen(!drawerOpen)} title="项目树(抽屉)" style={drawerBtn}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--psa-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.15)' }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2c1 4-2 5-2 8a2 2 0 1 0 4 0c0-1 0-1.5.5-2 1 2 2.5 3 2.5 6a5 5 0 1 1-10 0c0-4 4-6 5-12z" fill="#fff" /></svg>
-          </div>
-          <div style={{ lineHeight: 1.05 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#fff', letterSpacing: '.3px' }}>BESS&nbsp;PSA</div>
-            <div style={{ fontSize: 10.5, color: 'var(--psa-chrome-ink-dim)', marginTop: 1 }}>储能热失控定量风险评估</div>
-          </div>
-        </div>
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,.28)', padding: 3, borderRadius: 9, border: '1px solid rgba(255,255,255,.05)' }}>
-          {TAB_LABELS.map(([t, label]) => (
-            <button key={t} onClick={() => setTab(t)} style={tabBtn(tab === t)}>{label}</button>
-          ))}
-        </nav>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
-          <button onClick={() => setPaletteOpen(true)} title="命令板(⌘K / Ctrl+K)" style={kbdBtn}>⌘K</button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--psa-chrome-ink)' }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--psa-ok)', boxShadow: '0 0 6px var(--psa-ok)' }} />引擎就绪</div>
-          {identity?.mode === 'local' && identity.role === 'admin' && (
-            <button onClick={() => setAccountsOpen(true)} title="账户管理" style={kbdBtn}>账户</button>
-          )}
-          <div
-            title={identity ? `${identity.display_name ?? identity.username} · ${ROLE_LABEL[identity.role] ?? identity.role}${identity.mode === 'local' ? '' : '(单用户模式)'}` : ''}
-            style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--psa-chrome-2)', color: 'var(--psa-chrome-ink)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,.12)' }}
-          >
-            {(identity?.display_name ?? identity?.username ?? '?').slice(0, 2).toUpperCase()}
-          </div>
-          {identity?.mode === 'local' && (
-            <button onClick={() => { void doLogout() }} title="登出" style={kbdBtn}>登出</button>
-          )}
-        </div>
-      </header>
+    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--exp-bg)' }}>
+      <MenuBar persistence={persistence} setTab={setTab} onImportFile={persistence.onImportFile} onOpenAccounts={() => setAccountsOpen(true)} />
 
       {error && (
         <div style={errBar}>
@@ -169,11 +128,13 @@ function AppShell() {
       )}
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
-        <ProjectDrawer persistence={persistence} />
+        <ExplorerTree persistence={persistence} tab={tab} setTab={setTab} />
         {/* 懒页签统一挂起点:总览/ETA 为即时组件,其余页签首次进入时按需拉块 */}
         <Suspense fallback={<TabFallback />}>
         {tab === 'home' ? (
           <ProjectCockpit summaries={summaries} aggregateTotals={aggregateTotals} scenarios={scenarios} persistence={persistence} onOpenScenario={openScenario} />
+        ) : tab === 'portfolio' ? (
+          <PortfolioTab persistence={persistence} />
         ) : tab === 'ft' ? (
           <FtaWorkbench lib={lib} ai={ai} persistence={persistence} example={example} />
         ) : tab === 'params' ? (
@@ -213,12 +174,7 @@ function AppShell() {
         </Suspense>
       </div>
 
-      <footer className="psa-statusbar">
-        <span className="psa-dot" style={{ background: 'var(--psa-ok)' }} />引擎就绪<span>·</span>
-        <span>{TAB_LABELS.find(([t]) => t === tab)?.[1] ?? ''}</span>
-        {persistence.projectUuid && <span style={{ marginLeft: 10 }} className="psa-num">项目 {persistence.projectUuid.slice(0, 8)}</span>}
-        <span style={{ marginLeft: 'auto' }} className="psa-num">v2.0</span>
-      </footer>
+      <StatusBar tab={tab} persistence={persistence} />
 
       <CommandPalette scenarios={scenarios} summaries={summaries} persistence={persistence} onOpenScenario={openScenario} />
       <SaveConflictDialog persistence={persistence} onGoToDiff={() => setTab('report')} />
@@ -227,9 +183,5 @@ function AppShell() {
   )
 }
 
-const hdr: CSSProperties = { display: 'flex', alignItems: 'center', gap: 14, padding: '0 16px', minHeight: 54, flexShrink: 0, background: 'var(--psa-chrome)', borderBottom: '1px solid #000' }
-const tabBtn = (active: boolean): CSSProperties => ({ background: active ? 'var(--psa-primary)' : 'transparent', color: active ? '#fff' : 'var(--psa-chrome-ink)', border: 0, borderRadius: 6, padding: '6px 14px', fontSize: 13, fontWeight: active ? 500 : 400, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: active ? '0 1px 0 rgba(255,255,255,.2) inset,0 1px 3px rgba(0,0,0,.35)' : 'none' })
-const drawerBtn: CSSProperties = { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.28)', color: 'var(--psa-chrome-ink)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 7, cursor: 'pointer' }
-const kbdBtn: CSSProperties = { height: 26, padding: '0 9px', background: 'rgba(0,0,0,.28)', color: 'var(--psa-chrome-ink)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontFamily: 'var(--psa-font-mono)' }
 const errBar: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px', background: 'var(--psa-danger-soft)', color: 'var(--psa-danger-strong)', fontSize: 12.5, borderBottom: '1px solid rgba(220,38,38,.2)', flexShrink: 0 }
 const draftBar: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px', background: 'var(--psa-primary-soft)', color: 'var(--psa-primary-strong)', fontSize: 12.5, borderBottom: '1px solid rgba(37,99,235,.2)', flexShrink: 0 }
