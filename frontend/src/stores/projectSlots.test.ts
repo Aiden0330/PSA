@@ -142,3 +142,75 @@ describe('R2 槽注册表:打开/切换/关闭', () => {
     expect(P().present.etas[0].model.initEvent).toBe('项目A事件') // A 安然无恙
   })
 })
+
+// ── R2-审(2026-07-14 对抗审查)回归锁:槽定向身份写入 + 槽键迁移 ──
+// 审查判定 FAIL 的根因:钩子层在 await 之后把身份写回"当时活动的槽"。
+// 修法 = setIdentityFor(发起槽) + rekeyWorkspace(另存/首存后 wid 随新 savedId 走)。
+// 钩子级时序已由审查探针证实,此处锁死两个新 store 动作的语义(修复的承重点)。
+
+describe('R2-审:setIdentityFor 槽定向身份写入', () => {
+  it('F1 核心场景:发起保存后切换项目,身份写回落在发起槽(停放),活动项目不受染', () => {
+    openA()                                   // A 活动(模拟:A 发起保存,await 中)
+    const widA = useProjectStore.getState().workspaceId
+    openB()                                   // 用户切到 B(A 停放)
+    // 保存响应到达:身份写回 A 的槽,而不是活动的 B
+    P().setIdentityFor(widA, { savedId: 'recA-new', lastVersionHash: 'hashA2' })
+    expect(P().identity.savedId).toBe('sidB')                     // B 分毫未动
+    expect(P().identity.lastVersionHash).toBe('hashB')
+    expect(P().parked[widA].identity.savedId).toBe('recA-new')    // A 槽收到自己的新身份
+    expect(P().parked[widA].identity.lastVersionHash).toBe('hashA2')
+  })
+
+  it('发起槽已关闭 → 身份写入丢弃(绝不落到别的项目头上)', () => {
+    openA()
+    const widA = useProjectStore.getState().workspaceId
+    openB()
+    P().closeProject(widA)
+    P().setIdentityFor(widA, { savedId: 'ghost', lastVersionHash: 'ghost-hash' })
+    expect(P().identity.savedId).toBe('sidB')                     // 活动槽不背锅
+    expect(Object.values(P().parked).every((s) => s.identity.savedId !== 'ghost')).toBe(true)
+  })
+
+  it('wid 为活动槽时等价于 setIdentity', () => {
+    openA()
+    P().setIdentityFor(P().workspaceId, { displayName: '项目A·改名' })
+    expect(P().identity.displayName).toBe('项目A·改名')
+  })
+})
+
+describe('R2-审:rekeyWorkspace 槽键迁移(F4 另存后原存档不可打开)', () => {
+  it('F4 完整场景:开存档 sid1 → 另存为 sid2(rekey)→ 重开 sid1 不再被 wid 去重吞掉', () => {
+    // 开存档 sid1(读档路径约定 wid = savedId)
+    P().openProject('sid1', {
+      etas: [eta('x1', '原档事件')], activeKey: 'x1', checkedKeys: { x1: true },
+      identity: { savedId: 'sid1', projectUuid: 'u1', lastVersionHash: 'h1', displayName: '原档' },
+    })
+    // 另存为:身份换新 + 槽键迁移(修复后的钩子行为)
+    P().setIdentityFor(P().workspaceId, { savedId: 'sid2', displayName: '副本' })
+    P().rekeyWorkspace('sid1', 'sid2')
+    expect(P().workspaceId).toBe('sid2')
+    expect(P().openOrder).not.toContain('sid1')
+    // 重开原存档 sid1:必须真正载入(修复前 hitActive 命中 wid='sid1' → 静默 no-op,原档锁死)
+    P().openProject('sid1', {
+      etas: [eta('x1r', '原档事件·重开')], activeKey: 'x1r', checkedKeys: { x1r: true },
+      identity: { savedId: 'sid1', projectUuid: 'u1', lastVersionHash: 'h1', displayName: '原档' },
+    })
+    expect(P().workspaceId).toBe('sid1')
+    expect(P().identity.savedId).toBe('sid1')
+    expect(P().present.etas[0].key).toBe('x1r')
+    expect(P().parked['sid2'].identity.savedId).toBe('sid2')      // 副本安然停放
+  })
+
+  it('停放槽的键迁移 + openOrder 同步;目标键被占则拒绝', () => {
+    openA()
+    const widA = useProjectStore.getState().workspaceId
+    openB()
+    P().rekeyWorkspace(widA, 'sidA-rec')                          // 停放中的 A 迁移键
+    expect(P().parked['sidA-rec'].identity.savedId).toBe('sidA')
+    expect(P().parked[widA]).toBeUndefined()
+    expect(P().openOrder).toContain('sidA-rec')
+    P().rekeyWorkspace('sidA-rec', 'sidB')                        // 撞活动键:拒绝
+    expect(P().parked['sidA-rec']).toBeDefined()
+    expect(P().workspaceId).toBe('sidB')
+  })
+})

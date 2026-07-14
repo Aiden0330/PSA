@@ -5,6 +5,7 @@ import { applyAiDraftToProject, draftElements } from '../../aiDraft'
 import type { AiApplyMode, AiDraftResponse, AiDraftTarget, DraftElement } from '../../aiDraft'
 import type { ProjectEta, ProjectPayload } from '../../project'
 import { etaDisplayName, useActiveEta } from '../../stores/useActiveEta'
+import { useProjectStore } from '../../stores/projectStore'
 import { useViewStore } from '../../stores/viewStore'
 
 export type AiAppliedResult =
@@ -67,6 +68,14 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
   const toggleElement = (id: string) =>
     setAcceptedIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
 
+  // R2-审 F5:AI 草案是"当时项目"的上下文产物 —— 切换项目即整体清空,
+  // 否则 A 的草案面板在 B 里仍可点「应用」,把 A 语境的模型写进 B(跨项目写入)。
+  const workspaceId = useProjectStore((s) => s.workspaceId)
+  useEffect(() => {
+    setAiOpen(false); setAiDraft(null); setAiDraftContext(null)
+    setAiError(null); setAiNotice(null); setAiAppliedResult(null)
+  }, [workspaceId])
+
   useEffect(() => {
     if (!etModel?.functionalEvents.length) return
     if (!aiTargetFeId || !etModel.functionalEvents.some((fe) => fe.id === aiTargetFeId)) {
@@ -88,6 +97,7 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
       targetFeId: aiMode === 'fta_for_barrier' ? aiTargetFeId : undefined,
       targetFeLabel: aiMode === 'fta_for_barrier' ? (targetFe?.label ?? aiTargetFeId) : undefined,
     }
+    const wid = useProjectStore.getState().workspaceId   // R2-审 F5:生成也要槽钉定
     setAiBusy(true); setAiError(null); setAiNotice(null); setAiDraft(null); setAiDraftContext(context)
     try {
       const draft = await draftAiModel({
@@ -103,6 +113,7 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
           library: compactLibraryContext(lib),
         },
       })
+      if (useProjectStore.getState().workspaceId !== wid) return   // 迟到的草案不落入别的项目
       setAiDraft(draft)
     } catch (e: any) {
       setAiError(String(e?.message ?? e))

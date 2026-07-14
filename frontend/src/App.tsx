@@ -97,9 +97,11 @@ function AppShell() {
   const openScenario = async (val: string) => {
     if (!val) return
     if (etaTabs.some((t) => t.key === val)) { P().setActive(val); setTab('bess'); return }
+    const wid = P().workspaceId   // R2-审 F9:await 期间切换项目 → 场景页签不落入别的项目
     try {
       const sid = val.slice(3)
       const t = await buildScenarioTab(sid, scenarios.find((s) => s.id === sid)?.name ?? '场景')
+      if (P().workspaceId !== wid) return
       if (P().present.etas.some((x) => x.key === t.key)) { P().setActive(t.key) } else { P().addTab(t) }
       setTab('bess')
     } catch (e: any) { setError(String(e?.message ?? e)) }

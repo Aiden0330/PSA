@@ -71,6 +71,12 @@ export interface ProjectStore {
   fmeaMapping: MappingConfig
 
   setIdentity: (patch: Partial<ProjectIdentity>) => void
+  /** R2-审 F1:槽定向身份写入 —— 异步操作(保存/删除/冲突解决)期间用户可能切换项目,
+   *  写回必须落在**发起操作的槽**:活动 → 顶层;停放 → 该槽;已关闭 → 丢弃(绝不串槽)。 */
+  setIdentityFor: (wid: string, patch: Partial<ProjectIdentity>) => void
+  /** R2-审 F4:槽键迁移(另存为/首存后 wid 随新 savedId 走)。约定 wid=savedId(读档路径),
+   *  否则旧存档 id 的 wid 残留会让 openProject 的 wid 去重把重开旧存档吞成静默 no-op。 */
+  rekeyWorkspace: (oldWid: string, newWid: string) => void
   /** FMEA 行/映射更新(活动槽;不进 undo 历史——与今天的 hook 行为一致)。 */
   setFmea: (rows?: FmeaRow[], mapping?: MappingConfig) => void
   /** 打开项目:目标(按 wid 或 identity.savedId)已在打开集 → 仅聚焦(绝不重载,
@@ -147,6 +153,27 @@ export const useProjectStore = create<ProjectStore>()((set) => {
     fmeaMapping: freshMapping(),
 
     setIdentity: (patch) => set((s) => ({ identity: { ...s.identity, ...patch } })),
+    setIdentityFor: (wid, patch) =>
+      set((s) => {
+        if (wid === s.workspaceId) return { identity: { ...s.identity, ...patch } }
+        const slot = s.parked[wid]
+        if (!slot) return s   // 槽已关闭:身份写入丢弃(落到别的项目头上 = 跨项目存档覆盖)
+        return { parked: { ...s.parked, [wid]: { ...slot, identity: { ...slot.identity, ...patch } } } }
+      }),
+    rekeyWorkspace: (oldWid, newWid) =>
+      set((s) => {
+        if (!newWid || oldWid === newWid) return s
+        if (newWid === s.workspaceId || s.parked[newWid]) return s   // 目标键被占(防御):不动
+        if (oldWid === s.workspaceId) {
+          return { workspaceId: newWid, openOrder: s.openOrder.map((w) => (w === oldWid ? newWid : w)) }
+        }
+        const slot = s.parked[oldWid]
+        if (!slot) return s
+        const parked = { ...s.parked }
+        delete parked[oldWid]
+        parked[newWid] = slot
+        return { parked, openOrder: s.openOrder.map((w) => (w === oldWid ? newWid : w)) }
+      }),
     setFmea: (rows, mapping) => set(() => ({
       ...(rows !== undefined ? { fmeaRows: rows } : {}),
       ...(mapping !== undefined ? { fmeaMapping: mapping } : {}),
