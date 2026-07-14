@@ -126,10 +126,18 @@ export function EtaWorkbench(
   const onFtEdited = async (feId: string) => {
     const active = P().present.etas.find((e) => e.key === P().activeKey)
     if (!active) return
+    // review F3:独立性 lint 双侧生效 —— 屏障树编辑同样可能事后引入与初因树的共享事件;
+    // 屏障 PFD 本身仍照常更新(它自身无恙),但明确告知 F_IE × P_path 的独立性已破。
+    if (active.model.initFreqSource === 'ft') {
+      const shared = sharedIeBarrierEvents(active.fts)
+      if (shared.length) onError(`屏障树与初因树共享基本事件(${shared.join(', ')}):初因频率的独立性假设不成立,请调整树结构。`)
+    }
     try {
       const prob = (await quantify(active.fts, feId)).probability
       P().setEtaPfd(active.key, feId, prob)                    // 派生量入缓存,不进内容历史
-    } catch {}
+    } catch (e: any) {
+      onError(String(e?.message ?? e))                          // review F3:不再静默吞错
+    }
   }
 
   return (

@@ -116,3 +116,46 @@ def test_units_guard_frequency_param_rejected_in_probability_context():
     p = Parameter("F", "frequency", 1e-3)
     with pytest.raises(ValueError, match="probability context"):
         p.unavailability()
+
+
+# ── engine-review 2026-07-13 整改锁(F1/F2/F4)──
+
+def test_review_f1_not_gate_rejected_loudly():
+    """F1:NOT 门下 MCS 枚举静默丢负文字 → 错割集错频率(曾 +67% 无警告)——必须拒绝。"""
+    def build(g):
+        g.basic("F"); g.basic("Q")
+        g.gate("N", Op.NOT, ["Q"])
+        g.gate("TOP", Op.AND, ["F", "N"]); g.top = "TOP"
+    m = _model([Parameter("F", "frequency", 1e-2), Parameter("Q", "probability", 0.4)], build)
+    with pytest.raises(FrequencyRuleError, match="NOT"):
+        fault_tree_frequency(m, "IE")
+
+
+def test_review_f1_xor_gate_rejected_with_clear_message():
+    def build(g):
+        g.basic("F"); g.basic("Q")
+        g.gate("TOP", Op.XOR, ["F", "Q"]); g.top = "TOP"
+    m = _model([Parameter("F", "frequency", 1e-2), Parameter("Q", "probability", 0.4)], build)
+    with pytest.raises(FrequencyRuleError, match="XOR"):
+        fault_tree_frequency(m, "IE")
+
+
+def test_review_f2_no_limit_order_rule_cannot_escape():
+    """F2:曾经 limit_order=2 先截断 → AND(F1,F2,Q) 三阶违规割集消失、返回 F=0 无错。
+    limit_order 已整体移除 —— 违规必然被看见。"""
+    import inspect
+    assert "limit_order" not in inspect.signature(fault_tree_frequency).parameters
+    def build(g):
+        g.basic("F1"); g.basic("F2"); g.basic("Q")
+        g.gate("TOP", Op.AND, ["F1", "F2", "Q"]); g.top = "TOP"
+    m = _model([Parameter("F1", "frequency", 1e-3), Parameter("F2", "frequency", 2e-3),
+                Parameter("Q", "probability", 0.5)], build)
+    with pytest.raises(FrequencyRuleError):
+        fault_tree_frequency(m, "IE")
+
+
+def test_review_f4_negative_rate_rejected_at_source():
+    """F4:负 λ 曾经由 λ·MTTR 得负 q,再被 cutoff≥0 过滤静默吞掉 → F=0 貌似合理。"""
+    p = Parameter("R", "rate", -1e-3, mttr=8.0)
+    with pytest.raises(ValueError, match=">= 0"):
+        p.unavailability()

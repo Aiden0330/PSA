@@ -32,7 +32,8 @@ class FtFrequencyRequest(BaseModel):
     model: dict[str, Any]
     fault_tree: str
     cutoff: float = 0.0
-    limit_order: Optional[int] = None
+    # limit_order 有意不提供:频率通道的头条数字 = Σ 割集,阶截断直接咬掉头条
+    # (不同于概率通道的精确 P 不受影响)——静默低估不可接受(engine-review F2)。
 
 class FreqCutSetOut(BaseModel):
     events: list[str]

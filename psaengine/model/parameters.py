@@ -28,6 +28,10 @@ class Parameter:
             return self.value
         if self.kind == "rate":
             lam = self.value
+            if lam < 0:
+                # review F4:负 λ 经 λ·MTTR 得负 q,再被频率通道的 cutoff 过滤静默吞掉
+                # ——垃圾输入变成貌似合理的低估;在源头响亮拒绝。
+                raise ValueError(f"rate {self.id}={lam} must be >= 0")
             if self.mttr is not None:
                 q = lam * self.mttr
             elif self.test_interval is not None:

@@ -103,8 +103,7 @@ def api_ft_frequency(req: schemas.FtFrequencyRequest, _=Depends(require_role(*AN
     from psaengine.quantify.frequency import FrequencyRuleError, fault_tree_frequency
     model = load_model_from_dict(req.model)
     try:
-        r = fault_tree_frequency(model, req.fault_tree,
-                                 cutoff=req.cutoff, limit_order=req.limit_order)
+        r = fault_tree_frequency(model, req.fault_tree, cutoff=req.cutoff)
     except FrequencyRuleError as e:
         raise HTTPException(400, f"频率树规则违规:{e}")
     except KeyError as e:

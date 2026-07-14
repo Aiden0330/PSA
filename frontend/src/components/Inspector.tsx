@@ -18,6 +18,8 @@ interface Props {
 }
 
 const GATE_OPS = ['and', 'or', 'atleast', 'not', 'xor']
+// 频率初因树仅相干逻辑(引擎侧同样强制拒绝 NOT/XOR——review F1);此处只是不呈现。
+const GATE_OPS_COHERENT = ['and', 'or', 'atleast']
 
 const fieldRow: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
@@ -80,7 +82,7 @@ export function Inspector({ model, ftName, selected, onUpdateNode, onUpdateParam
             <span style={fieldLabel}>门类型</span>
             <select value={node.op} style={{ flex: 1 }} onChange={(e) =>
               onUpdateNode(node.id, { op: e.target.value, ...(e.target.value === 'atleast' ? { k: node.k ?? 2 } : {}) })}>
-              {GATE_OPS.map((o) => <option key={o} value={o}>{o.toUpperCase()}</option>)}
+              {(frequencyMode ? GATE_OPS_COHERENT : GATE_OPS).map((o) => <option key={o} value={o}>{o.toUpperCase()}</option>)}
             </select>
           </div>
           {node.op === 'atleast' && (
