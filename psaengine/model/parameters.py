@@ -38,7 +38,11 @@ class Parameter:
                 raise ValueError(f"rate {self.id} needs mttr|test_interval|mission_time")
             return min(q, 1.0)
         if self.kind == "frequency":
-            return self.value  # 每年频率, 由 ET 层使用
+            # 量纲护栏(规格 2026-07-13 §2.1):频率(/yr)不是概率,误入概率通道必须响亮——
+            # 频率量化走 psaengine.quantify.frequency.fault_tree_frequency(每割集一频率规则)。
+            raise ValueError(
+                f"frequency parameter {self.id} used in probability context; "
+                "use quantify.frequency.fault_tree_frequency for IE frequency trees")
         raise ValueError(f"unknown kind {self.kind}")
 
 class ParameterLibrary:
