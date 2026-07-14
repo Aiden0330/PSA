@@ -282,6 +282,59 @@ def get_project(puuid: str) -> Optional[dict]:
         return dict(r) if r else None
 
 
+def portfolio() -> list[dict]:
+    """R5 组合总览数据源:每项目一行。数字取自**已钉扎案例**,绝不现算(证据链正确性)——
+    无案例项目 latest_case=None,前端显示"未量化"。
+      review_state:锚定**最新版本**的评审行状态(草稿=无行=None)。回答"当前模型是否已签发",
+        而非"是否曾有某版本签发过"——后者会把旧签发误读为现状(监管工具须防的误导)。
+      latest_case:最新 report/uncertainty 案例的 results_json.consequences({C1..C5:频率/yr}),
+        携带其 version_hash/created_at —— 案例可能钉在比 latest_hash 更旧的版本上,该哈希即溯源锚点。"""
+    from backend import report_export
+    # uuid → savedId 反查(legacy_project_uuid 确定性映射):供前端从组合总览直达/打开项目。
+    # 仅存档过的项目有 savedId;纯 auto_pin/import 项目为 None(前端降级为"需先打开")。
+    saved_by_uuid: dict[str, str] = {}
+    try:
+        from backend import storage
+        for w in storage.list_workspaces():
+            saved_by_uuid[legacy_project_uuid(w["id"])] = w["id"]
+    except Exception:
+        pass
+    with _conn() as cx:
+        projs = cx.execute(
+            "SELECT p.uuid,p.name,p.modified_at,"
+            " (SELECT COUNT(*) FROM versions v WHERE v.project_uuid=p.uuid) AS versions,"
+            " (SELECT id FROM versions v WHERE v.project_uuid=p.uuid ORDER BY id DESC LIMIT 1) AS latest_vid,"
+            " (SELECT content_hash FROM versions v WHERE v.project_uuid=p.uuid ORDER BY id DESC LIMIT 1) AS latest_hash"
+            " FROM projects p ORDER BY p.modified_at DESC").fetchall()
+        out: list[dict] = []
+        for p in projs:
+            uuid = p["uuid"]
+            review_state = None
+            if p["latest_vid"] is not None:
+                rv = cx.execute("SELECT state FROM reviews WHERE project_uuid=? AND version_id=?",
+                                (uuid, p["latest_vid"])).fetchone()
+                review_state = rv["state"] if rv else None
+            cr = cx.execute(
+                "SELECT c.id,c.kind,c.results_json,c.created_at,v.content_hash"
+                " FROM analysis_cases c JOIN versions v ON v.id=c.version_id"
+                " WHERE c.project_uuid=? AND c.kind IN ('report','uncertainty')"
+                " ORDER BY c.id DESC LIMIT 1", (uuid,)).fetchone()
+            latest_case = None
+            if cr is not None:
+                cons = json.loads(cr["results_json"]).get("consequences")
+                if isinstance(cons, dict):
+                    consequences = {k: float(cons.get(k, 0.0)) for k in ("C1", "C2", "C3", "C4", "C5")}
+                    latest_case = {
+                        "id": cr["id"], "kind": cr["kind"], "consequences": consequences,
+                        "version_hash": cr["content_hash"], "created_at": cr["created_at"],
+                        "risk": report_export.risk_placement(consequences),
+                    }
+            out.append({"uuid": uuid, "name": p["name"], "versions": p["versions"],
+                        "latest_hash": p["latest_hash"], "review_state": review_state,
+                        "latest_case": latest_case, "saved_id": saved_by_uuid.get(uuid)})
+        return out
+
+
 def list_versions(puuid: str) -> list[dict]:
     with _conn() as cx:
         rows = cx.execute(

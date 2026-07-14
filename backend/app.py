@@ -377,6 +377,13 @@ def api_projects_list():
     from backend import store
     return store.list_projects()
 
+@app.get("/api/portfolio")
+def api_portfolio():
+    """R5 组合总览:每项目一行,数字取自已钉扎案例(证据链正确性)。只读聚合面,
+    与 /api/projects 同属无角色门的查询面。"""
+    from backend import store
+    return store.portfolio()
+
 @app.get("/api/projects/{puuid}")
 def api_project_get(puuid: str):
     from backend import store

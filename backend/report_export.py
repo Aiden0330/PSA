@@ -45,6 +45,29 @@ def _risk_level(sev_rank: int, freq_rank: int) -> str:
     return "extreme"
 
 
+_LEVEL_ORDER = {"low": 0, "medium": 1, "high": 2, "extreme": 3}
+
+
+def risk_placement(consequences: dict) -> dict:
+    """把 {C1..C5: 频率/yr} 映射到风险矩阵格,与报告内矩阵**同源**(同 _freq_band、
+    同 _SEV_RANK、同 _risk_level)—— 组合总览的"最劣格"标注据此得出,前端绝不重复阈值
+    (阈值一旦两处各写 = 口径漂移,监管工具的方法学缺陷)。零频/未量化级不落格。
+    返回 {cells:[{severity,freq,freq_band,level}], worst: cell|None}。"""
+    cells, worst = [], None
+    for c in _SEV:
+        f = float(consequences.get(c, 0.0))
+        if f <= 0:
+            continue
+        band = _freq_band(f)                       # 0-based 频带索引
+        level = _risk_level(_SEV_RANK[c], band + 1)  # freq_rank 为 1-based,与报告矩阵一致
+        cell = {"severity": c, "freq": f, "freq_band": band, "level": level}
+        cells.append(cell)
+        if worst is None or _LEVEL_ORDER[level] > _LEVEL_ORDER[worst["level"]] or (
+                _LEVEL_ORDER[level] == _LEVEL_ORDER[worst["level"]] and _SEV_RANK[c] > _SEV_RANK[worst["severity"]]):
+            worst = cell
+    return {"cells": cells, "worst": worst}
+
+
 def build_report_data(model, et_name: str = "TR", *, consequence_defs: dict | None = None,
                       labels: dict | None = None, linked_fe_ids: list | None = None,
                       samples: int = 1000, seed: int = 42, error_factor: float = 3.0,
