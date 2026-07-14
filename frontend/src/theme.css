@@ -190,7 +190,7 @@
 .exp-status .num { color:var(--exp-ink2); font-family:var(--psa-font-mono); font-variant-numeric:tabular-nums; }
 
 /* ── R4a ETA 画布迁移:悬浮缩放工具条 + 底栏折叠切换(页面级新增类,配色沿用既有 --psa-* 令牌——
-   本页内容区尚未整体换皮,详见 docs/superpowers/specs/2026-07-13-explorer-redesign.md §3) ── */
+   R4b(FTA)复用同一批类,详见 docs/superpowers/specs/2026-07-13-explorer-redesign.md §3) ── */
 .exp-zoom { position:absolute; right:10px; top:8px; display:flex; gap:4px; background:var(--psa-surface);
   border:1px solid var(--psa-line-2); border-radius:8px; padding:3px; box-shadow:var(--psa-shadow-pop); z-index:2; }
 .exp-zoom button { width:26px; height:22px; display:flex; align-items:center; justify-content:center; border:0;
@@ -202,5 +202,13 @@
   background:var(--psa-surface); border-radius:6px; padding:2px 8px; font-size:11px; color:var(--psa-ink-2); cursor:pointer; }
 .exp-collapse-toggle:hover { background:var(--psa-soft); }
 
-/* ETA 检视器定宽(mockup:290px,flex-shrink 0)——独立于 --psa-inspector-w(FTA 仍用后者的 clamp 宽度) */
+/* 检视器定宽(mockup:290px,flex-shrink 0)——独立于 --psa-inspector-w(旧 clamp 宽度,仍供未迁移面板用)。
+   R4a 引入,R4b(FTA 检视器)复用同一 token。 */
 :root { --exp-eta-inspector-w: 290px; }
+
+/* ── R4b FTA 画布迁移:工具栏「⚙ 分析设置」的弹出面板(ribbon-anchored popover)——
+   定位模式同 .exp-menu .drop(锚点 position:relative + top:100%),尺寸放宽以容纳
+   AnalysisSettingsPanel 的 house 覆盖表 + 后处理规则编辑器。 ── */
+.exp-popover { position:absolute; top:100%; left:0; margin-top:6px; z-index:20; min-width:320px; max-width:380px;
+  max-height:70vh; overflow:auto; background:var(--psa-surface); border:1px solid var(--psa-line-2);
+  border-radius:10px; box-shadow:var(--psa-shadow-pop); }

@@ -20,6 +20,8 @@ export interface ViewState {
   paletteOpen: boolean
   /** R4a:ETA 页事故序列坞是否展开(含风险矩阵/ETA 清单);默认折叠 = 画布为主导。 */
   seqExpanded: boolean
+  /** R4b:FTA 页量化结果坞(割集/重要度)是否展开;默认折叠 = 画布为主导。同 seqExpanded 模式。 */
+  ftaResultsExpanded: boolean
   setTab: (t: MainTab) => void
   setFtEditTarget: (t: FtEditTarget) => void
   setSelected: (id: string | null) => void
@@ -29,6 +31,7 @@ export interface ViewState {
   setDrawerOpen: (v: boolean) => void
   setPaletteOpen: (v: boolean) => void
   setSeqExpanded: (v: boolean) => void
+  setFtaResultsExpanded: (v: boolean) => void
 }
 
 const initial = {
@@ -41,6 +44,7 @@ const initial = {
   drawerOpen: false,
   paletteOpen: false,
   seqExpanded: false,
+  ftaResultsExpanded: false,
 }
 
 export const useViewStore = create<ViewState>()(
@@ -56,11 +60,12 @@ export const useViewStore = create<ViewState>()(
       setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
       setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
       setSeqExpanded: (seqExpanded) => set({ seqExpanded }),
+      setFtaResultsExpanded: (ftaResultsExpanded) => set({ ftaResultsExpanded }),
     }),
     {
       name: 'psa.view',
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ tab: s.tab, treeH: s.treeH, seqW: s.seqW, drawerOpen: s.drawerOpen, seqExpanded: s.seqExpanded }),
+      partialize: (s) => ({ tab: s.tab, treeH: s.treeH, seqW: s.seqW, drawerOpen: s.drawerOpen, seqExpanded: s.seqExpanded, ftaResultsExpanded: s.ftaResultsExpanded }),
     },
   ),
 )

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { quantify, importMef } from '../../api'
 import type { QuantifyResult, LibraryData } from '../../api'
@@ -21,7 +21,7 @@ import type { AiDraftState } from '../ai-draft/useAiDraft'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
 import type { ExampleModelState } from './useExampleModel'
 import { AnalysisSettingsPanel } from '../analysis/AnalysisSettingsPanel'
-import { EMPTY_SETTINGS, listHouseEvents, toQuantifyOptions } from '../analysis/analysisSettings'
+import { EMPTY_SETTINGS, listHouseEvents, settingsActive, toQuantifyOptions } from '../analysis/analysisSettings'
 import type { AnalysisSettings } from '../analysis/analysisSettings'
 
 function buildHeat(importance: Record<string, { fv: number }>): Record<string, number> {
@@ -41,6 +41,9 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
   const setHeatOn = useViewStore((s) => s.setHeatOn)
   const ftEditTarget = useViewStore((s) => s.ftEditTarget)
   const setFtEditTarget = useViewStore((s) => s.setFtEditTarget)
+  // R4b:量化结果坞(割集/重要度)展开态,持久于 viewStore——同 R4a EventTreeEditor 的 seqExpanded 模式
+  const ftaResultsExpanded = useViewStore((s) => s.ftaResultsExpanded)
+  const setFtaResultsExpanded = useViewStore((s) => s.setFtaResultsExpanded)
 
   const { examples, current, setCurrent, ftName, setFtName, model, set, reset, undo, redo, canUndo, canRedo } = example
   const [result, setResult] = useState<QuantifyResult | null>(null)
@@ -49,6 +52,9 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
   const [highlight, setHighlight] = useState<Set<string>>(new Set())
   const [ftPos, setFtPos] = useState<Record<string, Record<string, { x: number; y: number }>>>({})
   const [settings, setSettings] = useState<AnalysisSettings>(EMPTY_SETTINGS)
+  // R4b:「⚙ 分析设置」ribbon 弹出面板的展开态——纯展示态,不影响 settings 本身的读写路径
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsPopRef = useRef<HTMLDivElement>(null)
 
   // 示例切换 → 清选中与结果(与旧行为一致)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,6 +63,13 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
   // 切换目标树 → 重置分析设置(house 覆盖/后处理规则按树而异,不跨树携带)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setSettings(EMPTY_SETTINGS) }, [ftEditTarget.src, current])
+  // 弹出面板外点击关闭(与 MenuBar 下拉菜单相同的既有模式)
+  useEffect(() => {
+    if (!settingsOpen) return
+    const onDoc = (e: MouseEvent) => { if (settingsPopRef.current && !settingsPopRef.current.contains(e.target as Node)) setSettingsOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [settingsOpen])
 
   const selectEta = (key: string) => { if (key !== activeKey && etaTabs.some((t) => t.key === key)) P().setActive(key) }
   const onAddFt = () => {
@@ -257,6 +270,19 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
             </label>
           )}
           <div style={{ flex: 1 }} />
+          {/* R4b:AnalysisSettingsPanel 移入 ribbon 弹出面板(原内联右栏位置)——组件/props/handlers 不变,只改召唤方式 */}
+          {cvTreeExists && (
+            <div ref={settingsPopRef} style={{ position: 'relative' }}>
+              <button type="button" onClick={() => setSettingsOpen((v) => !v)} className="psa-btn" title="边界条件(house 覆盖)与割集后处理规则">
+                ⚙ 分析设置{settingsActive(settings) && <span style={settingsDot} />}
+              </button>
+              {settingsOpen && (
+                <div className="exp-popover">
+                  <AnalysisSettingsPanel houses={houses} basicEvents={cvBasics} settings={settings} onChange={setSettings} />
+                </div>
+              )}
+            </div>
+          )}
           <button onClick={cvUndo} disabled={!cvCanUndo} title="撤销" className="psa-btn" style={{ width: 30, padding: 0, justifyContent: 'center' }}><Icon name="undo" size={15} /></button>
           <button onClick={cvRedo} disabled={!cvCanRedo} title="重做" className="psa-btn" style={{ width: 30, padding: 0, justifyContent: 'center' }}><Icon name="redo" size={15} /></button>
           <button onClick={onQuantify} disabled={busy || !cvTreeExists} className="psa-btn psa-btn--dark"><Icon name="bolt" size={14} />{busy ? '计算中…' : '量化'}</button>
@@ -268,60 +294,78 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
           <button onClick={persistence.onSaveWorkspace} disabled={!etModel} className="psa-btn psa-btn--dark" title={persistence.savedId ? '更新当前项目存档（原地保存，含自建 FTA 工作区）' : '保存为新项目存档（含自建 FTA 工作区）'}><Icon name="save" size={14} />保存项目</button>
           <button onClick={persistence.onExportFile} disabled={!etModel} className="psa-btn" title="导出项目为文件（.psaproj.json，离线可用）"><Icon name="download" size={14} />导出文件</button>
         </div>
-        <div style={{ flex: 1, minHeight: 0 }}>
-          {cvTreeExists ? (
-            <FaultTreeCanvas
-              nodes={cvGraph.nodes}
-              edges={cvGraph.edges}
-              editable
-              highlight={highlight}
-              heat={heatOn && result ? buildHeat(result.importance as any) : undefined}
-              onConnectNodes={(s, t) => cvModel && cvSet(connect(cvModel, cvFtName, s, t))}
-              onDeleteNodes={(ids) => {
-                if (!cvModel) return
-                let m = cvModel; for (const id of ids) m = deleteNode(m, cvFtName, id)
-                cvSet(m); setSelected(null)
-              }}
-              onSelect={setSelected}
-              onNodeDragStop={(!ftIsEta && !ftIsStandalone) ? (id, x, y) => setFtPos((m) => ({ ...m, [ftName]: { ...(m[ftName] ?? {}), [id]: { x, y } } })) : undefined}
-            />
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--psa-faint)', fontSize: 13 }}>
-              {ftIsEta ? '该 ETA 尚未挂载故障树' : ftIsStandalone ? '（自建故障树不存在）' : '加载中…'}
+        {/* 画布(psa-panel 卡片,占满剩余空间)+ 量化结果坞(默认折叠 ~96px peek,⌃ 展开;
+            持久于 viewStore.ftaResultsExpanded——同 R4a EventTreeEditor 的 seqExpanded 折叠模式) */}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8, padding: 8 }}>
+          <section className="psa-panel" style={{ flex: '1 1 auto', minHeight: 220 }}>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              {cvTreeExists ? (
+                <FaultTreeCanvas
+                  nodes={cvGraph.nodes}
+                  edges={cvGraph.edges}
+                  editable
+                  zoomToolbar
+                  highlight={highlight}
+                  heat={heatOn && result ? buildHeat(result.importance as any) : undefined}
+                  onConnectNodes={(s, t) => cvModel && cvSet(connect(cvModel, cvFtName, s, t))}
+                  onDeleteNodes={(ids) => {
+                    if (!cvModel) return
+                    let m = cvModel; for (const id of ids) m = deleteNode(m, cvFtName, id)
+                    cvSet(m); setSelected(null)
+                  }}
+                  onSelect={setSelected}
+                  onNodeDragStop={(!ftIsEta && !ftIsStandalone) ? (id, x, y) => setFtPos((m) => ({ ...m, [ftName]: { ...(m[ftName] ?? {}), [id]: { x, y } } })) : undefined}
+                />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--psa-faint)', fontSize: 13 }}>
+                  {ftIsEta ? '该 ETA 尚未挂载故障树' : ftIsStandalone ? '（自建故障树不存在）' : '加载中…'}
+                </div>
+              )}
             </div>
-          )}
+          </section>
+
+          <section className="psa-panel" style={{ flexShrink: 0, ...(ftaResultsExpanded ? { flex: '0 0 340px' } : { flex: '0 0 auto' }) }}>
+            <div className="psa-ch">
+              <span className="t">量化结果{result ? `（割集 ${result.cutsets.length}）` : ''}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="meta">{ftaResultsExpanded ? '顶值 · 割集 · 重要度' : (result ? '展开查看完整割集与重要度' : '点击「量化」运行分析')}</span>
+                <button type="button" onClick={() => setFtaResultsExpanded(!ftaResultsExpanded)} className="exp-collapse-toggle"
+                  title={ftaResultsExpanded ? '收起量化结果' : '展开量化结果(割集/重要度)'}>
+                  <Icon name="chevron-down" size={12} style={{ transform: ftaResultsExpanded ? 'none' : 'rotate(180deg)' }} />
+                  {ftaResultsExpanded ? '收起' : '展开'}
+                </button>
+              </div>
+            </div>
+            {error && <div style={{ margin: 14, padding: 10, background: 'var(--psa-danger-soft)', color: 'var(--psa-danger-strong)', borderRadius: 6, fontSize: 12 }}>量化失败:{error}</div>}
+            <div style={ftaResultsExpanded ? { flex: 1, minHeight: 0, overflowY: 'auto' } : { maxHeight: 96, overflowY: 'auto' }}>
+              <ResultsPanel result={result} onCutsetClick={onCutsetClick} />
+            </div>
+          </section>
         </div>
       </div>
 
-      {/* 右侧属性/结果面板 */}
-      <div style={{ width: 'var(--psa-inspector-w)', borderLeft: '1px solid var(--psa-line)', background: 'var(--psa-surface)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ borderBottom: '1px solid var(--psa-line)' }}>
-          <div className="psa-ch"><span className="t">属性</span></div>
-          {cvModel && (
-            <Inspector
-              model={cvModel} ftName={cvFtName} selected={selected}
-              onUpdateNode={(id, patch) => cvSet(updateNode(cvModel, cvFtName, id, patch))}
-              onUpdateParam={(id, v) => cvSet(updateParam(cvModel, id, v))}
-              onSetTop={(id) => cvSet(setTop(cvModel, cvFtName, id))}
-              onDelete={(id) => { cvSet(deleteNode(cvModel, cvFtName, id)); setSelected(null) }}
-              onRenameNode={(o, n) => { if (cvModel) { cvSet(renameNode(cvModel, cvFtName, o, n)); setSelected(n) } }}
-            />
-          )}
-        </div>
-        {cvTreeExists && (
-          <AnalysisSettingsPanel houses={houses} basicEvents={cvBasics} settings={settings} onChange={setSettings} />
+      {/* 右侧检视器(R4b:290px 定宽,复用 --exp-eta-inspector-w——分析设置已移入 ribbon 弹出面板,
+          量化结果已移入底部坞,此栏现在只放节点属性) */}
+      <div style={{ width: 'var(--exp-eta-inspector-w)', flexShrink: 0, borderLeft: '1px solid var(--psa-line)', background: 'var(--psa-surface)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <div className="psa-ch"><span className="t">属性</span></div>
+        {cvModel && (
+          <Inspector
+            model={cvModel} ftName={cvFtName} selected={selected}
+            onUpdateNode={(id, patch) => cvSet(updateNode(cvModel, cvFtName, id, patch))}
+            onUpdateParam={(id, v) => cvSet(updateParam(cvModel, id, v))}
+            onSetTop={(id) => cvSet(setTop(cvModel, cvFtName, id))}
+            onDelete={(id) => { cvSet(deleteNode(cvModel, cvFtName, id)); setSelected(null) }}
+            onRenameNode={(o, n) => { if (cvModel) { cvSet(renameNode(cvModel, cvFtName, o, n)); setSelected(n) } }}
+          />
         )}
-        <div>
-          <div className="psa-ch"><span className="t">量化结果</span></div>
-          {error && <div style={{ margin: 14, padding: 10, background: 'var(--psa-danger-soft)', color: 'var(--psa-danger-strong)', borderRadius: 6, fontSize: 12 }}>量化失败:{error}</div>}
-          <ResultsPanel result={result} onCutsetClick={onCutsetClick} />
-        </div>
       </div>
     </div>
   )
 }
 
-const toolbar: CSSProperties = { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 10, rowGap: 8, padding: '8px 14px', borderBottom: '1px solid var(--psa-line)', background: 'var(--psa-surface)' }
+// R4b:borderBottom 对齐 R4a 的 etaToolbar(--psa-line-2);background 已是 --psa-surface,无需改(FTA 本就是白底 ribbon)
+const toolbar: CSSProperties = { display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 10, rowGap: 8, padding: '8px 14px', borderBottom: '1px solid var(--psa-line-2)', background: 'var(--psa-surface)' }
+const settingsDot: CSSProperties = { display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--psa-primary)', marginLeft: 6, verticalAlign: 'middle' }
 const ftSidebar: CSSProperties = { width: 192, flexShrink: 0, borderRight: '1px solid var(--psa-line)', background: 'var(--psa-soft)', overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 12 }
 const ftSidebarGroup: CSSProperties = { padding: '8px 10px 4px', fontSize: 10.5, fontWeight: 700, color: 'var(--psa-muted)', textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: '1px solid var(--psa-line)', background: 'var(--psa-soft)' }
 const ftSidebarSubhead: CSSProperties = { padding: '6px 10px 3px', fontSize: 11.5, fontWeight: 700, color: 'var(--psa-ink-2)', background: 'var(--psa-primary-soft)', borderBottom: '1px solid var(--psa-line)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
