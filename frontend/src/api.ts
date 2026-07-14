@@ -245,6 +245,14 @@ export interface ProjectInfo { uuid: string; name: string; created_at: string; m
 export interface VersionInfo { id: number; content_hash: string; parent_version_id: number | null; created_at: string; actor: string; origin: 'save' | 'auto_pin' | 'import'; message: string | null }
 export interface CaseInfo { id: number; version_id: number; kind: string; engine_version: string; created_at: string; settings_json?: string; results_json?: string; artifacts_json?: string }
 export const listProjects = () => jget<ProjectInfo[]>('/projects')
+
+// ── R5 组合总览:每项目一行,数字取自已钉扎案例(绝不现算)。risk.* 的频带/评级
+//    与报告矩阵同源(后端 report_export.risk_placement),前端不重复阈值。──
+export type ReviewState = 'in_review' | 'signed' | 'returned'
+export interface PortfolioRiskCell { severity: string; freq: number; freq_band: number; level: 'low' | 'medium' | 'high' | 'extreme' }
+export interface PortfolioCase { id: number; kind: string; consequences: Record<string, number>; version_hash: string; created_at: string; risk: { cells: PortfolioRiskCell[]; worst: PortfolioRiskCell | null } }
+export interface PortfolioRow { uuid: string; name: string; versions: number; latest_hash: string | null; review_state: ReviewState | null; latest_case: PortfolioCase | null; saved_id: string | null }
+export const getPortfolio = () => jget<PortfolioRow[]>('/portfolio')
 export const listProjectVersions = (uuid: string) => jget<VersionInfo[]>(`/projects/${uuid}/versions`)
 export const listProjectCases = (uuid: string) => jget<CaseInfo[]>(`/projects/${uuid}/cases`)
 export interface DiffChange { op: 'added' | 'removed' | 'changed'; path: string; from?: unknown; to?: unknown }

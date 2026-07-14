@@ -133,7 +133,7 @@ function AppShell() {
         {tab === 'home' ? (
           <ProjectCockpit summaries={summaries} aggregateTotals={aggregateTotals} scenarios={scenarios} persistence={persistence} onOpenScenario={openScenario} />
         ) : tab === 'portfolio' ? (
-          <PortfolioTab persistence={persistence} />
+          <PortfolioTab persistence={persistence} setTab={setTab} />
         ) : tab === 'ft' ? (
           <FtaWorkbench lib={lib} ai={ai} persistence={persistence} example={example} />
         ) : tab === 'params' ? (
