@@ -10,6 +10,7 @@ import { clearSessionDraft, peekSessionDraft, stageSessionDraft } from './sessio
 import type { SessionDraftMeta } from './sessionDraft'
 import { composeEta } from '../../stores/derived'
 import { etaDisplayName, useActiveEta } from '../../stores/useActiveEta'
+import { useProjectStore } from '../../stores/projectStore'
 import { loadRows, saveRows } from '../../fmeaStore'
 import { loadMapping, saveMapping } from '../../mappingStore'
 import type { FmeaRow, MappingConfig } from '../../fmea'
@@ -22,29 +23,38 @@ import type { FmeaRow, MappingConfig } from '../../fmea'
 export function useProjectPersistence(onError: (msg: string) => void, onLibraryOverlayMerged: () => void) {
   const { etaTabs, userFtsModel, activeKey, checkedKeys, etaPfds, etModel, P } = useActiveEta()
   const [saved, setSaved] = useState<SavedItem[]>([])
-  const [savedId, setSavedId] = useState('')
+  // R2:项目身份(savedId/projectUuid/lastVersionHash)随槽存于 projectStore ——
+  // 切换项目时身份跟着槽走(乐观并发基线绝不能串项目)。hook 返回面保持不变。
+  const savedId = useProjectStore((s) => s.identity.savedId)
+  const projectUuid = useProjectStore((s) => s.identity.projectUuid)
+  const lastVersionHash = useProjectStore((s) => s.identity.lastVersionHash)
+  const setIdentity = useProjectStore((s) => s.setIdentity)
   const [archiveLocal, setArchiveLocal] = useState(false)
-  const [projectUuid, setProjectUuid] = useState('')
   const [loading, setLoading] = useState(false)      // 读档进行中(下拉禁用,防止值回弹误导)
-  // D-P5-4 乐观并发:当前已知的服务器版本哈希(保存/读档时更新),下次保存原样带回。
-  const [lastVersionHash, setLastVersionHash] = useState<string | undefined>(undefined)
+  const [pendingId, setPendingId] = useState('')     // 读档期间受控下拉的乐观显示值
   const [conflict, setConflict] = useState<{ serverHash: string; baseHash: string; name: string; payload: ProjectPayload } | null>(null)
   // 会话过期(local 模式,401)暂存的草稿元信息;内容留在 localStorage,这里只镜像name/时间供 UI 显示。
   const [sessionDraft, setSessionDraft] = useState<SessionDraftMeta | null>(() => {
     const d = peekSessionDraft()
     return d ? { name: d.name, at: d.at } : null
   })
-  const [fmeaRows, setFmeaRows] = useState<FmeaRow[]>(() => loadRows())
-  const [fmeaMapping, setFmeaMapping] = useState<MappingConfig>(() => loadMapping())
+  // R2:FMEA 随槽(结构性隔离);启动草稿槽一次性从 localStorage 续接(与旧初始行为一致)
+  const fmeaRows = useProjectStore((s) => s.fmeaRows)
+  const fmeaMapping = useProjectStore((s) => s.fmeaMapping)
+  useEffect(() => {
+    const st = useProjectStore.getState()
+    if (st.identity.savedId === '' && st.fmeaRows.length === 0) st.setFmea(loadRows(), loadMapping())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => { listSaved().then((s) => { setSaved(s); setArchiveLocal(wasSavedOffline()) }).catch(() => {}) }, [])
 
   const persistFmeaRows = (next: FmeaRow[]) => {
-    setFmeaRows(next)
+    P().setFmea(next, undefined)
     try { saveRows(next) } catch (e: any) { onError(String(e?.message ?? e)) }
   }
   const persistFmeaMapping = (next: MappingConfig) => {
-    setFmeaMapping(next)
+    P().setFmea(undefined, next)
     try { saveMapping(next) } catch (e: any) { onError(String(e?.message ?? e)) }
   }
   const buildPayload = (): ProjectPayload =>
@@ -57,8 +67,10 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   const refreshList = async () => { setSaved(await listSaved()); setArchiveLocal(wasSavedOffline()) }
   const captureUuid = (rec: unknown) => {
     const v = (rec as { version?: { project_uuid?: string; content_hash?: string } })?.version
-    if (v?.project_uuid) setProjectUuid(v.project_uuid)
-    if (v?.content_hash) setLastVersionHash(v.content_hash)
+    setIdentity({
+      ...(v?.project_uuid ? { projectUuid: v.project_uuid } : {}),
+      ...(v?.content_hash ? { lastVersionHash: v.content_hash } : {}),
+    })
   }
 
   // 保存项目:已载入存档(savedId 命中)→ 原地更新(沿用原名, 不再追问);否则新建并记住其 id。
@@ -84,7 +96,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
         captureUuid(await saveWorkspace(name, payload, savedId, lastVersionHash))
       } else {
         const rec = await saveWorkspace(name, payload)
-        setSavedId(rec.id)
+        setIdentity({ savedId: rec.id, displayName: name })
         captureUuid(rec)
       }
       await refreshList()
@@ -114,7 +126,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     const payload = buildPayload()
     try {
       const rec = await saveWorkspace(name, payload)
-      setSavedId(rec.id)
+      setIdentity({ savedId: rec.id, displayName: name })
       captureUuid(rec)
       await refreshList()
     } catch (e) {
@@ -143,7 +155,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     setConflict(null)
     if (!name) return
     const rec = await saveWorkspace(name, conflict.payload)
-    setSavedId(rec.id)
+    setIdentity({ savedId: rec.id, displayName: name })
     captureUuid(rec)
     await refreshList()
   }
@@ -157,7 +169,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     const tabs = projectToTabs(proj)
     const restoredActiveKey = tabs.some((t) => t.key === proj.activeKey) ? proj.activeKey : (tabs[0]?.key ?? '')
     if (!tabs.length) { onError('暂存草稿不含任何 ETA,已丢弃。'); clearSessionDraft(); setSessionDraft(null); return }
-    setSavedId(d.savedId)
+    setIdentity({ savedId: d.savedId })
     P().load(tabs, restoredActiveKey, proj.checkedKeys, proj.userFts ?? EMPTY_FTS)
     applyProjectFmea(proj)
     clearSessionDraft()
@@ -165,27 +177,31 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   }
   const discardSessionDraft = () => { clearSessionDraft(); setSessionDraft(null) }
 
-  // 读取项目存档:完整还原全部 ETA(替换当前所有页签)。兼容旧版单 ETA 存档。
-  // savedId 乐观置位:受控下拉在 await 期间不回弹到「—」;失败则回退并亮错。
+  // 读取项目存档(R2):已打开(活动/停放)→ 仅聚焦切换,绝不重载(保护未保存编辑);
+  // 未打开 → fetch 后作为新槽打开(停放当前项目)。pendingId 保证受控下拉在 await 期间不回弹。
   const loadProject = async (id: string) => {
-    const prevId = savedId
-    setSavedId(id)
+    const st = useProjectStore.getState()
+    const isOpen = st.identity.savedId === id || Object.values(st.parked).some((sl) => sl.identity.savedId === id)
+    if (isOpen) {
+      st.openProject(id, { etas: [], activeKey: '', checkedKeys: {}, identity: { savedId: id, projectUuid: '', displayName: '' } })
+      return
+    }
+    setPendingId(id)
     setLoading(true)
     try {
       const proj = await loadProjectArchive(id); setArchiveLocal(wasSavedOffline())
       if (!proj.tabs.length) {
-        setSavedId(prevId)
         onError('该存档不含任何 ETA,未载入。')
         return
       }
-      setProjectUuid(proj.projectUuid ?? '')
-      setLastVersionHash(proj.versionHash)
-      P().load(proj.tabs, proj.activeKey, proj.checkedKeys, proj.userFts ?? EMPTY_FTS)
-      applyProjectFmea(proj)
+      useProjectStore.getState().openProject(id, {
+        etas: proj.tabs, activeKey: proj.activeKey, checkedKeys: proj.checkedKeys, userFts: proj.userFts ?? EMPTY_FTS,
+        identity: { savedId: id, projectUuid: proj.projectUuid ?? '', lastVersionHash: proj.versionHash, displayName: proj.name },
+        fmeaRows: proj.fmeaRows, fmeaMapping: proj.fmeaMapping,
+      })
     } catch (e: any) {
-      setSavedId(prevId)
       onError(`读取存档失败:${String(e?.message ?? e)}`)
-    } finally { setLoading(false) }
+    } finally { setLoading(false); setPendingId('') }
   }
   // 导出项目为文件(含参考库覆盖层, 离线可用)
   const onExportFile = () => {
@@ -200,7 +216,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
       const proj = importProjectText(await file.text(), file.name.replace(/\.[^.]+$/, ''))
       if (!proj.tabs.length) return
       if (proj.libraryOverlay) { mergeOverlay(proj.libraryOverlay as any); onLibraryOverlayMerged() }
-      setSavedId(''); setProjectUuid('')
+      setIdentity({ savedId: '', projectUuid: '', lastVersionHash: undefined })
       P().load(proj.tabs, proj.activeKey, proj.checkedKeys, proj.userFts ?? EMPTY_FTS)
       applyProjectFmea(proj)
     } catch (e: any) { onError(String(e?.message ?? e)) }
@@ -209,11 +225,11 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     if (!savedId) return
     const name = saved.find((s) => s.id === savedId)?.name ?? savedId
     if (!window.confirm(`删除项目存档「${name}」?存档删除不可撤销(版本库中的历史版本仍保留)。`)) return
-    await deleteSaved(savedId); setSavedId(''); setProjectUuid(''); setLastVersionHash(undefined); await refreshList()
+    await deleteSaved(savedId); setIdentity({ savedId: '', projectUuid: '', lastVersionHash: undefined }); await refreshList()
   }
 
   return {
-    saved, savedId, archiveLocal, projectUuid, loading, conflict, sessionDraft,
+    saved, savedId: pendingId || savedId, archiveLocal, projectUuid, loading, conflict, sessionDraft,
     fmeaRows, fmeaMapping, persistFmeaRows, persistFmeaMapping,
     buildPayload, onSaveWorkspace, onSaveAs, loadProject, onExportFile, onImportFile, onDeleteSaved,
     resolveConflictOverwrite, resolveConflictSaveAsCopy, dismissConflict,

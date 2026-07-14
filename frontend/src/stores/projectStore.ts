@@ -4,6 +4,8 @@ import { setLinkFt } from '../eventtree'
 import { attachStarterFt } from '../model'
 import type { ModelJson } from '../model'
 import type { ProjectEta } from '../project'
+import type { FmeaRow, MappingConfig } from '../fmea'
+import { DEFAULT_MAPPING } from '../fmea'
 
 export const EMPTY_FTS: ModelJson = { model_data: { parameters: [] }, fault_trees: [] }
 
@@ -18,6 +20,39 @@ export interface ProjectDoc {
 type Updater<T> = T | ((prev: T) => T)
 const apply = <T,>(u: Updater<T>, prev: T): T => (typeof u === 'function' ? (u as (p: T) => T)(prev) : u)
 
+// ── R2 多项目(规格 2026-07-13-explorer-redesign §1,方案 C)──
+// 顶层字段(past/present/future/activeKey/checkedKeys/pfds)**就是**活动项目;
+// 非活动项目"停放"在 parked 注册表。任一时刻每个项目的文档只存在于一处 ——
+// 切换 = park(顶层→注册表) + unpark(注册表→顶层),undo 历史/pfds/身份随槽整体迁移,
+// 隔离是结构给的(跨项目串染对监管工具是溯源违规级缺陷)。
+
+export interface ProjectIdentity {
+  savedId: string           // '' = 未存档
+  projectUuid: string       // '' = 未绑定版本库
+  lastVersionHash?: string  // D-P5-4 乐观并发基线(随项目切换)
+  displayName: string
+}
+
+interface ParkedSlot {
+  past: ProjectDoc[]
+  present: ProjectDoc
+  future: ProjectDoc[]
+  activeKey: string
+  checkedKeys: Record<string, boolean>
+  pfds: Record<string, Record<string, number>>
+  identity: ProjectIdentity
+  // FMEA 属项目内容(随 payload 走);并入槽以获得结构性隔离(修复既有 hook 级全局串染)
+  fmeaRows: FmeaRow[]
+  fmeaMapping: MappingConfig
+}
+
+const freshMapping = (): MappingConfig => JSON.parse(JSON.stringify(DEFAULT_MAPPING))
+
+export const EMPTY_IDENTITY: ProjectIdentity = { savedId: '', projectUuid: '', displayName: '未命名项目' }
+
+let _draftSeq = 1
+const nextDraftId = () => `draft:${_draftSeq++}`
+
 export interface ProjectStore {
   past: ProjectDoc[]
   present: ProjectDoc
@@ -26,6 +61,23 @@ export interface ProjectStore {
   checkedKeys: Record<string, boolean>
   /** 派生量缓存(各 ETA 的 PFD/顶值),在撤销历史之外:undo/redo 永不回滚派生值。 */
   pfds: Record<string, Record<string, number>>
+
+  /** R2:活动项目身份 + 槽注册表。 */
+  identity: ProjectIdentity
+  workspaceId: string
+  parked: Record<string, ParkedSlot>
+  openOrder: string[]
+  fmeaRows: FmeaRow[]
+  fmeaMapping: MappingConfig
+
+  setIdentity: (patch: Partial<ProjectIdentity>) => void
+  /** FMEA 行/映射更新(活动槽;不进 undo 历史——与今天的 hook 行为一致)。 */
+  setFmea: (rows?: FmeaRow[], mapping?: MappingConfig) => void
+  /** 打开项目:目标(按 wid 或 identity.savedId)已在打开集 → 仅聚焦(绝不重载,
+   *  保护未保存编辑);否则停放当前、载入新槽。 */
+  openProject: (wid: string, init: { etas: ProjectEta[]; activeKey: string; checkedKeys: Record<string, boolean>; userFts?: ModelJson; identity: ProjectIdentity; fmeaRows?: FmeaRow[]; fmeaMapping?: MappingConfig }) => void
+  switchProject: (wid: string) => void
+  closeProject: (wid: string) => void
 
   /** 整体载入(读档/导入/初始场景):替换内容并清空历史。 */
   load: (etas: ProjectEta[], activeKey: string, checkedKeys: Record<string, boolean>, userFts?: ModelJson) => void
@@ -60,9 +112,24 @@ function mapEta(doc: ProjectDoc, key: string, f: (e: ProjectEta) => ProjectEta):
 const pfdsOf = (etas: ProjectEta[]): Record<string, Record<string, number>> =>
   Object.fromEntries(etas.map((e) => [e.key, { ...(e.pfds ?? {}) }]))
 
+/** 把顶层(活动槽)打包为停放槽。 */
+const packActive = (s: ProjectStore): ParkedSlot => ({
+  past: s.past, present: s.present, future: s.future,
+  activeKey: s.activeKey, checkedKeys: s.checkedKeys, pfds: s.pfds, identity: s.identity,
+  fmeaRows: s.fmeaRows, fmeaMapping: s.fmeaMapping,
+})
+
+/** 把停放槽展开为顶层字段。 */
+const unpackSlot = (slot: ParkedSlot) => ({
+  past: slot.past, present: slot.present, future: slot.future,
+  activeKey: slot.activeKey, checkedKeys: slot.checkedKeys, pfds: slot.pfds, identity: slot.identity,
+  fmeaRows: slot.fmeaRows, fmeaMapping: slot.fmeaMapping,
+})
+
 export const useProjectStore = create<ProjectStore>()((set) => {
   const push = (f: (doc: ProjectDoc) => ProjectDoc) =>
     set((s) => ({ past: [...s.past, s.present], present: f(s.present), future: [] }))
+  const firstWid = nextDraftId()
 
   return {
     past: [],
@@ -71,6 +138,85 @@ export const useProjectStore = create<ProjectStore>()((set) => {
     activeKey: '',
     checkedKeys: {},
     pfds: {},
+
+    identity: EMPTY_IDENTITY,
+    workspaceId: firstWid,
+    parked: {},
+    openOrder: [firstWid],
+    fmeaRows: [],
+    fmeaMapping: freshMapping(),
+
+    setIdentity: (patch) => set((s) => ({ identity: { ...s.identity, ...patch } })),
+    setFmea: (rows, mapping) => set((s) => ({
+      ...(rows !== undefined ? { fmeaRows: rows } : {}),
+      ...(mapping !== undefined ? { fmeaMapping: mapping } : {}),
+    })),
+
+    openProject: (wid, init) =>
+      set((s) => {
+        // 去重:wid 或 savedId 命中打开集(含活动)→ 仅聚焦
+        const hitActive = s.workspaceId === wid ||
+          (init.identity.savedId !== '' && s.identity.savedId === init.identity.savedId)
+        if (hitActive) return s
+        const hitParked = Object.entries(s.parked).find(([w, slot]) =>
+          w === wid || (init.identity.savedId !== '' && slot.identity.savedId === init.identity.savedId))
+        if (hitParked) {
+          const [targetWid, slot] = hitParked
+          const parked = { ...s.parked, [s.workspaceId]: packActive(s) }
+          delete parked[targetWid]
+          return { ...unpackSlot(slot), workspaceId: targetWid, parked }
+        }
+        const parked = { ...s.parked, [s.workspaceId]: packActive(s) }
+        return {
+          past: [], future: [],
+          present: { etas: init.etas, userFts: init.userFts ?? EMPTY_FTS },
+          activeKey: init.activeKey, checkedKeys: init.checkedKeys,
+          pfds: pfdsOf(init.etas),
+          identity: init.identity,
+          // 新槽的 FMEA 来自档案载荷;缺省 = 干净项目([] + 默认映射),绝不从 localStorage 渗入
+          fmeaRows: init.fmeaRows ?? [],
+          fmeaMapping: init.fmeaMapping ?? freshMapping(),
+          workspaceId: wid, parked,
+          openOrder: [...s.openOrder.filter((w) => w !== s.workspaceId), s.workspaceId, wid]
+            .filter((w, i, a) => a.indexOf(w) === i),
+        }
+      }),
+
+    switchProject: (wid) =>
+      set((s) => {
+        if (wid === s.workspaceId) return s
+        const slot = s.parked[wid]
+        if (!slot) return s
+        const parked = { ...s.parked, [s.workspaceId]: packActive(s) }
+        delete parked[wid]
+        return { ...unpackSlot(slot), workspaceId: wid, parked }
+      }),
+
+    closeProject: (wid) =>
+      set((s) => {
+        if (wid !== s.workspaceId) {
+          if (!s.parked[wid]) return s
+          const parked = { ...s.parked }
+          delete parked[wid]
+          return { parked, openOrder: s.openOrder.filter((w) => w !== wid) }
+        }
+        // 关活动槽:切到打开顺序里的下一个;一个不剩 → 重置为新草稿
+        const rest = s.openOrder.filter((w) => w !== wid && s.parked[w])
+        if (rest.length) {
+          const nextWid = rest[rest.length - 1]
+          const slot = s.parked[nextWid]
+          const parked = { ...s.parked }
+          delete parked[nextWid]
+          return { ...unpackSlot(slot), workspaceId: nextWid, parked,
+                   openOrder: s.openOrder.filter((w) => w !== wid) }
+        }
+        const freshWid = nextDraftId()
+        return {
+          past: [], present: initialDoc, future: [], activeKey: '', checkedKeys: {}, pfds: {},
+          identity: EMPTY_IDENTITY, workspaceId: freshWid, parked: {}, openOrder: [freshWid],
+          fmeaRows: [], fmeaMapping: freshMapping(),
+        }
+      }),
 
     load: (etas, activeKey, checkedKeys, userFts) =>
       set({ past: [], future: [], present: { etas, userFts: userFts ?? EMPTY_FTS }, activeKey, checkedKeys, pfds: pfdsOf(etas) }),
@@ -157,10 +303,24 @@ export const useProjectStore = create<ProjectStore>()((set) => {
   }
 })
 
-/** 测试用:回到空项目。 */
+/** 测试用:回到空项目(单一新草稿槽,注册表清空,草稿序号复位保证确定性)。 */
 export function resetProjectStore() {
-  useProjectStore.setState({ past: [], present: initialDoc, future: [], activeKey: '', checkedKeys: {}, pfds: {} })
+  _draftSeq = 1
+  const wid = nextDraftId()
+  useProjectStore.setState({
+    past: [], present: initialDoc, future: [], activeKey: '', checkedKeys: {}, pfds: {},
+    identity: EMPTY_IDENTITY, workspaceId: wid, parked: {}, openOrder: [wid],
+    fmeaRows: [], fmeaMapping: freshMapping(),
+  })
 }
+
+/** 打开集(树消费):按打开顺序,含活动标记与身份。 */
+export const selectOpenProjects = (s: ProjectStore): { workspaceId: string; identity: ProjectIdentity; isActive: boolean }[] =>
+  s.openOrder
+    .map((w) => w === s.workspaceId
+      ? { workspaceId: w, identity: s.identity, isActive: true }
+      : s.parked[w] ? { workspaceId: w, identity: s.parked[w].identity, isActive: false } : null)
+    .filter((x): x is { workspaceId: string; identity: ProjectIdentity; isActive: boolean } => x !== null)
 
 /** 便捷选择器:活动 ETA(不存在时 null)。 */
 export const selectActiveEta = (s: ProjectStore): ProjectEta | null =>
