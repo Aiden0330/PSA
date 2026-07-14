@@ -18,6 +18,8 @@ export interface ViewState {
   seqW: number | null
   drawerOpen: boolean
   paletteOpen: boolean
+  /** R4a:ETA 页事故序列坞是否展开(含风险矩阵/ETA 清单);默认折叠 = 画布为主导。 */
+  seqExpanded: boolean
   setTab: (t: MainTab) => void
   setFtEditTarget: (t: FtEditTarget) => void
   setSelected: (id: string | null) => void
@@ -26,6 +28,7 @@ export interface ViewState {
   setSeqW: (w: number | null) => void
   setDrawerOpen: (v: boolean) => void
   setPaletteOpen: (v: boolean) => void
+  setSeqExpanded: (v: boolean) => void
 }
 
 const initial = {
@@ -37,6 +40,7 @@ const initial = {
   seqW: null,
   drawerOpen: false,
   paletteOpen: false,
+  seqExpanded: false,
 }
 
 export const useViewStore = create<ViewState>()(
@@ -51,11 +55,12 @@ export const useViewStore = create<ViewState>()(
       setSeqW: (seqW) => set({ seqW }),
       setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
       setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+      setSeqExpanded: (seqExpanded) => set({ seqExpanded }),
     }),
     {
       name: 'psa.view',
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ tab: s.tab, treeH: s.treeH, seqW: s.seqW, drawerOpen: s.drawerOpen }),
+      partialize: (s) => ({ tab: s.tab, treeH: s.treeH, seqW: s.seqW, drawerOpen: s.drawerOpen, seqExpanded: s.seqExpanded }),
     },
   ),
 )

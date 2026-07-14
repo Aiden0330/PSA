@@ -70,7 +70,7 @@ export function EtInspector(
   const sevIdx = (c?: string) => CONSEQUENCES.indexOf(consLevel(model, c ?? 'C1'))
 
   return (
-    <aside style={{ width: 'var(--psa-inspector-w)', flexShrink: 0, alignSelf: 'stretch', background: 'var(--psa-surface)', border: '1px solid var(--psa-line-2)', borderRadius: 9, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 1px 2px rgba(15,25,40,.04)' }}>
+    <aside style={{ width: 'var(--exp-eta-inspector-w)', flexShrink: 0, alignSelf: 'stretch', background: 'var(--psa-surface)', border: '1px solid var(--psa-line-2)', borderRadius: 9, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 1px 2px rgba(15,25,40,.04)' }}>
       <div style={{ flexShrink: 0, padding: 14, borderBottom: '1px solid var(--psa-line)', background: 'var(--psa-soft-2)' }}>
         <button onClick={onEngineQuantify} disabled={qBusy} className="psa-btn psa-btn--primary" style={{ width: '100%', justifyContent: 'center' }}>
           <Icon name="bolt" size={14} />{qBusy ? '引擎计算中…' : '引擎精确量化（当前 ETA）'}

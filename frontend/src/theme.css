@@ -188,3 +188,19 @@
 .exp-status { display:flex; gap:16px; align-items:center; padding:4px 12px; background:#fff;
   border-top:1px solid var(--exp-line); font-size:11px; color:var(--exp-muted); flex-shrink:0; }
 .exp-status .num { color:var(--exp-ink2); font-family:var(--psa-font-mono); font-variant-numeric:tabular-nums; }
+
+/* ── R4a ETA 画布迁移:悬浮缩放工具条 + 底栏折叠切换(页面级新增类,配色沿用既有 --psa-* 令牌——
+   本页内容区尚未整体换皮,详见 docs/superpowers/specs/2026-07-13-explorer-redesign.md §3) ── */
+.exp-zoom { position:absolute; right:10px; top:8px; display:flex; gap:4px; background:var(--psa-surface);
+  border:1px solid var(--psa-line-2); border-radius:8px; padding:3px; box-shadow:var(--psa-shadow-pop); z-index:2; }
+.exp-zoom button { width:26px; height:22px; display:flex; align-items:center; justify-content:center; border:0;
+  background:none; border-radius:5px; font-size:13px; line-height:1; color:var(--psa-ink-2); cursor:pointer; padding:0; }
+.exp-zoom button:hover { background:var(--psa-soft); }
+.exp-zoom .pct { width:auto; padding:0 7px; display:flex; align-items:center; font-size:10.5px; color:var(--psa-faint); }
+
+.exp-collapse-toggle { display:inline-flex; align-items:center; gap:4px; border:1px solid var(--psa-line-strong);
+  background:var(--psa-surface); border-radius:6px; padding:2px 8px; font-size:11px; color:var(--psa-ink-2); cursor:pointer; }
+.exp-collapse-toggle:hover { background:var(--psa-soft); }
+
+/* ETA 检视器定宽(mockup:290px,flex-shrink 0)——独立于 --psa-inspector-w(FTA 仍用后者的 clamp 宽度) */
+:root { --exp-eta-inspector-w: 290px; }

@@ -17,6 +17,8 @@ import { EtInspector } from './eta/EtInspector'
 import { EtKpiStrip } from './eta/EtKpiStrip'
 import { EtaSummaryList } from './eta/EtaSummaryList'
 import type { SeqRow } from './eta/types'
+import { ETA_CANVAS_CONTENT_ATTR } from './eta/types'
+import { Icon } from './icons'
 
 // 懒加载:reactflow 只随故障树画布进入,ETA 关键路径不解析它(性能报障修复 2026-07-09)
 const BarrierFtModal = lazy(() => import('./BarrierFtModal').then((m) => ({ default: m.BarrierFtModal })))
@@ -24,6 +26,19 @@ const BarrierFtModal = lazy(() => import('./BarrierFtModal').then((m) => ({ defa
 interface Linked { fault_trees: any[]; parameters: any[]; ccf_groups?: any[] }
 interface Api { set: (m: any) => void; undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean }
 export interface EtaSummary { key: string; name: string; leafCount: number; worstC: string; worstFreq: number; active: boolean; checked: boolean }
+
+/**
+ * 导出前重置画布缩放/平移(R4a):EtCanvas 把 pan/zoom 变换放在内容 <g data-eta-canvas-content>
+ * 上,外层 <svg ref={svgRef}> 本身的像素宽高从未被缩放/平移影响(参见 EtCanvas 顶部注释)——
+ * 但克隆前该 <g> 上仍带着"当前正在看"的 transform,若原样导出,PNG/SVG 会是缩放/平移后的裁剪画面,
+ * 而不是缩放功能加入前那样的完整原图。这里克隆一份并把该 <g> 的 transform 属性清空,
+ * 保证导出结果与用户当前的缩放/平移状态无关、与加缩放前的行为逐位一致。
+ */
+function prepareCanvasForExport(svg: SVGSVGElement): SVGSVGElement {
+  const clone = svg.cloneNode(true) as SVGSVGElement
+  clone.querySelector(`[${ETA_CANVAS_CONTENT_ATTR}]`)?.removeAttribute('transform')
+  return clone
+}
 
 /**
  * ETA 工作台容器(§三拆分后):选中态/量化与导出副作用/序列行计算在此,
@@ -62,6 +77,9 @@ export function EventTreeEditor(
   const bottomRef = useRef<HTMLDivElement>(null)
   const treeH = useViewStore((s) => s.treeH)
   const setTreeH = useViewStore((s) => s.setTreeH)
+  // R4a:画布为主导——事故序列/风险矩阵/ETA 清单默认折叠到底部窄条(展开态与折叠前逐位一致)
+  const seqExpanded = useViewStore((s) => s.seqExpanded)
+  const setSeqExpanded = useViewStore((s) => s.setSeqExpanded)
   const onSplitDrag = (e: ReactPointerEvent) => {
     const tree = treeRef.current, bottom = bottomRef.current
     if (!tree || !bottom) return
@@ -138,7 +156,7 @@ export function EventTreeEditor(
     try {
       const req = toEngineRequest(model, linked)
       let png: string | undefined
-      if (fmt !== 'csv' && svgRef.current) png = await svgToPng(svgRef.current)
+      if (fmt !== 'csv' && svgRef.current) png = await svgToPng(prepareCanvasForExport(svgRef.current))
       await exportReport(fmt, {
         ...req, samples: 1000,
         consequence_defs: Object.fromEntries(CONSEQUENCES.map((c) => [c, consDef(model, c)])),
@@ -150,9 +168,10 @@ export function EventTreeEditor(
   }
   const onExportImage = async (fmt: 'png' | 'svg') => {
     if (!svgRef.current) return
+    const prepared = prepareCanvasForExport(svgRef.current)   // 缩放/平移不应改变导出结果(见函数注释)
     let url: string
-    if (fmt === 'png') url = await svgToPng(svgRef.current)
-    else url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svgRef.current)], { type: 'image/svg+xml' }))
+    if (fmt === 'png') url = await svgToPng(prepared)
+    else url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(prepared)], { type: 'image/svg+xml' }))
     const a = document.createElement('a'); a.href = url; a.download = `event_tree.${fmt}`
     document.body.appendChild(a); a.click(); a.remove()
     if (fmt === 'svg') setTimeout(() => URL.revokeObjectURL(url), 1000)
@@ -209,8 +228,8 @@ export function EventTreeEditor(
 
         <EtKpiStrip kpis={kpis} />
 
-        {/* ---- TREE PANEL: 树 + 末态表并排（画布最大、可横向滑窗）---- */}
-        <section ref={treeRef} className="psa-panel" style={{ flex: treeH == null ? '4.5 1 0' : `0 0 ${treeH}px`, minHeight: 180 }}>
+        {/* ---- TREE PANEL: 画布为主导(R4a)——序列坞折叠时占满剩余空间;展开时保持原可拖拽比例 ---- */}
+        <section ref={treeRef} className="psa-panel" style={{ flex: seqExpanded ? (treeH == null ? '4.5 1 0' : `0 0 ${treeH}px`) : '1 1 auto', minHeight: 180 }}>
           <div className="psa-ch">
             <span className="t">事件树 · 纵深防御序列</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -224,34 +243,56 @@ export function EventTreeEditor(
           </div>
         </section>
 
-        {/* ---- 竖向分隔条:拖拽改画布/底栏高度(双击复位)---- */}
-        <div className="psa-vsplit" onPointerDown={onSplitDrag} onDoubleClick={() => setTreeH(null)} title="拖拽调整画布高度 · 双击复位"><i /></div>
+        {/* ---- 竖向分隔条:仅展开态可拖拽(折叠态底栏定高,无需拖拽)---- */}
+        {seqExpanded && (
+          <div className="psa-vsplit" onPointerDown={onSplitDrag} onDoubleClick={() => setTreeH(null)} title="拖拽调整画布高度 · 双击复位"><i /></div>
+        )}
 
-        {/* ---- BOTTOM DOCK: 多 ETA 汇总矩阵 + ETA 勾选清单 ---- */}
-        <div ref={bottomRef} style={{ flex: '4 1 0', minHeight: 160, display: 'flex', gap: 12, alignItems: 'stretch' }}>
-          <section ref={seqRef} className="psa-panel" style={{ flex: seqW == null ? '1 1 0' : `0 0 ${seqW}px`, minWidth: 0 }}>
-            <div className="psa-ch">
-              <span className="t">事故序列路径图</span>
-              <span className="meta">{leafCount} 序列 · 按频率</span>
+        {/* ---- BOTTOM DOCK: 事故序列——默认折叠为窄条(~96px/3 行),展开后与折叠前完全一致
+              (多 ETA 汇总矩阵 + ETA 勾选清单同时可见);折叠态状态持久于 viewStore.seqExpanded ---- */}
+        <section className="psa-panel" style={{ flex: seqExpanded ? '4 1 0' : '0 0 auto', minHeight: seqExpanded ? 160 : undefined }}>
+          <div className="psa-ch">
+            <span className="t">事故序列（{leafCount}）</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span className="meta">{seqExpanded ? `${aggCount} 个 ETA 参与汇总` : '按频率 · 展开可见风险矩阵/ETA 清单'}</span>
+              <button type="button" onClick={() => setSeqExpanded(!seqExpanded)} className="exp-collapse-toggle"
+                title={seqExpanded ? '收起底栏' : '展开底栏(风险矩阵/ETA 清单)'}>
+                <Icon name="chevron-down" size={12} style={{ transform: seqExpanded ? 'none' : 'rotate(180deg)' }} />
+                {seqExpanded ? '收起' : '展开'}
+              </button>
             </div>
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          </div>
+          {seqExpanded ? (
+            <div ref={bottomRef} style={{ flex: 1, minHeight: 0, display: 'flex', gap: 12, alignItems: 'stretch', padding: 12 }}>
+              <section ref={seqRef} className="psa-panel" style={{ flex: seqW == null ? '1 1 0' : `0 0 ${seqW}px`, minWidth: 0 }}>
+                <div className="psa-ch">
+                  <span className="t">事故序列路径图</span>
+                  <span className="meta">{leafCount} 序列 · 按频率</span>
+                </div>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                  <SequencePaths rows={seqRows} model={model} selKey={selKey} onSelect={setSel} />
+                </div>
+              </section>
+              {/* ---- 横向分隔条:左右拖拽改风险矩阵宽度(双击复位)---- */}
+              <div className="psa-hsplit" onPointerDown={onColDrag} onDoubleClick={() => setSeqW(null)} title="左右拖拽调整风险矩阵宽度 · 双击复位"><i /></div>
+              <section ref={matrixRef} className="psa-panel" style={{ flex: '2 1 0', minWidth: 0 }}>
+                <div className="psa-ch">
+                  <span className="t">风险矩阵 · 多 ETA 汇总</span>
+                  <span className="meta">{aggCount} 个 ETA</span>
+                </div>
+                <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <RiskMatrix totals={aggTotals} />
+                  <RiskSummary totals={aggTotals} etaCount={aggCount} />
+                </div>
+              </section>
+              <EtaSummaryList etaSummaries={etaSummaries} aggSevere={aggSevere} onSelectEta={onSelectEta} onToggleEta={onToggleEta} />
+            </div>
+          ) : (
+            <div style={{ maxHeight: 96, overflowY: 'auto' }}>
               <SequencePaths rows={seqRows} model={model} selKey={selKey} onSelect={setSel} />
             </div>
-          </section>
-          {/* ---- 横向分隔条:左右拖拽改风险矩阵宽度(双击复位)---- */}
-          <div className="psa-hsplit" onPointerDown={onColDrag} onDoubleClick={() => setSeqW(null)} title="左右拖拽调整风险矩阵宽度 · 双击复位"><i /></div>
-          <section ref={matrixRef} className="psa-panel" style={{ flex: '2 1 0', minWidth: 0 }}>
-            <div className="psa-ch">
-              <span className="t">风险矩阵 · 多 ETA 汇总</span>
-              <span className="meta">{aggCount} 个 ETA</span>
-            </div>
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <RiskMatrix totals={aggTotals} />
-              <RiskSummary totals={aggTotals} etaCount={aggCount} />
-            </div>
-          </section>
-          <EtaSummaryList etaSummaries={etaSummaries} aggSevere={aggSevere} onSelectEta={onSelectEta} onToggleEta={onToggleEta} />
-        </div>
+          )}
+        </section>
       </div>
 
       {/* ============ INSPECTOR ============ */}
