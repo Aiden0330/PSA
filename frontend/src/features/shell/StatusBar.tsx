@@ -15,7 +15,6 @@ export function StatusBar({ tab, persistence }: { tab: MainTab; persistence: Pro
 
   return (
     <footer className="exp-status">
-      <span>◉ 引擎在线</span>
       <span>{TAB_NAME[tab]}</span>
       <span>活动项目 <span className="num">{displayName || '未命名'}</span></span>
       <span>打开 <span className="num">{openCount}</span></span>
