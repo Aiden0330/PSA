@@ -15,8 +15,10 @@ export function bgLevel(sevRank: number, freqRank: number): RiskLevel {
   return 'extreme'
 }
 
-/** C≥3 累计 = C3+C4+C5 端态频率之和。事件树端态互斥,频率可直接相加(区别于概率:
- *  概率并集须 1−Π(1−q),频率并集是求和)。 */
+/** C3+C4+C5 端态频率之和(后果**类别**口径,非 0–IV 危险等级口径——等级映射
+ *  CONS_GRADE 是代码常量、未随案例钉扎,故本页不用等级口径)。单树内端态互斥,
+ *  求和是恒等式;若未来聚合跨多树(F2 聚合范围钉扎),论证改为速率线性相加,仍为求和。
+ *  区别于概率:概率并集须 1−Π(1−q),频率并集是求和。 */
 export function cGE3(cons: Record<string, number>): number {
   return (cons.C3 || 0) + (cons.C4 || 0) + (cons.C5 || 0)
 }

@@ -48,7 +48,9 @@ export function PortfolioTab({ persistence, setTab }: { persistence: ProjectPers
   }, [rows])
 
   const quantified = rows.filter((r) => r.latest_case)
-  const queue = rows.filter((r) => r.review_state === 'in_review')
+  // 队列按 open_review 过滤(域评审裁决 2):在审行可能钉在旧版本上(送审后又存新版),
+  // 若按最新版本锚定的 review_state 过滤,挂起评审会从队列消失("看不见还能签")。
+  const queue = rows.filter((r) => r.open_review)
 
   // 对比条形:C≥3 累计,对数感知宽度(跨越多个数量级时线性会压扁小值)
   const [minLog, maxLog] = useMemo(() => {
@@ -102,7 +104,9 @@ export function PortfolioTab({ persistence, setTab }: { persistence: ProjectPers
               <table style={tableSt}>
                 <thead>
                   <tr>
-                    {['项目', '版本', 'C≥3 累计 /yr', 'C5 /yr', '最劣格', '评审(当前版本)', '版本哈希', '案例来源'].map((h) => (
+                    {/* 列名直接用公式(域评审裁决 1b):与单项目页"≥III 累计"(C4+C5,危险等级
+                        口径)是不同口径,近同形缩写会诱发跨页口径混淆,故不用"C≥3"缩写。 */}
+                    {['项目', '版本', 'C3+C4+C5 /yr', 'C5 /yr', '最劣格', '评审(当前版本)', '版本哈希', '案例来源'].map((h) => (
                       <th key={h} style={th}>{h}</th>
                     ))}
                   </tr>
@@ -110,8 +114,10 @@ export function PortfolioTab({ persistence, setTab }: { persistence: ProjectPers
                 <tbody>
                   {rows.map((r) => {
                     const c = r.latest_case
-                    const src = c ? `案例 #${c.id} · ${c.kind} · 版本 ${hash8(c.version_hash)} · ${c.created_at.slice(0, 10)}` : ''
+                    const src = c ? `案例 #${c.id} · ${c.kind}${c.scenario ? ` · 场景 ${c.scenario}` : ''} · 版本 ${hash8(c.version_hash)} · ${c.created_at.slice(0, 10)}` : ''
                     const worst = c?.risk.worst
+                    // 域评审裁决 3:数字来自比当前最新版本更旧的案例 → 显式徽章,不靠肉眼比对哈希
+                    const stale = !!(c && r.latest_hash && c.version_hash !== r.latest_hash)
                     return (
                       <tr key={r.uuid}>
                         <td style={td}>
@@ -121,7 +127,7 @@ export function PortfolioTab({ persistence, setTab }: { persistence: ProjectPers
                           </button>
                         </td>
                         <td style={{ ...td, ...mono }}>{r.versions}</td>
-                        <td style={{ ...td, ...mono }} title={c ? `C3+C4+C5 端态频率之和 · ${src}` : '未量化'}>
+                        <td style={{ ...td, ...mono }} title={c ? `C3+C4+C5 端态频率之和(后果类别口径,非 0–IV 危险等级)· ${src}` : '未量化'}>
                           {c ? fmtE(cGE3(c.consequences)) : <span style={unq}>未量化</span>}
                         </td>
                         <td style={{ ...td, ...mono }} title={c ? `爆燃/爆炸端态频率 · ${src}` : '未量化'}>
@@ -141,19 +147,34 @@ export function PortfolioTab({ persistence, setTab }: { persistence: ProjectPers
                             : <span style={{ ...pill, background: 'var(--exp-soft)', color: 'var(--exp-faint)' }}>草稿</span>}
                         </td>
                         <td style={{ ...td, ...mono, color: 'var(--exp-faint)' }}>{hash8(r.latest_hash)}</td>
-                        <td style={{ ...td, ...mono, color: 'var(--exp-faint)', fontSize: 11 }}>{c ? `#${c.id} · ${hash8(c.version_hash)}` : '—'}</td>
+                        <td style={{ ...td, ...mono, color: 'var(--exp-faint)', fontSize: 11 }}>
+                          {c ? `#${c.id}${c.scenario ? ` · ${c.scenario}` : ''} · ${hash8(c.version_hash)}` : '—'}
+                          {stale && (
+                            <span style={{ ...pill, marginLeft: 6, background: 'var(--psa-warn-soft, #fff7ed)', color: 'var(--psa-warn-strong, #b45309)' }}
+                              title={`风险数字取自版本 ${hash8(c!.version_hash)},当前最新版本为 ${hash8(r.latest_hash)} —— 数字非当前模型,重新导出报告/运行不确定性可更新`}>
+                              数字非当前版本
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
             </div>
+            {/* 口径脚注(域评审 1b + F2 + F3):可见文字,不藏 tooltip——截图/投影不丢失 */}
+            <div style={{ padding: '6px 12px', fontSize: 11, color: 'var(--exp-muted)', borderTop: '1px solid var(--exp-line)' }}>
+              口径:C 列为后果<b>类别</b>频率(C1 单体排气 … C5 爆燃/爆炸),非 0–IV 危险等级口径,本页不使用等级口径;
+              每行数字取自该项目最近一次钉扎案例,覆盖范围为该案例对应的事件树(场景),非项目全部 ETA 之和;
+              跨项目比较假设各项目 C1–C5 内涵一致(内置口径)。
+            </div>
           </div>
 
           {/* —— C≥3 累计对比条形 + 组合矩阵(并排)—— */}
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <div className="psa-panel" style={{ flex: '1 1 340px', minWidth: 300, overflow: 'hidden' }}>
-              <div style={panelHead}>C≥3 累计频率对比 <span style={{ color: 'var(--exp-faint)', fontWeight: 400 }}>(条形 = /yr,对数感知)</span></div>
+            <div className="psa-panel" style={{ flex: '1 1 340px', minWidth: 300, overflow: 'hidden' }}
+              title="条长按 log10 归一(最短 12% 保可见),视觉差距被压缩——以旁标数值为准">
+              <div style={panelHead}>C3+C4+C5 频率对比 <span style={{ color: 'var(--exp-faint)', fontWeight: 400 }}>(对数刻度;条长≠线性比例,以数值为准)</span></div>
               <div style={{ padding: '8px 12px 12px' }}>
                 {quantified.length === 0 && <div style={{ color: 'var(--exp-muted)', fontSize: 12 }}>无已量化项目。</div>}
                 {quantified.map((r) => {
@@ -176,9 +197,14 @@ export function PortfolioTab({ persistence, setTab }: { persistence: ProjectPers
               <div style={{ padding: 12, overflowX: 'auto' }}>
                 <RiskMatrix quantified={quantified} markerOf={markerOf} />
                 <div style={{ marginTop: 8, fontSize: 11.5 }}>
-                  {worstOverall
-                    ? <>组合最劣格:<b style={{ color: RISK_HEX[worstOverall.level] }}>{LEVEL_ZH[worstOverall.level]}区</b> —— {worstOverall.row.name} · {worstOverall.severity}({SEV_LABEL[worstOverall.severity]})</>
-                    : <span style={{ color: 'var(--exp-muted)' }}>无已量化项目落格。</span>}
+                  {worstOverall ? (() => {
+                    // 同级同后果的并列项目数(域评审裁决 4:"—— 某项目"暗示唯一性,并列须注明)
+                    const ties = quantified.filter((r) => {
+                      const w = r.latest_case!.risk.worst
+                      return w && w.level === worstOverall.level && w.severity === worstOverall.severity
+                    }).length
+                    return <>组合最劣格:<b style={{ color: RISK_HEX[worstOverall.level] }}>{LEVEL_ZH[worstOverall.level]}区</b> —— {worstOverall.row.name}{ties > 1 ? ` 等 ${ties} 项` : ''} · {worstOverall.severity}({SEV_LABEL[worstOverall.severity]})</>
+                  })() : <span style={{ color: 'var(--exp-muted)' }}>无已量化项目落格。</span>}
                 </div>
               </div>
             </div>
@@ -193,7 +219,14 @@ export function PortfolioTab({ persistence, setTab }: { persistence: ProjectPers
                 <div key={r.uuid} style={queueRow}>
                   <span style={{ ...pill, background: STATE_STYLE.in_review.bg, color: STATE_STYLE.in_review.fg }}>送审中</span>
                   <b style={{ color: 'var(--exp-ink)' }}>{r.name}</b>
-                  <span style={{ ...mono, color: 'var(--exp-faint)', fontSize: 11 }}>{hash8(r.latest_hash)}</span>
+                  {/* 在审的是 open_review 指向的版本(可能非最新)——哈希显示被审版本 */}
+                  <span style={{ ...mono, color: 'var(--exp-faint)', fontSize: 11 }} title="送审版本哈希">{hash8(r.open_review!.version_hash)}</span>
+                  {!r.open_review!.is_latest && (
+                    <span style={{ ...pill, background: 'var(--psa-warn-soft, #fff7ed)', color: 'var(--psa-warn-strong, #b45309)' }}
+                      title={`送审的版本 ${hash8(r.open_review!.version_hash)} 之后已保存更新版本(当前 ${hash8(r.latest_hash)})——签发前请确认审的是哪一版`}>
+                      已有更新版本
+                    </span>
+                  )}
                   <button style={{ ...linkBtn, marginLeft: 'auto', color: 'var(--exp-accent, #0f766e)' }}
                     disabled={!r.saved_id} title={r.saved_id ? '打开该项目的报告与证据链页' : '无本地存档,请从左侧存档树打开'}
                     onClick={() => openProject(r.saved_id, 'report')}>
@@ -235,9 +268,12 @@ function RiskMatrix({ quantified, markerOf }: { quantified: PortfolioRow[]; mark
             {SEV.map((c) => {
               const key = `${band}:${c}`
               const here = placed[key]
-              const bg = RISK_HEX[bgLevel(SEV_RANK[c], band + 1)]
+              // 占用格颜色用**后端给定**的 cell.level(域评审裁决 5:阈值漂移时落格颜色
+              // 必须跟载荷走);空格背景才是前端 bgLevel 的装饰性热区(半透明)。
+              const bg = here ? RISK_HEX[here[0].level] + 'ff'
+                : RISK_HEX[bgLevel(SEV_RANK[c], band + 1)] + '2e'
               return (
-                <td key={c} style={{ ...mCell, background: bg + (here ? 'ff' : '2e') }}
+                <td key={c} style={{ ...mCell, background: bg }}
                   title={`${c}(${SEV_LABEL[c]})× ${BAND_LABEL[band]}`}>
                   {here && here.map((p, i) => <span key={i} style={{ color: '#fff', fontSize: 12, marginRight: 1 }}>{p.marker}</span>)}
                 </td>

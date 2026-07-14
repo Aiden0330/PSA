@@ -4,6 +4,9 @@ import { bgLevel, cGE3, worseCell } from './portfolioMath'
 describe('bgLevel — 与后端 report_export._risk_level 同源(4/9/14 阈值)', () => {
   // 逐格锁死 5×5 可接受准则热区(sevRank 1..5 × freqRank 1..5),与后端矩阵一致。
   // 任何一处阈值被误改 → 此表失配 → CI 拦截口径漂移。
+  // 域评审裁决 5:此表在后端有孪生镜像 tests/backend/test_portfolio.py::
+  // test_risk_level_golden_table_all_25_cells(同一张字面金表锁 _risk_level)——
+  // 单侧锁只防单侧漂移,两侧必须同步修改。
   const EXPECT: Record<string, string> = {
     '1,1': 'low', '2,1': 'low', '3,1': 'low', '4,1': 'low', '5,1': 'medium',
     '1,2': 'low', '2,2': 'low', '3,2': 'medium', '4,2': 'medium', '5,2': 'high',

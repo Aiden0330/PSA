@@ -96,13 +96,32 @@ def test_portfolio_no_case_is_unquantified_not_computed():
 
 def test_portfolio_latest_case_wins_and_carries_version_hash():
     v1, _ = _project_with_case(PUUID, "P", {"C5": 1e-6})
-    # 新版本 + 新案例(不同后果)→ 组合总览取最新
+    # 新版本 + 新案例(不同后果)→ 组合总览取最新。
+    # 域评审 F1 锁:uncertainty 案例用**真实管线形状** {"point","bands"}(见 app.py
+    # api_event_tree_uncertainty → uncertainty.py 返回值),不得伪造 "consequences" 键——
+    # 伪造形状曾遮蔽"真实不确定性运行被显示为未量化"的反保守缺陷。
     v2 = store.create_version(PUUID, *to_canonical(_payload(0.2), PUUID))
-    store.create_case(PUUID, v2["id"], "uncertainty", results={"consequences": {"C5": 9e-4}})
+    store.create_case(PUUID, v2["id"], "uncertainty", results={
+        "point": {"C1": 0.0, "C2": 0.0, "C3": 0.0, "C4": 0.0, "C5": 9e-4},
+        "bands": {c: {"p05": 0.0, "p50": 0.0, "p95": 0.0} for c in ("C1", "C2", "C3", "C4", "C5")},
+    })
     row = next(r for r in store.portfolio() if r["uuid"] == PUUID)
+    assert row["latest_case"] is not None      # F1:point 形状必须被识别,不得显示"未量化"
     assert row["latest_case"]["consequences"]["C5"] == 9e-4
     assert row["latest_case"]["kind"] == "uncertainty"
     assert row["latest_case"]["version_hash"] == v2["content_hash"]   # 溯源锚点
+
+
+def test_portfolio_scenario_passthrough_for_disclosure():
+    # 域评审 F2:数字口径 = 该案例覆盖的事件树(场景)。scenario_name 随钉扎 settings
+    # 透传,前端在案例来源列披露;无该键(uncertainty 旧钉扎)→ None,不虚构。
+    store.ensure_project(PUUID, "P")
+    v = store.create_version(PUUID, *to_canonical(_payload(), PUUID))
+    store.create_case(PUUID, v["id"], "report",
+                      settings={"scenario_name": "电芯内短路"},
+                      results={"consequences": {"C5": 1e-5}})
+    row = next(r for r in store.portfolio() if r["uuid"] == PUUID)
+    assert row["latest_case"]["scenario"] == "电芯内短路"
 
 
 def test_portfolio_review_state_anchored_to_latest_version():
@@ -128,7 +147,40 @@ def test_portfolio_in_review_surfaces_for_queue():
     v1, _ = _project_with_case(PUUID, "P", {"C5": 1e-6})
     store.submit_review(PUUID, v1["id"])
     row = next(r for r in store.portfolio() if r["uuid"] == PUUID)
-    assert row["review_state"] == "in_review"  # 前端评审队列据此过滤
+    assert row["review_state"] == "in_review"
+    assert row["open_review"] == {"version_id": v1["id"], "version_hash": v1["content_hash"],
+                                  "is_latest": True}
+
+
+def test_portfolio_open_review_on_old_version_not_lost():
+    # 域评审裁决 2:送审 v1 后又存出 v2 —— 挂起评审钉在旧版本上。
+    # 最新版本锚定的 review_state 正确地报 None(当前模型未签发),但队列若只按它过滤,
+    # 这条在审行会从所有界面消失("看不见还能签")。open_review 保证队列不漏,
+    # is_latest=False 供前端标注"已有更新版本"。
+    v1, _ = _project_with_case(PUUID, "P", {"C5": 1e-6})
+    store.submit_review(PUUID, v1["id"])
+    v2 = store.create_version(PUUID, *to_canonical(_payload(0.3), PUUID))
+    row = next(r for r in store.portfolio() if r["uuid"] == PUUID)
+    assert row["review_state"] is None                      # 当前版本视角:未签发
+    assert row["open_review"]["version_id"] == v1["id"]     # 但挂起评审仍可见
+    assert row["open_review"]["is_latest"] is False
+    assert row["latest_hash"] == v2["content_hash"]
+
+
+# ── 域评审裁决 5:后端 25 格金表(与前端 portfolioMath.test.ts 同一张表)────────
+# 前端锁测只防前端漂移;此表用字面值锁死后端 _risk_level,后端阈值(4/9/14)一改即红。
+# 两侧金表必须同步修改——另一半在 frontend/src/features/portfolio/portfolioMath.test.ts。
+
+def test_risk_level_golden_table_all_25_cells():
+    GOLDEN = {
+        (1, 1): "low", (2, 1): "low", (3, 1): "low", (4, 1): "low", (5, 1): "medium",
+        (1, 2): "low", (2, 2): "low", (3, 2): "medium", (4, 2): "medium", (5, 2): "high",
+        (1, 3): "low", (2, 3): "medium", (3, 3): "medium", (4, 3): "high", (5, 3): "extreme",
+        (1, 4): "low", (2, 4): "medium", (3, 4): "high", (4, 4): "extreme", (5, 4): "extreme",
+        (1, 5): "medium", (2, 5): "high", (3, 5): "extreme", (4, 5): "extreme", (5, 5): "extreme",
+    }
+    for (sev, frq), expect in GOLDEN.items():
+        assert report_export._risk_level(sev, frq) == expect, (sev, frq)
 
 
 def test_portfolio_saved_id_maps_from_legacy_blob():

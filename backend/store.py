@@ -314,23 +314,43 @@ def portfolio() -> list[dict]:
                 rv = cx.execute("SELECT state FROM reviews WHERE project_uuid=? AND version_id=?",
                                 (uuid, p["latest_vid"])).fetchone()
                 review_state = rv["state"] if rv else None
+            # 域评审裁决 2:挂起评审独立字段。部分唯一索引保证每项目至多一行 in_review,但该行
+            # 可能钉在旧版本上(送审后又存新版)——若只按最新版本锚定,挂起的评审会从队列消失
+            # ("看不见还能签")。open_review 让队列不漏,is_latest=False 由前端标"已有更新版本"。
+            orow = cx.execute(
+                "SELECT r.version_id, v.content_hash FROM reviews r"
+                " JOIN versions v ON v.id = r.version_id"
+                " WHERE r.project_uuid=? AND r.state='in_review'", (uuid,)).fetchone()
+            open_review = None
+            if orow is not None:
+                open_review = {"version_id": orow["version_id"], "version_hash": orow["content_hash"],
+                               "is_latest": orow["version_id"] == p["latest_vid"]}
             cr = cx.execute(
-                "SELECT c.id,c.kind,c.results_json,c.created_at,v.content_hash"
+                "SELECT c.id,c.kind,c.results_json,c.settings_json,c.created_at,v.content_hash"
                 " FROM analysis_cases c JOIN versions v ON v.id=c.version_id"
                 " WHERE c.project_uuid=? AND c.kind IN ('report','uncertainty')"
                 " ORDER BY c.id DESC LIMIT 1", (uuid,)).fetchone()
             latest_case = None
             if cr is not None:
-                cons = json.loads(cr["results_json"]).get("consequences")
+                res = json.loads(cr["results_json"])
+                # 域评审 F1:report 案例钉 {"consequences",...};uncertainty 案例钉 {"point","bands"}
+                # (point = quantify_event_tree(...)["consequences"],同一确定性频率口径)。
+                # 只读 "consequences" 会把真实不确定性运行显示成"未量化"——反保守,必须双读。
+                cons = res.get("consequences") or res.get("point")
                 if isinstance(cons, dict):
+                    settings = json.loads(cr["settings_json"] or "{}")
                     consequences = {k: float(cons.get(k, 0.0)) for k in ("C1", "C2", "C3", "C4", "C5")}
                     latest_case = {
                         "id": cr["id"], "kind": cr["kind"], "consequences": consequences,
                         "version_hash": cr["content_hash"], "created_at": cr["created_at"],
+                        # 域评审 F2:数字口径 = 该案例覆盖的事件树(场景),非项目全部 ETA 之和。
+                        # 场景名透传供前端披露;聚合范围钉扎(按勾选集合并)记 ROADMAP。
+                        "scenario": settings.get("scenario_name"),
                         "risk": report_export.risk_placement(consequences),
                     }
             out.append({"uuid": uuid, "name": p["name"], "versions": p["versions"],
                         "latest_hash": p["latest_hash"], "review_state": review_state,
+                        "open_review": open_review,
                         "latest_case": latest_case, "saved_id": saved_by_uuid.get(uuid)})
         return out
 

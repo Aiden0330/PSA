@@ -250,8 +250,11 @@ export const listProjects = () => jget<ProjectInfo[]>('/projects')
 //    与报告矩阵同源(后端 report_export.risk_placement),前端不重复阈值。──
 export type ReviewState = 'in_review' | 'signed' | 'returned'
 export interface PortfolioRiskCell { severity: string; freq: number; freq_band: number; level: 'low' | 'medium' | 'high' | 'extreme' }
-export interface PortfolioCase { id: number; kind: string; consequences: Record<string, number>; version_hash: string; created_at: string; risk: { cells: PortfolioRiskCell[]; worst: PortfolioRiskCell | null } }
-export interface PortfolioRow { uuid: string; name: string; versions: number; latest_hash: string | null; review_state: ReviewState | null; latest_case: PortfolioCase | null; saved_id: string | null }
+/** scenario:该案例覆盖的事件树/场景名(域评审 F2 口径披露);旧钉扎无此键 → null。 */
+export interface PortfolioCase { id: number; kind: string; consequences: Record<string, number>; version_hash: string; created_at: string; scenario: string | null; risk: { cells: PortfolioRiskCell[]; worst: PortfolioRiskCell | null } }
+/** open_review:挂起的在审行(可能钉在旧版本,is_latest=false → 前端标"已有更新版本")。
+ *  review_state 锚定最新版本(当前模型是否签发),两者语义不同,都要。 */
+export interface PortfolioRow { uuid: string; name: string; versions: number; latest_hash: string | null; review_state: ReviewState | null; open_review: { version_id: number; version_hash: string; is_latest: boolean } | null; latest_case: PortfolioCase | null; saved_id: string | null }
 export const getPortfolio = () => jget<PortfolioRow[]>('/portfolio')
 export const listProjectVersions = (uuid: string) => jget<VersionInfo[]>(`/projects/${uuid}/versions`)
 export const listProjectCases = (uuid: string) => jget<CaseInfo[]>(`/projects/${uuid}/cases`)
