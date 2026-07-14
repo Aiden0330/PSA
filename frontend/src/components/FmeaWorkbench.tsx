@@ -395,7 +395,13 @@ export function FmeaWorkbench({ etModel, lib, rows: controlledRows, onRowsChange
 
   // ── 渲染 ──
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--psa-bg)', padding: 14 }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--exp-bg)', padding: 14 }}>
+      {/* Page header(R4c:该页此前无统一标题,补一条,呼应 PortfolioTab.tsx 的既有写法) */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--exp-ink)', marginBottom: 4 }}>FMEA / RPN</div>
+        <div style={{ fontSize: 11.5, color: 'var(--exp-muted)' }}>{rows.length} 行 · 失效模式影响分析(S×O×D)</div>
+      </div>
+
       {/* 汇总卡 */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
         <div className="psa-kpi">
@@ -416,8 +422,8 @@ export function FmeaWorkbench({ etModel, lib, rows: controlledRows, onRowsChange
         </div>
       </div>
 
-      {/* 工具栏 */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
+      {/* 工具栏(R4c:换皮为 ETA/FTA ribbon 配色,处理器不变) */}
+      <div style={{ display: 'flex', alignItems: 'center', columnGap: 10, rowGap: 8, flexWrap: 'wrap', marginBottom: 12, padding: '8px 14px', background: 'var(--psa-surface)', borderBottom: '1px solid var(--psa-line-2)' }}>
         <button className="psa-btn" onClick={addRow}>+ 新增行</button>
         <button className="psa-btn" onClick={importFromLib} disabled={!lib} title={lib ? '从参考库导入器件/屏障(跳过已有 id)' : '参考库未加载'}>
           从参考库导入

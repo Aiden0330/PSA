@@ -137,7 +137,7 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
   }
 
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--psa-bg)', padding: 18 }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--exp-bg)', padding: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--psa-ink)' }}>报告与证据链</div>
