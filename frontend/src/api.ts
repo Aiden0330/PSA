@@ -134,7 +134,31 @@ export async function quantifyEventTree(req: any): Promise<EtQuantifyResult> {
   return r.json()
 }
 
-export interface EtBands { point: Record<string, number>; bands: Record<string, { p05: number; p50: number; p95: number }> }
+export interface EtBands {
+  point: Record<string, number>
+  bands: Record<string, { p05: number; p50: number; p95: number }>
+  // spec A(勾选集聚合,scope=checked_set 时后端附带;single 响应不变):
+  scope?: 'checked_set'
+  per_tree?: { key: string; name: string; consequences: Record<string, number> }[]
+}
+
+/** spec A:勾选集聚合的单棵树载荷(与单树请求同形 + 场景身份/口径注记)。
+ *  报告/不确定性请求附 { scope:'checked_set', trees: AggregateTreePayload[] } 即聚合。 */
+export interface AggregateTreePayload {
+  key: string
+  name: string
+  init_event: string
+  init_frequency: number
+  functional_events: unknown[]
+  fault_trees: Record<string, unknown>
+  parameters: Record<string, unknown>
+  sequences: unknown[]
+  consequence_bins: Record<string, string>
+  ccf_groups?: unknown[]
+  labels?: Record<string, string>
+  consequence_defs?: Record<string, string>
+  init_note?: string
+}
 export interface EtImportance { importance: Record<string, { barrier: string; fv: number; raw: number }[]> }
 
 export async function uncertaintyEventTree(req: any): Promise<EtBands> {
@@ -250,8 +274,10 @@ export const listProjects = () => jget<ProjectInfo[]>('/projects')
 //    与报告矩阵同源(后端 report_export.risk_placement),前端不重复阈值。──
 export type ReviewState = 'in_review' | 'signed' | 'returned'
 export interface PortfolioRiskCell { severity: string; freq: number; freq_band: number; level: 'low' | 'medium' | 'high' | 'extreme' }
-/** scenario:该案例覆盖的事件树/场景名(域评审 F2 口径披露);旧钉扎无此键 → null。 */
-export interface PortfolioCase { id: number; kind: string; consequences: Record<string, number>; version_hash: string; created_at: string; scenario: string | null; risk: { cells: PortfolioRiskCell[]; worst: PortfolioRiskCell | null } }
+/** scenario:该案例覆盖的事件树/场景名(域评审 F2 口径披露);旧钉扎无此键 → null。
+ *  scope/tree_count(spec A §2.4):checked_set 案例 → 徽章「聚合 n 树」替代场景名;
+ *  旧案例后端补 scope="single"(零迁移),老前端字段可缺省。 */
+export interface PortfolioCase { id: number; kind: string; consequences: Record<string, number>; version_hash: string; created_at: string; scenario: string | null; scope?: 'single' | 'checked_set'; tree_count?: number | null; risk: { cells: PortfolioRiskCell[]; worst: PortfolioRiskCell | null } }
 /** open_review:挂起的在审行(可能钉在旧版本,is_latest=false → 前端标"已有更新版本")。
  *  review_state 锚定最新版本(当前模型是否签发),两者语义不同,都要。 */
 export interface PortfolioRow { uuid: string; name: string; versions: number; latest_hash: string | null; review_state: ReviewState | null; open_review: { version_id: number; version_hash: string; is_latest: boolean } | null; latest_case: PortfolioCase | null; saved_id: string | null }

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { addVersionComment, diffProjectVersions, exportReport, listProjectCases, listProjectReviews, listProjectVersions, listVersionComments, returnReview, signReview, submitReview } from '../../api'
-import type { CaseInfo, ReviewComment, ReviewInfo, VersionDiff, VersionInfo } from '../../api'
+import type { AggregateTreePayload, CaseInfo, ReviewComment, ReviewInfo, VersionDiff, VersionInfo } from '../../api'
 import { Icon } from '../../components/icons'
 import { CONSEQUENCES, consDef, toEngineRequest } from '../../eventtree'
-import { useActiveEta } from '../../stores/useActiveEta'
+import type { ProjectEta } from '../../project'
+import { composeModel } from '../../stores/derived'
+import { useActiveEta, etaDisplayName } from '../../stores/useActiveEta'
 import { useAuthStore } from '../../stores/authStore'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
 
@@ -14,13 +16,35 @@ const mono = 'var(--psa-font-mono)'
  * 证据文档页(外壳决策记录 D → 报告页演进):报告导出 + 版本/案例台账,
  * 每条案例挂版本短哈希与引擎版本徽章 —— 报告页脚「评价依据」在此可回查(ADR-2)。
  */
+/** spec A:单棵勾选树 → 聚合请求 trees[] 项(与单树导出同一 toEngineRequest 序列化,
+ *  另带场景身份 key/name、屏障标签、后果内涵与初因口径注记 initEvidence → init_note)。 */
+function toAggregateTreePayload(t: ProjectEta, pfds: Record<string, number>): AggregateTreePayload {
+  const composed = composeModel(t.model, pfds)
+  const linked = {
+    fault_trees: t.fts.fault_trees ?? [],
+    parameters: t.fts.model_data?.parameters ?? [],
+    ccf_groups: t.fts.ccf_groups ?? [],
+  }
+  return {
+    key: t.key,
+    name: etaDisplayName(t, composed),
+    ...toEngineRequest(composed, linked),
+    labels: Object.fromEntries(composed.functionalEvents.map((f) => [f.id, f.label])),
+    consequence_defs: Object.fromEntries(CONSEQUENCES.map((c) => [c, consDef(composed, c)])),
+    ...(composed.initEvidence ? { init_note: composed.initEvidence } : {}),
+  }
+}
+
 export function ReportDossier({ persistence }: { persistence: ProjectPersistence }) {
-  const { etModel, etFtsModel } = useActiveEta()
+  const { etModel, etFtsModel, etaTabs, checkedKeys, etaPfds } = useActiveEta()
   const [versions, setVersions] = useState<VersionInfo[]>([])
   const [cases, setCases] = useState<CaseInfo[]>([])
   const [reviews, setReviews] = useState<ReviewInfo[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // spec A:「按勾选集聚合」默认 OFF(单场景导出零扰动);ON 时 trees[] = 全部勾选页签。
+  const [aggScope, setAggScope] = useState(false)
+  const checkedTabs = etaTabs.filter((t) => checkedKeys[t.key])
   const pu = persistence.projectUuid
   // 前端呈现层的角色感知(后端 B3 已实际守卫,这里只是不呈现无权限操作)。
   // identity===null(off 模式/未知)一律视为全权 —— off 模式单用户即全权(约束 #0)。
@@ -43,12 +67,15 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
     try {
       const linked = { fault_trees: etFtsModel.fault_trees ?? [], parameters: etFtsModel.model_data.parameters ?? [] }
       const req = toEngineRequest(etModel, linked)
+      const useAgg = aggScope && checkedTabs.length >= 1
       await exportReport(fmt, {
         ...req, samples: 1000,
         consequence_defs: Object.fromEntries(CONSEQUENCES.map((c) => [c, consDef(etModel, c)])),
         labels: Object.fromEntries(etModel.functionalEvents.map((f) => [f.id, f.label])),
+        // spec A:聚合 = 当前勾选的全部 ETA 页签;单树字段照带(契约不放松,聚合路径不消费)
+        ...(useAgg ? { scope: 'checked_set', trees: checkedTabs.map((t) => toAggregateTreePayload(t, etaPfds(t))) } : {}),
         ...(pu ? { project_uuid: pu, project_payload: persistence.buildPayload() } : {}),
-      }, etModel.initEvent)
+      }, useAgg ? `勾选集聚合(${checkedTabs.length} 树)` : etModel.initEvent)
       refresh()                                              // auto-pin 产生了新版本/案例 → 台账即时更新
     } catch (e: any) { setErr(String(e?.message ?? e)) }
     finally { setBusy(false) }
@@ -84,6 +111,10 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
   }
   const artifacts = (c: CaseInfo): { format?: string; sha256?: string } => {
     try { return typeof c.artifacts_json === 'string' ? JSON.parse(c.artifacts_json) : (c.artifacts_json ?? {}) } catch { return {} }
+  }
+  // spec A §2.4:scope 标识全表面 —— 案例列表也要。旧案例无 scope 键 = single,照旧渲染。
+  const caseSettings = (c: CaseInfo): { scope?: string; scenarios?: { key: string; name: string }[] } => {
+    try { return typeof c.settings_json === 'string' ? JSON.parse(c.settings_json) : (c.settings_json ?? {}) } catch { return {} }
   }
 
   // ── 4a5 版本对比(parity #5)──
@@ -148,7 +179,17 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
           </div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: 'var(--psa-muted)' }}>导出当前 ETA 报告</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--psa-muted)', cursor: checkedTabs.length ? 'pointer' : 'not-allowed' }}
+            title={checkedTabs.length
+              ? '勾选后导出「勾选集聚合」报告:全部勾选 ETA 的后果频率逐级求和(点估计精确),分位带按同名参数联合抽样;逐树分解与口径披露入页脚'
+              : '当前无勾选的 ETA 页签(在 ETA 页勾选参与汇总的页签)'}>
+            <input type="checkbox" checked={aggScope} disabled={!checkedTabs.length}
+              onChange={(e) => setAggScope(e.target.checked)} data-testid="agg-scope-toggle" />
+            按勾选集聚合({checkedTabs.length} 棵)
+          </label>
+          <span style={{ fontSize: 12, color: 'var(--psa-muted)' }}>
+            {aggScope && checkedTabs.length ? '导出勾选集聚合报告' : '导出当前 ETA 报告'}
+          </span>
           {(['docx', 'pdf', 'csv'] as const).map((f) => (
             <button key={f} onClick={() => onExport(f)} disabled={busy || !etModel} className="psa-btn psa-btn--dark">
               <Icon name="download" size={13} />{f === 'docx' ? 'Word' : f.toUpperCase()}
@@ -176,10 +217,19 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
                   {[...cases].sort((a, b) => b.id - a.id).map((c) => {
                     const v = versionByCase(c)
                     const a = artifacts(c)
+                    const st = caseSettings(c)
                     return (
                       <tr key={c.id} style={{ borderTop: '1px solid var(--psa-line)' }}>
                         <td style={td}><span style={{ fontFamily: mono, fontWeight: 600 }}>#{c.id}</span></td>
-                        <td style={td}>{c.kind === 'report' ? '报告' : c.kind}</td>
+                        <td style={td}>
+                          {c.kind === 'report' ? '报告' : c.kind}
+                          {st.scope === 'checked_set' && (
+                            <span style={{ ...badge, marginLeft: 6 }}
+                              title={`勾选集聚合案例:${(st.scenarios ?? []).map((s) => s.name).join('、') || '?'}`}>
+                              聚合 {(st.scenarios ?? []).length} 树
+                            </span>
+                          )}
+                        </td>
                         <td style={td}>
                           <span style={badge} title={v ? `完整哈希 ${v.content_hash}` : ''}>{v ? v.content_hash.slice(0, 8) : `v${c.version_id}`}</span>
                         </td>

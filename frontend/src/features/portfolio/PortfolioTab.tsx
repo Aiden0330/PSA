@@ -114,7 +114,10 @@ export function PortfolioTab({ persistence, setTab }: { persistence: ProjectPers
                 <tbody>
                   {rows.map((r) => {
                     const c = r.latest_case
-                    const src = c ? `案例 #${c.id} · ${c.kind}${c.scenario ? ` · 场景 ${c.scenario}` : ''} · 版本 ${hash8(c.version_hash)} · ${c.created_at.slice(0, 10)}` : ''
+                    // spec A §2.4:checked_set 案例 → 口径写「聚合 n 树」;单场景/旧案例照旧场景名。
+                    const isAgg = c?.scope === 'checked_set'
+                    const srcScope = c ? (isAgg ? ` · 聚合 ${c.tree_count ?? '?'} 树` : (c.scenario ? ` · 场景 ${c.scenario}` : '')) : ''
+                    const src = c ? `案例 #${c.id} · ${c.kind}${srcScope} · 版本 ${hash8(c.version_hash)} · ${c.created_at.slice(0, 10)}` : ''
                     const worst = c?.risk.worst
                     // 域评审裁决 3:数字来自比当前最新版本更旧的案例 → 显式徽章,不靠肉眼比对哈希
                     const stale = !!(c && r.latest_hash && c.version_hash !== r.latest_hash)
@@ -148,7 +151,16 @@ export function PortfolioTab({ persistence, setTab }: { persistence: ProjectPers
                         </td>
                         <td style={{ ...td, ...mono, color: 'var(--exp-faint)' }}>{hash8(r.latest_hash)}</td>
                         <td style={{ ...td, ...mono, color: 'var(--exp-faint)', fontSize: 11 }}>
-                          {c ? `#${c.id}${c.scenario ? ` · ${c.scenario}` : ''} · ${hash8(c.version_hash)}` : '—'}
+                          {c ? `#${c.id}` : '—'}
+                          {c && isAgg && (
+                            // 聚合徽章替代场景名(§2.4)——聚合行与单场景行落格天然不同,比较以徽章为准
+                            <span style={{ ...pill, marginLeft: 6, background: 'var(--psa-primary-soft, #eff6ff)', color: 'var(--psa-primary-strong, #1d4ed8)' }}
+                              title={`勾选集聚合案例:${c.tree_count ?? '?'} 棵勾选事件树的后果频率逐级求和(点估计精确);分位带为同名参数联合抽样`}>
+                              聚合 {c.tree_count ?? '?'} 树
+                            </span>
+                          )}
+                          {c && !isAgg && c.scenario ? ` · ${c.scenario}` : ''}
+                          {c ? ` · ${hash8(c.version_hash)}` : ''}
                           {stale && (
                             <span style={{ ...pill, marginLeft: 6, background: 'var(--psa-warn-soft, #fff7ed)', color: 'var(--psa-warn-strong, #b45309)' }}
                               title={`风险数字取自版本 ${hash8(c!.version_hash)},当前最新版本为 ${hash8(r.latest_hash)} —— 数字非当前模型,重新导出报告/运行不确定性可更新`}>
@@ -165,7 +177,8 @@ export function PortfolioTab({ persistence, setTab }: { persistence: ProjectPers
             {/* 口径脚注(域评审 1b + F2 + F3):可见文字,不藏 tooltip——截图/投影不丢失 */}
             <div style={{ padding: '6px 12px', fontSize: 11, color: 'var(--exp-muted)', borderTop: '1px solid var(--exp-line)' }}>
               口径:C 列为后果<b>类别</b>频率(C1 单体排气 … C5 爆燃/爆炸),非 0–IV 危险等级口径,本页不使用等级口径;
-              每行数字取自该项目最近一次钉扎案例,覆盖范围为该案例对应的事件树(场景),非项目全部 ETA 之和;
+              每行数字取自该项目最近一次钉扎案例,覆盖范围为该案例对应的事件树(场景)或勾选集聚合(徽章「聚合 n 树」),非必然为项目全部 ETA 之和;
+              <b>各行案例口径可能不同(单场景/聚合),比较以徽章为准</b>;
               跨项目比较假设各项目 C1–C5 内涵一致(内置口径)。
             </div>
           </div>

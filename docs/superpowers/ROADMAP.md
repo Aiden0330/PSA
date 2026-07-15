@@ -228,6 +228,26 @@
   移除,升为阻断门,parity Gap 6b 收口**。CI 四道物理门(py 351 / benchmark 24 /
   CUDD parity / fe 287+build)自此对每次 push 生效。
 
+- **勾选集聚合落地(2026-07-15,已裁决规格稿 A,前置稿 B 已于 582e0c0 先行)**:
+  引擎新增 `aggregate_event_tree_uncertainty(specs)`——点估计 = 各树同级后果逐级
+  求和(期望线性,精确);不确定性 = **同 ref 名 = 同认知参数**的联合抽样向量
+  (单一 RNG 流;规格点名禁止的同 seed 伪耦合/独立抽样两种实现均非)。三锚先行:
+  均值 2.5e-3/5e-4 + 守恒 Σ=Σf、共享参数均值不变、**分位判据**——联合 p95
+  9.049e-4 ≈ 9e-4 锚(rel 0.54%)vs 独立抽样 7.66e-4(压窄 ~15%,非保守方向实证)。
+  后端 `/api/report` 与 `/api/event-tree/uncertainty` 增可选 `scope="checked_set"
+  +trees[]`(默认 single 零扰动;空集/逐树边界条件响亮 400);钉扎形状按 §2.3
+  (settings.scope+scenarios,results.consequences+per_tree+bands,不改 DB schema)。
+  scope 标识全表面(§2.4):docx/pdf 标题+C1–C5 表标题+矩阵标题标「勾选集聚合
+  (n 树)」、页脚逐树分解表+逐树 init_note 基准注记+免责三句(MECE 重复/重叠告警、
+  分位不可加、IE 频率定值)、CSV 元数据行、案例列表徽章、组合总览「聚合 n 树」
+  徽章+「各行案例口径可能不同,比较以徽章为准」页脚;聚合报告无跨树重要度语义
+  → 该节不出。前端 ReportDossier 增「按勾选集聚合(n 棵)」默认 OFF 复选框
+  (trees[] 逐勾选页签复用 toEngineRequest 序列化,initEvidence→init_note 透传)。
+  收口:py 362(351+11)、benchmark 24/24 逐位、tsc -b 清、fe 293(291+2)、
+  tab-1 实测(2 树聚合导出 → 钉扎 per_tree 守恒 5e-3=Σf → 台账/组合总览双徽章,
+  console 零错)。过程发现(已挂 chip task_75694c92):_pin_case→ensure_project
+  会把已存项目改名为 scenario_name(先于本改动存在,审计有痕)。
+
 ---
 
 ### 0.1 上一基线:2026-06-30(Windows,历史记录)

@@ -26,7 +26,9 @@ vi.mock('../../api', () => ({
   diffProjectVersions: vi.fn(async () => ({ from: {}, to: {}, changes: [], summary: { added: 0, removed: 0, changed: 0 } })),
   exportReport: vi.fn(async () => {}),
 }))
-import { signReview, submitReview } from '../../api'
+import { exportReport, signReview, submitReview } from '../../api'
+import { EMPTY_FTS, resetProjectStore, useProjectStore } from '../../stores/projectStore'
+import type { ProjectEta } from '../../project'
 
 const V = (id: number, hash: string) => ({
   id, content_hash: hash, parent_version_id: null,
@@ -68,6 +70,9 @@ describe('ReportDossier 台账签发(D-P5-5 方向 A)', () => {
     h.cases = [
       { id: 11, version_id: 1, kind: 'report', engine_version: '0.1.0', created_at: '2026-07-12T08:30:00' },
       { id: 12, version_id: 2, kind: 'report', engine_version: '0.1.0', created_at: '2026-07-12T08:40:00' },
+      // spec A §2.4:checked_set 案例 → 案例列表徽章「聚合 n 树」;无 scope 的旧案例照旧
+      { id: 13, version_id: 2, kind: 'report', engine_version: '0.1.0', created_at: '2026-07-12T08:50:00',
+        settings_json: JSON.stringify({ scope: 'checked_set', scenarios: [{ key: 'a', name: '内短' }, { key: 'b', name: '过充' }] }) },
     ]
     await render()
     const text = host!.textContent ?? ''
@@ -75,6 +80,7 @@ describe('ReportDossier 台账签发(D-P5-5 方向 A)', () => {
     expect(text).toContain('送审中')
     expect(text).toContain('正式(签发版)')                 // 案例 #11(签发版)
     expect(text).toContain('工作稿')                        // 案例 #12(送审中 ≠ 正式)
+    expect(text).toContain('聚合 2 树')                     // 案例 #13(checked_set 徽章)
   })
 
   it('最新草稿行有送审按钮,点击调用 submitReview', async () => {
@@ -106,5 +112,72 @@ describe('ReportDossier 台账签发(D-P5-5 方向 A)', () => {
     expect(host!.textContent).toContain('退回')
     expect(buttons().some((b) => b.textContent === '送审')).toBe(true)   // 退回后可重新送审
     expect(buttons().some((b) => b.textContent === '签发…')).toBe(false)
+  })
+})
+
+// ── spec A:「按勾选集聚合」触发器(默认 OFF 零扰动;ON → trees[] = 全部勾选页签)──
+
+function pEta(key: string, initEvent: string, opts: { checked?: boolean; initEvidence?: string } = {}): ProjectEta {
+  return {
+    key, name: key.toUpperCase(), renamed: false,
+    model: {
+      initEvent, initFreq: 1e-3,
+      functionalEvents: [{ id: 'FE1', label: '屏障一', failProb: 0.1 }],
+      root: {
+        kind: 'branch', feId: 'FE1',
+        success: { kind: 'leaf', consequence: 'C1' },
+        failure: { kind: 'leaf', consequence: 'C2' },
+      },
+      ...(opts.initEvidence ? { initEvidence: opts.initEvidence } : {}),
+    } as any,
+    fts: EMPTY_FTS,
+    pfds: {},
+  }
+}
+
+describe('ReportDossier 勾选集聚合导出(spec A)', () => {
+  beforeEach(() => {
+    resetProjectStore()
+    // 3 页签,勾选 a、b(c 不勾)→ 聚合应恰为 [a, b]
+    useProjectStore.getState().load(
+      [pEta('a', '电芯内短路', { initEvidence: '舱级 canonical,见稿 B' }), pEta('b', 'BMS 过充'), pEta('c', '外部火烧')],
+      'a', { a: true, b: true, c: false })
+  })
+  afterEach(() => resetProjectStore())
+
+  const toggle = () => host!.querySelector('[data-testid="agg-scope-toggle"]') as HTMLInputElement
+
+  it('默认 OFF:导出请求不带 scope/trees(单场景零扰动),场景名 = 当前初因', async () => {
+    await render()
+    expect(toggle()).toBeTruthy()
+    expect(toggle().checked).toBe(false)
+    expect(host!.textContent).toContain('按勾选集聚合(2 棵)')   // 勾选计数 = a,b
+    await click('Word')
+    expect(exportReport).toHaveBeenCalledTimes(1)
+    const [fmt, req, scenario] = (exportReport as any).mock.calls[0]
+    expect(fmt).toBe('docx')
+    expect(req.scope).toBeUndefined()
+    expect(req.trees).toBeUndefined()
+    expect(scenario).toBe('电芯内短路')
+  })
+
+  it('ON:trees[] = 全部勾选页签(key/name/单树字段/init_note 透传),场景名标聚合口径', async () => {
+    await render()
+    await act(async () => { toggle().click() })
+    expect(toggle().checked).toBe(true)
+    await click('CSV')
+    const [fmt, req, scenario] = (exportReport as any).mock.calls[0]
+    expect(fmt).toBe('csv')
+    expect(req.scope).toBe('checked_set')
+    expect(req.trees).toHaveLength(2)                            // c 未勾选 → 不在集合
+    expect(req.trees.map((t: any) => t.key)).toEqual(['a', 'b'])
+    expect(req.trees[0].name).toBe('电芯内短路')                  // 未改名页签显示名 = 初因名
+    expect(req.trees[0].init_event).toBe('电芯内短路')
+    expect(req.trees[0].init_frequency).toBe(1e-3)
+    expect(req.trees[0].sequences.length).toBeGreaterThan(0)      // 单树序列化(toEngineRequest)
+    expect(req.trees[0].labels).toEqual({ FE1: '屏障一' })
+    expect(req.trees[0].init_note).toBe('舱级 canonical,见稿 B')  // spec B 注记透传
+    expect(req.trees[1].init_note).toBeUndefined()                // 无注记 → 优雅省略
+    expect(scenario).toBe('勾选集聚合(2 树)')
   })
 })
