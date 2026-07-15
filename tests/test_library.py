@@ -30,6 +30,16 @@ def test_component_rate_and_ie_freq_positive():
         assert e["freq_prior"] > 0
 
 
+def test_component_rates_unit_discipline():
+    """单位是载荷(CLAUDE.md 硬约束 4):器件失效率逐条必须带 unit,且只允许既有
+    三种口径 —— 新口径须走规格评审,不得静默发明(/cell·yr 与 /unit·yr 差 3-4 个量级)。"""
+    allowed = {"/cell·yr", "/unit·yr", "/demand"}
+    for c in load_library()["component_failure_rates"]:
+        u = c.get("unit", "").strip()
+        assert u, f"{c['id']} 缺 unit(单位是载荷)"
+        assert u in allowed, f"{c['id']} unit={u!r} 不在既有口径集 {allowed}"
+
+
 def test_disclaimer_present():
     assert load_library()["meta"]["disclaimer"].strip()
 

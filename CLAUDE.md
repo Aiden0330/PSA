@@ -65,6 +65,17 @@ Deep dives: `.claude/skills/psa-engine`, `psa-frontend`, `psa-evidence-chain`
   implementation · `domain-reviewer` (fable) for PSA methodology, data
   grading, and report claims.
 
+## 后 Fable 运行规则(无 Fable 级模型时的分级授权)
+
+- **禁独改**(须已有 Fable 级规格+锚点测试在先,否则积压 backlog 等条件恢复):
+  psaengine/bess 数值**语义**、隔离/状态机/并发路径(projectStore、persistence hook、
+  store.py 事务)、密码学/会话/身份、监管口径声明(报告/组合总览聚合口径)。
+- **可放行**(Opus/Sonnet + verify-psa 门):UI/换皮、报表布局、数据录入(库校验锁
+  兜底)、文档、既有锁测覆盖之内的重构、按已评审规格的机械实现。
+- 依据:verify-psa 的对抗审查升级规则(隔离/状态机/并发类改动,套件全绿仍须冷读
+  审查——无 Fable 时该类改动直接积压)。绊线清单:
+  `docs/reviews/2026-07-14-guardrail-tripwire-audit.md`;CI 四作业为物理门。
+
 ## Current state (2026-07-14)
 
 **Phases 0–5 全部完成**(工具链/技能体系/三 ADR 落地/前端结构改造/引擎对标补全/
