@@ -84,7 +84,10 @@ AI 管线/评审签发+本地认证),**探索者壳重设计 R1–R5 完成**(�
 canonical 手册。基线:py 366 collected(含 24 benchmark 逐位)· fe 281 · bundle 2.78MB。
 文档地图:`docs/README.md`。
 
-**悬置项**:GitHub 远程未建(CI / CUDD Linux 验证 / 异地协作 inert,用户侧动作);
-AI 真实供应商首跑待 API key(runbook 就绪);parity Gap 6b/9 与组合总览"聚合范围
-钉扎"记 `.claude/skills/riskspectrum-parity` 与 ROADMAP。Windows 历史:
-`git-archive repo/`(ignored);被取代的旧手册与技能蓝图在 `docs/archive/`。
+**悬置项**:GitHub 远程已建(github.com/Aiden1981/PSA,2026-07-15)——CI 四作业
+随 push 生效,CUDD Linux 作业首跑结果决定 Gap 6b 收口(绿则移除
+continue-on-error);AI 真实供应商首跑待 API key(runbook 就绪);两份已裁决规格
+(IE 口径统一 → 聚合范围钉扎,**必须按此顺序**)与 UI exact/Σ 切换为待实现
+backlog(锚点齐备,Opus/Sonnet 级);parity 残余 = 序列级 LFT 集成(禁独改类,
+需 Fable 规格先行)。Windows 历史:`git-archive repo/`(ignored);被取代的旧手册
+与技能蓝图在 `docs/archive/`。
