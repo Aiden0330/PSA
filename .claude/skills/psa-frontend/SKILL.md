@@ -1,48 +1,76 @@
 ---
 name: psa-frontend
-description: 本项目 React+TS 前端工作台(frontend/src)的实现与维护技能。修改 ETA 编辑器/FTA 画布/FMEA/参考库/风险矩阵/报告界面、项目文件与持久化、撤销重做、布局与主题、离线单文件包,或新增前端功能时使用。触发词:前端、EventTreeEditor、FaultTreeCanvas、App.tsx、eventtree.ts、model.ts、useModel、参考库界面、FMEA 界面、风险矩阵、psa-btn/psa-card、standalone、离线包、vitest。
+description: 本项目 React+TS 前端工作台(frontend/src)的实现与维护技能。修改探索者壳(菜单/项目树/状态栏)、多项目状态层、ETA/FTA 画布(缩放/直角走线)、参数库/参考库/FMEA/报告/组合总览页面、持久化与撤销重做、主题令牌、离线单文件包,或新增前端功能时使用。触发词:前端、App.tsx、projectStore、viewStore、ExplorerTree、MenuBar、EtCanvas、useCanvasZoom、FaultTreeCanvas、EventTreeEditor、eventtree.ts、model.ts、persistence、多项目、切换项目、--exp-、psa-btn、standalone、离线包、vitest、tsc。
 ---
 
 # 前端工作台实现与维护(psa-frontend)
 
-真实代码结构优先——原蓝图(etafta-frontend)的 architecture/assets 描述的是设计期草图,已归档 `docs/skill-blueprints/`,**以本文与实际代码为准**;references/ 保留的是仍然有效的设计意图(FTA 符号规范、交互模式、结果呈现)。
+探索者壳 + 多项目架构(2026-07-13/14 R1–R5 落地)。以本文与实际代码为准;
+证据链相关 UI 语义(台账/组合总览/409)另见技能 **psa-evidence-chain**。
 
-## 一、真实架构(2026-07)
+## 一、真实架构(2026-07-14)
 
 ```
 frontend/src/
-  App.tsx            ~1000 行:标签路由(ETA/FTA/FMEA/参考库/报告)+ 两个 useModel(故障树 model + 事件树 etModel)
-                     + userFts(自建 FTA)+ 各 store 装配 + 保存/存档/项目文件工具栏。Phase 3 计划拆分——新状态优先放 store,别再往里加。
-  eventtree.ts       可编辑事件树模型:EtNode 分支显式记 feId(**有序可跳过**:选中叶可续接任意更靠后屏障);
-                     积式频率(独立屏障下=精确);toEngineRequest 序列化(共享事件必须走引擎精确定量);
-                     reorderFe(次序调整,后果按深度保留)、normalizeEta(旧存档兼容)。
-  model.ts           可编辑故障树 + 纯操作 + activatedNodes(割集回溯高亮) + addFaultTree/deleteFaultTree(自建 FTA)。
-  useModel.ts        撤销/重做 reducer(泛化 useHistory<T>)。
-  api.ts             引擎/后端契约类型 + 调用(/api/quantify、/api/event-tree/{quantify,uncertainty,importance}、/api/bess/*、/api/saved、/api/report)。
-  bayes.ts           纯前端贝叶斯:posteriorPfd(Beta-二项)+ posteriorRate(Poisson-Gamma)+ beta/gamma 分位数。
-  riskmatrix.ts      6×5 中电联矩阵 + riskSummary。   fmea.ts  RPN/AP + 可配置 MappingConfig。
-  libraryStore.ts    参考库用户覆盖层(localStorage 叠加内置,applyOverlay 全站生效,随项目文件迁移)。
-  fmeaStore.ts / mappingStore.ts   localStorage 持久化(键 bess-eta:*)。
-  projectFile.ts     项目文件信封 bess-psa-project(payload v2:ETA 页签+活动页+勾选集+userFts+FMEA+映射+库覆盖层)。
-  components/        EventTreeEditor(837 行,直角连接器/冻结表头/检视器/内联贝叶斯)、FaultTreeCanvas+Palette+Inspector(React Flow+dagre)、
-                     BarrierFtModal(屏障挂 FTA)、FmeaWorkbench、ReferenceLibrary(三表+分级筛选+现场更新)、
-                     RiskMatrix+RiskSummary、SequencePaths(事故序列路径图)、LibPicker、AiDraftPanel、EChart(自写,勿用 echarts-for-react)、icons.tsx。
-  theme.css          --psa-* 设计令牌 + psa-btn/psa-card/psa-ch/psa-kpi 等组合类;设计规范见 docs/design/restyle-spec.md。
+  App.tsx                 ~190 行壳:App(认证门,off 恒放行)→ AppShell(菜单栏+项目树+
+                          懒页签 Suspense+状态栏)。新状态一律进 store,不进 App。
+  stores/
+    projectStore.ts       ★多项目单一真源(方案 C 绞杀者):顶层字段=活动项目;非活动整槽
+                          停放 parked{past,present,future,activeKey,checkedKeys,pfds,identity,
+                          fmea*}。openProject(wid+savedId 双键去重→聚焦)/switchProject/
+                          closeProject/setIdentityFor(槽定向)/rekeyWorkspace(另存后键迁移)。
+                          pfds 派生缓存在撤销历史之外。锁测 projectSlots.test.ts(13)。
+    viewStore.ts          布局/页签/命令板/折叠态(seqExpanded/ftaResultsExpanded),persist 子集。
+    useActiveEta.ts       活动 ETA 选择器门面(etaTabs/activeKey/P() 等,稳定快照)。
+    derived.ts            composeEta/stripDerived(PFD 写回与历史解耦)。
+  features/
+    shell/                MenuBar(文件/编辑/视图/分析/数据/评审/帮助+身份簇)· ExplorerTree
+                          (稳定切片订阅+useMemo——fresh-array 选择器会无限渲染)· StatusBar ·
+                          CommandPalette · LoginWall · AccountsPanel · SaveConflictDialog。
+    persistence/          useProjectPersistence(★身份/存档/导入导出/会话草稿;所有 await 后
+                          身份写回必须 setIdentityFor(发起 wid)——见陷阱)· projectIo · bootstrap。
+    eta/ fta/ home/ report/ portfolio/ ai-draft/ library/ analysis/ templates/
+  components/eta/         EtCanvas(SVG 直角级联,全内容 <g transform>)· useCanvasZoom
+                          (纯数学:clamp 0.4–2.5/指针不动点/fit;16 测)· EtInspector 等。
+  components/             FaultTreeCanvas(reactflow+dagre,zoomToolbar prop)· ResultsPanel ·
+                          ParamLibrary(ag-grid)· ReferenceLibrary · FmeaWorkbench · EChart(自写)。
+  eventtree.ts / model.ts 可编辑模型纯函数(有序可跳过分支;toEngineRequest;consLevel 折级)。
+  api.ts                  后端契约(quantify/event-tree/*、ft/frequency、saved、projects、
+                          reviews、auth、portfolio);401→AuthRequiredError 上抛。
+  theme.css               --psa-*(工作台)+ --exp-*(探索者壳)令牌与组合类。
 ```
 
 ## 二、硬性规则
 
 1. **版本锁定**:Vite 5 / React 18 / echarts 5 / ag-grid 32(Node 20)。不升级。
-2. **`id`/`feId` 稳定性是全局契约**——挂载 FTA、pfds、序列化、MEF 导出全依赖它;改名只改中文 `label`。屏障重排(`reorderFe`)有 isCascade/cascadeConsequences 守护测试。
-3. **积式频率只在屏障独立时精确**;功能事件挂了共享基本事件的 FTA 时必须走「引擎精确量化」按钮路径(POST /api/event-tree/quantify)。UI 上要保留差异高亮语义。
-4. **持久化三层**:localStorage(工作态)→ `/api/saved` 快速存档(opaque payload)→ 项目文件导出(离线可迁移)。改 payload 结构必须保持旧档兼容(经 normalizeEta / 缺省补全),并同时更新 serialize/deserialize 两侧。
-5. **改了参考库数据或影响离线包的 UI ⇒ `make bundle`** 重新生成 `bess-eta-standalone.html`(scripts/capture-data.mjs 重生成 embeddedData.ts + inline-html.mjs 打包)。
-6. **UI 验证用 `preview_eval` 查 DOM,不用 `preview_screenshot`**(重前端包必超时,既定惯例)。交互类改动在 preview 里实测(点击/拖拽/联动)再收口。
-7. 样式走 `theme.css` 令牌与组合类,遵循 `docs/design/restyle-spec.md` 的卡片式语言;不要新增大段内联样式。
-8. vitest 与源码同目录(`*.test.ts`);纯函数(eventtree/model/bayes/fmea/riskmatrix)是测试重心,新纯逻辑必须带测试。当前基线 165 例。
+2. **类型门是 `npx tsc -b`**(构建同款,项目引用配置)——`tsc --noEmit` 解析更宽松的
+   config,漏过 4 个错误的前科。CI/收口一律 tsc -b。
+3. **`id`/`feId` 稳定契约**;改名只改中文 `label`;reorderFe 有级联守护测试。
+4. **多项目隔离是结构给的,别绕过**:项目内容/身份只经 projectStore 动作变更;
+   **任何 async 回调里的身份写回必须槽定向**(`setIdentityFor(发起时捕获的 wid)`,
+   槽已关闭即丢弃);另存/首存后 `rekeyWorkspace`;跨项目 UI 态(AI 草案、冲突对话)
+   要么随 workspaceId 清空、要么携带发起 wid。R2 对抗审查 9 项发现全是违反此条。
+5. **积式频率只在屏障独立时精确**;共享事件必须走「引擎精确量化」;初因频率走
+   /api/ft/frequency 专用通道(频率≠概率,不钳位≤1)。
+6. **持久化兼容**:旧档经 normalizeEta/缺省补全;serialize/deserialize 同改 + 旧档往返测试。
+7. **改影响离线包的东西 ⇒ `make bundle`**(协调者跑,子代理不跑)。
+8. **UI 验证:浏览器 DOM 检查/JS 断言**,截图在重前端页超时(既定);交互实测后收口。
+9. 样式走 theme.css 令牌(壳用 --exp-*,工作台用 --psa-*);禁大段内联样式蔓生;
+   数字 tabular-nums。vitest 与源码同目录,纯函数必须带测;基线 **281**。
+10. React 陷阱备忘:`onWheel` 是 passive 委托(preventDefault 无效 → 原生
+    {passive:false});useSyncExternalStore 选择器必须稳定快照;StrictMode 下
+    reactflow 缩放按钮 dev 无效(生产正常,已知)。
 
-## 三、references(设计意图,仍有效)
+## 三、开发环境陷阱
 
-- `fta-symbols.md` — IEC 标准门符号(与门平底拱顶/或门凹弧底尖顶)与节点视觉规范。
-- `interactions.md` — 画布交互模式(选中/连线/删除/撤销/割集回溯高亮)。
+- **白屏 + "Invalid hook call"(双 React)**:vite 依赖预优化缓存损坏(非正常重启后),
+  网络里同名 chunk 带/不带 `?v=` 各一份即确诊 → `rm -rf node_modules/.vite` 重启。
+  **不是代码回归,别急着改码。**
+- 非交互 shell 先 `source ~/.nvm/nvm.sh`;npm/npx 在 frontend/ 下跑(cwd 漂移常犯)。
+
+## 四、references(设计意图,仍有效)
+
+- `fta-symbols.md` — IEC 门符号视觉规范。 `interactions.md` — 画布交互模式。
 - `results-and-data.md` — 结果呈现与数据网格设计意图。
+- 设计令牌规范 `docs/design/restyle-spec.md`;探索者壳版式以
+  `docs/superpowers/specs/2026-07-13-explorer-redesign.md` 为准(§6 有偏离记录)。

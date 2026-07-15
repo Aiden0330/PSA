@@ -29,6 +29,8 @@ ledger is the single place that answers "how far are we?" — keep it current.
 | **Model compare / diff** | ✅ 2026-07-09 | Identity-keyed structural diff over canonical versions + dossier compare view. tests/backend/test_diff.py |
 | CUDD backend correctness (coherent + non-coherent) | ✅ 2026-07-09 | dd.cudd built on macOS arm64, parity tests live (0 skipped); complement-mark cofactor fix + NOT/XOR/success-branch locks; 1000-event closed-form; iterative Shannon traversal (no recursion cap) |
 | **Initiating-event fault trees**(手动/FTA 双通道初因) | ✅ 2026-07-13 | fault_tree_frequency:每割集恰好一个频率事件,F=Σ 率×Π使能概率(与 RS/SAPHIRE 同法);双向量纲护栏(频率参数进概率通道 raise、非相干门 NOT/XOR 拒绝、limit_order 整体移除);engine-reviewer 两轮(round-1 FAIL 6 项→整改→round-2 PASS);spec 2026-07-13-ie-fault-tree-frequency.md。残留:load-time 独立性 lint、逐初因精确模式(见 Gaps #9) |
+| **Review/sign-off workflow**(状态机级) | ✅ exceeds 2026-07-12(商用工具均为外挂配置管理流程) | reviews 状态机(signed 终态 DB 触发器、每项目单在审部分唯一索引、角色快照入审计)+ 导出门=内容寻址幂等(签发页脚 vs 工作稿自动区分);spec 2026-07-12-phase5-review-signoff-spec.md |
+| **Multi-project portfolio**(跨项目组合总览) | ✅ 2026-07-14(对标产品无对应物) | /api/portfolio 只读已钉扎案例(绝不现算);review 锚最新版 + open_review 防"看不见还能签";矩阵口径与报告同源(前后端 25 格金表互锁);domain-reviewer 落审 6 裁决 + F1/F2 修复 |
 
 ## Gaps (remaining)
 
@@ -39,6 +41,13 @@ ledger is the single place that answers "how far are we?" — keep it current.
 | 8 | Boundary-condition / post-processing / CCF-per-barrier UI(engine+API done) | Analyst ergonomics | API-first shipped 2026-07-09; UI slot: analysis settings panel |
 | 9 | IE 频率逐初因精确模式 + 序列级 IE-树×路径全集成(共享事件跨 IE/屏障) | Σ-of-MCS 对共享初因保守可超物理上界(非稀有使能域);共享事件场景现被前端 lint 拒绝而非精确处理 | 对每初因的使能析取建 BDD(机器已有);完整 LFT 集成 = RS 序列割集法。2026-07-13 review F5 |
 
+## Adjacent-tool intel (2026-07-14, TD-001 §9 调研)
+
+**Isograph FaultTree+**(Reliability Workbench;航空/轨道/国防主力):MCS + 精确上界
+后处理(其公开文档未宣称 BDD 主通道);CCF β/MGL/α/**β-BFR**;**initiator–enabler
+分析**(与我们 §4.13 频率通道同族语义——对拍候选);ETA 模块厂商宣称"成功态完全处理"
+(口径未公开验证);无 MEF、无贝叶斯更新、无 AI。对比全表:TD-001 表 11。
+
 ## Rules
 
 - Before implementing any gap: `reference-hunt` its exact semantics (SCRAM
@@ -46,3 +55,4 @@ ledger is the single place that answers "how far are we?" — keep it current.
   `tests/benchmark/`.
 - When a gap closes: move the row up with evidence, note the date. When
   claiming "exceeds", there must be a test demonstrating the difference.
+- 面向外部的能力声明(文档/对比表)与本账本必须同步——TD-001 表 11/12 改动时回写此处。

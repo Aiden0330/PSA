@@ -19,10 +19,14 @@ psaengine/
   importance/  measures(Birnbaum/FV/RAW/RRW/DIM)
   uncertainty/ montecarlo(lognormal-EF/normal/uniform/beta)
   eta/         sequence(_build_event_tree 建一次 BDD + quantify_event_tree(fe_overrides=))·uncertainty(MC + barrier_importance_exact)
+  quantify/frequency.py  ★初因频率通道:fault_tree_frequency——每割集恰好一个频率事件
+               (initiator),F = Σ λ·Πq(/yr,互斥割集求和,绝不 1−Π(1−q));违规
+               FrequencyRuleError 响亮拒绝;规范化图上拒 NOT/XOR;无 limit_order(截断
+               先于校验会造成规则逃逸,评审 F2 整体移除)。共享使能精确,共享初因保守。
   analysis.py  Analysis 门面(CCF 在此接入)      cli.py(python -m psaengine.cli)
 ```
 
-参数模型(`model/parameters.py`):`probability` | `rate`(λ·MTTR / λτ/2 / λ·mission_time)| `frequency`;分布 lognormal(median+EF)/normal/uniform/beta。
+参数模型(`model/parameters.py`):`probability` | `rate`(λ·MTTR / λτ/2 / λ·mission_time)| `frequency`;分布 lognormal(median+EF)/normal/uniform/beta。**双向量纲护栏**:frequency 参数进概率语境(`unavailability()`)即 raise;负 λ / 负时间参数源头拒绝——量纲静默混算是这类工具最危险的缺陷类。
 
 ## 二、既定偏离(有意为之,勿"修复")
 
@@ -40,7 +44,10 @@ psaengine/
 
 ## 四、当前对标缺口(扩展路线,详见技能 riskspectrum-parity)
 
-`ccf_expand.py` 只实现 beta(MGL/Alpha 以首因子近似——模型 schema 已声明 `beta|mgl|alpha|phi`,展开未实现);house event/边界条件集(常量传播已有,缺一等公民接口);后处理规则(delete-term/互斥事件);分析案例(模型版本+设置+结果的可审计绑定)。实现顺序按 parity 技能排定;每项都从 `references/` 对应理论 + SCRAM 实践对照读起。
+历史缺口已陆续关闭(CCF 全模型展开、house/边界条件集、后处理规则、分析案例、模型 diff、
+CUDD 本机验证、初因频率通道——均见 parity 账本"至/超对标"区,附证据与日期)。剩余:
+Gap 6b(CUDD Linux CI,待 GitHub 远程)、Gap 9(逐初因精确模式/完整 LFT 序列集成)、
+长尾(交换事件、时变 Q(t))。新缺口实现前先 `reference-hunt` 语义 + 锚定基准数。
 
 ## 五、references(写对应模块前精读)
 
@@ -49,4 +56,4 @@ psaengine/
 - `quantification.md` — REA/MCUB/容斥、成功分支与删除项、重要度、CCF 集成。
 - `tools-and-libraries.md` — SCRAM/XFTA/FTREX/RSAT 实践对照、dd/CUDD 适配、基准与一手文献。
 
-> 原蓝图 assets(bdd_engine.py 等草图)已被真实实现取代,归档于 `docs/skill-blueprints/`——**别参照草图改真码**。
+> 原蓝图 assets(bdd_engine.py 等草图)已被真实实现取代,归档于 `docs/archive/skill-blueprints/`——**别参照草图改真码**。

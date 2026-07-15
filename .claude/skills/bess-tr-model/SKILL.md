@@ -9,7 +9,7 @@ description: 储能（BESS）锂离子电池热失控的事件序列与防护屏
 
 本技能是**领域内容层**:产出的事件树模型交给引擎 `psaengine/`(技能 `psa-engine`)做精确定量,在前端(技能 `psa-frontend`)渲染编辑。面向 BESS 热失控 QRA,但框架对其他锂电场景通用。
 
-> **当前实现(2026-07)**:本框架已落地——链条/屏障/后果数据在 `bess/tr_model_data.json`(驱动 `bess/tr_model.py`),5 个内置初始事件场景树在 `bess/scenarios.json`(内短/过充/液冷/外火/机械进水,`GET /api/bess/scenarios`),C1–C5 在 `bess/consequences.py`。**修改事件树结构或屏障时改这些数据文件,不要新写脚手架**;新增场景先读本技能 references 再落 `scenarios.json`。原蓝图 assets(`tr_event_tree.py`/`tr_model.json`)已被真实实现取代,归档于 `docs/skill-blueprints/`;前身工具的模板文件 `docs/reference-assets/templates-eta-claude.ts` 待迁移为模板库。
+> **当前实现(2026-07)**:本框架已落地——链条/屏障/后果数据在 `bess/tr_model_data.json`(驱动 `bess/tr_model.py`),5 个内置初始事件场景树在 `bess/scenarios.json`(内短/过充/液冷/外火/机械进水,`GET /api/bess/scenarios`),C1–C5 在 `bess/consequences.py`。**修改事件树结构或屏障时改这些数据文件,不要新写脚手架**;新增场景先读本技能 references 再落 `scenarios.json`。原蓝图 assets(`tr_event_tree.py`/`tr_model.json`)已被真实实现取代,归档于 `docs/archive/skill-blueprints/`;前身工具的模板文件 `docs/reference-assets/templates-eta-claude.ts` 待迁移为模板库。
 
 ## 一、核心框架:链条即事件树（先读)
 

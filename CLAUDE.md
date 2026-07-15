@@ -11,11 +11,11 @@ next-generation UX + AI-assisted ETA/FTA generation**, regulator-facing
 |---|---|---|
 | Engine | `psaengine/` | Generic FTA/ETA: exact ROBDD (**no complement edges — deliberate**) + ZBDD/MOCUS cut sets, exact Shannon probability, importance (Birnbaum/FV/RAW/RRW/DIM), MC uncertainty, beta-CCF, Open-PSA MEF XML I/O. Pure Python. |
 | Domain | `bess/` | TR event trees (`tr_model_data.json`, 5 scenarios in `scenarios.json`), graded reference library (`reference_data.json` + `library.py`), C1–C5 consequences, report data. |
-| Backend | `backend/` | FastAPI (`app.py`), ET builder, workspace blobs (`storage.py` → `saved/`), Word/PDF/CSV export, AI draft (`ai_draft.py`, gated by `PSA_AI_ENABLED`). |
-| Frontend | `frontend/src/` | React 18 + TS workbench. Tabs: ETA / FTA / FMEA / 参考库 / 报告. Load-bearing: `App.tsx`, `eventtree.ts`, `model.ts`, `api.ts`, `components/EventTreeEditor.tsx`, theme tokens in `theme.css`. |
+| Backend | `backend/` | FastAPI (`app.py`) + 证据链核心 `store.py`(内容寻址版本库 / 只增审计 / 分析案例 / 评审状态机 / 本地认证 `auth/`)+ canonical 规范层 + `/api/portfolio` + Word/PDF/CSV export + AI 管线(`ai_pipeline.py`, gated by `PSA_AI_ENABLED`). Legacy blobs `storage.py` → `saved/`. |
+| Frontend | `frontend/src/` | React 18 + TS,探索者壳(菜单栏/项目树/状态栏)+ 多项目槽架构. Pages: 总览 / ETA / FTA / 参数库 / 参考库 / 后果 / FMEA / 报告证据链 / **组合总览**. Load-bearing: `stores/projectStore.ts`(多项目单一真源), `features/{shell,persistence}`, `components/eta/EtCanvas.tsx`, `eventtree.ts`, `model.ts`, `api.ts`, theme tokens in `theme.css`(`--psa-*` + `--exp-*`). |
 
-Deep dives: `.claude/skills/psa-engine`, `psa-frontend`, `bess-tr-model`,
-`eta-reference-data`.
+Deep dives: `.claude/skills/psa-engine`, `psa-frontend`, `psa-evidence-chain`
+(版本库/评审/认证/组合总览), `bess-tr-model`, `eta-reference-data`.
 
 ## Environment & commands — macOS is primary
 
@@ -23,7 +23,8 @@ Deep dives: `.claude/skills/psa-engine`, `psa-frontend`, `bess-tr-model`,
   · `make backend` (:8000) · `make frontend` (:5173) · `make run` · `make bundle`.
   `run.ps1` is Windows legacy.
 - Python 3.12 via uv (`.venv`); Node 20 via nvm — in non-interactive shells
-  `source ~/.nvm/nvm.sh` first.
+  `source ~/.nvm/nvm.sh` first. 前端类型门是 **`npx tsc -b`**(构建同款项目引用
+  配置;`--noEmit` 解析更宽松的 config,有漏错前科)。
 - Preview servers: `.claude/launch.json`. **`preview_screenshot` times out on
   this app — verify UI with `preview_eval` DOM checks** (established practice).
 
@@ -64,10 +65,15 @@ Deep dives: `.claude/skills/psa-engine`, `psa-frontend`, `bess-tr-model`,
   implementation · `domain-reviewer` (fable) for PSA methodology, data
   grading, and report claims.
 
-## Current state (2026-07)
+## Current state (2026-07-14)
 
-Phase 0+1 done (macOS toolchain, CI, git, this structure). Next: **Phase 2
-keystone ADRs** — canonical ProjectDocument schema, storage/versioning/audit,
-AI pipeline. Parity backlog: `.claude/skills/riskspectrum-parity`. Windows
-history: `git-archive repo/` (ignored, standalone). Predecessor templates
-awaiting migration: `docs/reference-assets/templates-eta-claude.ts`.
+**Phases 0–5 全部完成**(工具链/技能体系/三 ADR 落地/前端结构改造/引擎对标补全/
+AI 管线/评审签发+本地认证),**探索者壳重设计 R1–R5 完成**(多项目槽架构/画布缩放/
+组合总览,规格 §6 有偏离记录),技术文档 **TD-001 Rev C**(docs/,含 Word 版)即
+canonical 手册。基线:py 366 collected(含 24 benchmark 逐位)· fe 281 · bundle 2.78MB。
+文档地图:`docs/README.md`。
+
+**悬置项**:GitHub 远程未建(CI / CUDD Linux 验证 / 异地协作 inert,用户侧动作);
+AI 真实供应商首跑待 API key(runbook 就绪);parity Gap 6b/9 与组合总览"聚合范围
+钉扎"记 `.claude/skills/riskspectrum-parity` 与 ROADMAP。Windows 历史:
+`git-archive repo/`(ignored);被取代的旧手册与技能蓝图在 `docs/archive/`。
