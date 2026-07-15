@@ -120,11 +120,11 @@ npm --prefix frontend run build
 
 ## 文档
 
-- [使用手册](docs/USER_GUIDE.md)
-- [算法设计说明](docs/ALGORITHM_DESIGN.md)
+- [技术文档与算法手册(TD-001 Rev C,权威)](docs/BESS-PSA-TD-001-技术文档.html)——方法基础/算法/工具手册/SOTA 对比;Word 版同目录
+- [文档目录地图](docs/README.md)(旧使用手册/算法说明已归档 `docs/archive/`)
 - [路线图与交接文档](docs/superpowers/ROADMAP.md)
 - 开发协作约定：根 `CLAUDE.md` + `.claude/skills/`（4 领域 + 9 流程技能）+ `.claude/agents/`（3 评审/实现代理）
-- [AI 模型策略](docs/design/ai-model-strategy.md)；原技能蓝图归档于 `docs/skill-blueprints/`
+- [AI 模型策略](docs/design/ai-model-strategy.md)；原技能蓝图归档于 `docs/archive/skill-blueprints/`
 
 ## 下一步建议
 

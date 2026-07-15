@@ -167,6 +167,22 @@
   8 条锁测全绿的隔离层,冷读探针 40 分钟判 FAIL。审查者已核清白项(双击竞态/关闭回退/
   载荷跨槽/bootstrap 覆盖等)记录在案,不再重复质疑。
 
+- **技术文档 Rev C + 技能/文档体系刷新(2026-07-14,用户点题)**:TD-001 大改版
+  (`aa5f96d`:新 §3 方法基础两图两表 / §4.13–4.14 / 手册扩写含 AI 指南与组合总览 /
+  §8.4 AI 生成输入调研(MBSA vs LLM 两路线,ETA 生成侧空档结论)/ 能力矩阵 +Isograph
+  列 +评审签发行 / 参考文献 21–26 / 补 meta charset;Word 版 1.0MB 自建管线:
+  lxml+python-docx,SVG 浏览器浅色 2x 栅格,同 URL Artifact 更新)。技能结构重设计:
+  **域技能 4→5,新增 `psa-evidence-chain`**(版本库/评审签发/认证/组合总览的不变量
+  与已付学费清单——该子系统不变量密度已配得上独立技能);`psa-frontend` 按探索者
+  多项目架构全量重写(槽钉定规则/双 React 伪象/tsc -b 门);`verify-psa` 升级
+  (基线 py366·fe281、`tsc -b` 取代 --noEmit、**对抗审查升级规则**:隔离/状态机/并发
+  类改动绿了也要冷读审查、夹具镜像真实管线、开发环境假警报清单);`psa-engine` 补
+  频率通道与量纲护栏;parity 账本 +评审签发/组合总览两行 + Isograph 情报;
+  frontend-dev 代理同步(槽钉定/tsc -b/vite 缓存)。docs/ 重组:新 `README.md`
+  地图 + `research/`(RiskSpectrum 调研、compass ×3 自根目录迁入)+ `archive/`
+  (USER_GUIDE/ALGORITHM_DESIGN 加迁移注记归档——内容已并入 TD-001;skill-blueprints;
+  早期样例报告);CLAUDE.md 架构表/现状/门禁刷新。
+
 ---
 
 ### 0.1 上一基线:2026-06-30(Windows,历史记录)
@@ -315,5 +331,5 @@ run.ps1   .claude/launch.json(预览)
 
 ## 6. 参考文档
 - 引擎设计/计划:`docs/superpowers/specs/2026-06-20-bess-psa-engine-design.md`、`docs/superpowers/plans/2026-06-20-bess-psa-engine.md`、`...-phase1.5.md`、`...-frontend-v1.md`。
-- 领域/算法/对标调研:仓库根目录 `compass_artifact_*.md`、`RiskSpectrum_PSA_ETA_调研报告.docx`。
+- 领域/算法/对标调研:`docs/research/compass_artifact_*.md`、`RiskSpectrum_PSA_ETA_调研报告.docx`。
 - 技能蓝图:`bess-tr-event-tree.skill`、`fta-eta-quantification-engine.skill`、`etafta-frontend.skill`。
