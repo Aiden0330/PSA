@@ -44,6 +44,26 @@ function defaultFactors(model: CcfModel, m: number): Record<string, number> {
 export function ParamLibrary({ model, onUpdateParam, onSetCcf }: Props) {
   const rows = model.model_data.parameters
   const basics = rows.map((r) => r.id)
+  // CCF 成员挑选:按来源故障树分组(param_ref → 首个引用它的树名),未被任何树引用的归「未挂载参数」。
+  // 建组便利性(parity Gap8):从扁平清单升级为带来源树标签的分组清单,不改选择语义(仍是多选 id)。
+  const memberGroups = (() => {
+    const treeOf = new Map<string, string>()
+    for (const ft of model.fault_trees) {
+      for (const n of ft.nodes) {
+        const ref = n.param_ref ?? (n.basic ? n.id : undefined)
+        if (ref && !treeOf.has(ref)) treeOf.set(ref, ft.name)
+      }
+    }
+    const order: { tree: string; ids: string[] }[] = []
+    const byTree = new Map<string, string[]>()
+    for (const id of basics) {
+      const g = treeOf.get(id) ?? '未挂载参数'
+      let bucket = byTree.get(g)
+      if (!bucket) { bucket = []; byTree.set(g, bucket); order.push({ tree: g, ids: bucket }) }
+      bucket.push(id)
+    }
+    return order
+  })()
   const groups = model.ccf_groups ?? []
   const [members, setMembers] = useState<string[]>([])
   const [ccfModel, setCcfModel] = useState<CcfModel>('beta')
@@ -153,10 +173,14 @@ export function ParamLibrary({ model, onUpdateParam, onSetCcf }: Props) {
         {showForm && (
           <div style={{ padding: '0 10px 14px', borderTop: '1px solid var(--psa-line)', paddingTop: 12, display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontSize: 11.5, color: 'var(--psa-ink-2)', marginBottom: 4 }}>成员（多选）</div>
+              <div style={{ fontSize: 11.5, color: 'var(--psa-ink-2)', marginBottom: 4 }}>成员（多选，按来源故障树分组）</div>
               <select multiple value={members} style={{ minWidth: 220, height: 120, fontSize: 12 }}
                 onChange={(e) => setMembers(Array.from(e.target.selectedOptions, (o) => o.value))}>
-                {basics.map((b) => <option key={b} value={b}>{b}</option>)}
+                {memberGroups.map((g) => (
+                  <optgroup key={g.tree} label={g.tree}>
+                    {g.ids.map((b) => <option key={b} value={b}>{b}</option>)}
+                  </optgroup>
+                ))}
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 20 }}>
