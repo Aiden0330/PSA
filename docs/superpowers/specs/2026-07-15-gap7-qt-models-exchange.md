@@ -47,7 +47,18 @@ RiskWatcher 是**在线运营**产品(实时配置风险/ACT/机组状态接入)
 RIF≡RAW、RWF≡RRW、停役≡house 强制、ICCDP=(P_cfg−P_base)·d 平凡后算)——
 「配置风险 Δ 分析案例」薄片记 backlog 候选(数日级,复用证据链)。
 
-## 4 · 评审与门禁
+## 4 · 评审记录
+
+- **round-1(2026-07-15,engine-reviewer 轻扫):FAIL** ——公式全部经 Decimal-60 独立
+  复核正确(glm 与二态 Markov 解一致、weibull β=1 逐位退化指数、保守方向断言解析成立、
+  旧三线性化 300 例逐位不变),但 **G1(必修)**:periodic_test 在 λτ≲1e-6 灾难性消去
+  (x=1e-9 实测 56× 高估;[1e-15,1e-6] 扫描 772/2000 点**负值**静默入概率通道;现实
+  可达 λ=1e-6/yr 日检)→ 小 x 泰勒级数 + expm1 无消去形 + Decimal-60 对照锚 +
+  q̄∈[0,1] 500 例性质锁;**G2(应修)**:exchange 可把两割集映射同一事件集 → REA 双计
+  (2.00× 实测)→ 应用后按事件集去重(merged 计数),非最小性在文档披露;
+  注记:source==target 的 regime-A 后门改为响亮拒绝;exponential/glm 换 −expm1 抛光。
+
+## 5 · 门禁
 
 参数层公式实现,无 BDD 内核改动 → benchmark 必跑(应零差异,结构性:概率通道
 只经 unavailability() 取标量);锚点先红后绿;engine-reviewer 并入本日 LFT 审查

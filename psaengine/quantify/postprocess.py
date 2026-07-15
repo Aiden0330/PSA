@@ -51,6 +51,11 @@ class PostRule:
                 raise ValueError("exchange rule needs source (被替换的基本事件)")
             if not r.add_event:
                 raise ValueError("exchange rule needs add_event (target)")
+            if r.source == r.add_event:
+                # review 365e7e5 注记:source==target 事实上是参数重绑定(规格 regime A,
+                # 明示留 v2)——不许从后门进,响亮拒绝。
+                raise ValueError("exchange rule source == add_event(参数重绑定属 regime A,"
+                                 "v1 不支持;见规格 2026-07-15-gap7 §2)")
             if r.prob is None or not 0.0 <= r.prob <= 1.0:
                 raise ValueError("exchange rule needs prob in [0,1] (target 概率)")
             if r.source_prob is None or not 0.0 < r.source_prob <= 1.0:
@@ -59,8 +64,11 @@ class PostRule:
 
 
 def apply_post_rules(cutsets: list[CutSet], rules: list[PostRule]) -> tuple[list[CutSet], dict]:
-    """按序应用规则。返回 (处理后割集, 统计 {removed, recovered});
-    幂等安全:recovery 不重复追加已含的恢复事件。"""
+    """按序应用规则。返回 (处理后割集, 统计 {removed, recovered, exchanged, merged});
+    幂等安全:recovery 不重复追加已含的恢复事件。
+    review 365e7e5 G2:exchange 可把两个割集映射成同一事件集(A→B 落在既有 {B,C} 上)
+    ——REA 会双计;应用后按事件集合并去重(保留首个,merged 计数),并披露
+    结果列表可能非最小(吸收关系不在此重跑,REA/MCUB 为 MCS 级估计语义)。"""
     removed = 0
     recovered = 0
     exchanged = 0
@@ -98,5 +106,18 @@ def apply_post_rules(cutsets: list[CutSet], rules: list[PostRule]) -> tuple[list
                     p *= float(r.prob)
                 exchanged += 1
         out.append(CutSet(events, order, p))
-    out.sort(key=lambda c: (-c.probability, c.order, c.events))
-    return out, {"removed": removed, "recovered": recovered, "exchanged": exchanged}
+    # G2:按事件集去重(exchange 可造成同集重复 → REA 双计;方向虽保守,
+    # 监管面向的 MCS 列表出现重复行是记账错误,不是近似)。
+    merged = 0
+    seen: dict[frozenset, int] = {}
+    dedup: list[CutSet] = []
+    for c in out:
+        key = frozenset(c.events)
+        if key in seen:
+            merged += 1
+            continue
+        seen[key] = 1
+        dedup.append(c)
+    dedup.sort(key=lambda c: (-c.probability, c.order, c.events))
+    return dedup, {"removed": removed, "recovered": recovered,
+                   "exchanged": exchanged, "merged": merged}

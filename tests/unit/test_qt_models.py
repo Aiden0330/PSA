@@ -92,3 +92,31 @@ def test_json_io_roundtrip_new_kinds():
     assert m.parameters.get("G").gamma == 0.005
     assert m.parameters.get("PT").unavailability() == pytest.approx(
         1 - (1 - math.exp(-0.1)) / 0.1, rel=1e-12)
+
+
+def test_periodic_test_tiny_x_no_cancellation():
+    """review 365e7e5 G1:小 λτ 灾难性消去——x=1e-9 曾 56× 高估、大片负值。
+    级数区与 expm1 区均与 60 位十进制参考一致;q̄∈[0,1] 全域性质锁。"""
+    from decimal import Decimal, getcontext
+    getcontext().prec = 60
+
+    def ref(x: float) -> float:
+        xd = Decimal(str(x))
+        return float(1 - (1 - (-xd).exp()) / xd)
+
+    for x in (1e-15, 1e-12, 1e-9, 1e-6, 5e-5, 1e-4, 1e-3, 0.1, 1.0, 5.0):
+        p = Parameter("PT", "periodic_test", x, test_interval=1.0)   # λτ = x
+        q = p.unavailability()
+        assert q == pytest.approx(ref(x), rel=1e-9), f"x={x}"
+        assert 0.0 <= q <= 1.0, f"x={x} q={q}"
+        assert q == pytest.approx(x / 2, rel=1e-3) or x > 1e-3       # 小 x 渐近 λτ/2
+
+
+def test_periodic_test_q_in_unit_interval_property():
+    import random
+    rng = random.Random(20260715)
+    for _ in range(500):
+        x = 10 ** rng.uniform(-15, 1.5)
+        lam = 10 ** rng.uniform(-8, 0)
+        q = Parameter("PT", "periodic_test", lam, test_interval=x / lam).unavailability()
+        assert 0.0 <= q <= 1.0

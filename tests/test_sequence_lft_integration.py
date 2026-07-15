@@ -301,3 +301,19 @@ def test_guard_legitimate_sharing_unperturbed():
     r = quantify_event_tree_integrated(m, "TR", ie_ft_name="__init__")
     assert r["sequences"]["S_FAIL"] == pytest.approx(2e-4, rel=1e-12)
     assert r["sequences"]["S_OK"] == pytest.approx(0.0, abs=1e-18)
+
+
+def test_guard_barrier_basic_id_collides_with_ie_gate():
+    """review round-2 残留 1:第六行探针(屏障基本事件 id == IE 门 id)补专属锁。"""
+    params = [Parameter("I", "frequency", 1e-3),
+              Parameter("A", "probability", 0.3), Parameter("B", "probability", 0.2),
+              Parameter("ENQ", "probability", 0.05)]
+    def ie(g):
+        g.basic("I"); g.basic("A"); g.basic("B")
+        g.gate("EN", Op.OR, ["A", "B"]); g.gate("IE_TOP", Op.AND, ["I", "EN"])
+    barriers = {"FE_B": lambda g: (g.basic("EN", param_ref="ENQ"),
+                                   g.gate("B_TOP", Op.OR, ["EN"]))}
+    seqs = [_seq({"FE_B": "failure"}, "S_FAIL"), _seq({"FE_B": "success"}, "S_OK")]
+    with pytest.raises(ValueError, match="'EN'"):
+        quantify_event_tree_integrated(_model(params, ie, barriers, seqs), "TR",
+                                       ie_ft_name="__init__")

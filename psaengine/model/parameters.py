@@ -57,8 +57,8 @@ class Parameter:
                 raise ValueError(f"exponential {self.id}: rate {lam} must be >= 0")
             if self.mission_time is None or self.mission_time < 0:
                 raise ValueError(f"exponential {self.id} needs mission_time >= 0")
-            from math import exp
-            return 1.0 - exp(-lam * self.mission_time)
+            from math import expm1
+            return -expm1(-lam * self.mission_time)   # 1−e^{−x} 的无消去形(review G 抛光)
         if self.kind == "glm":
             # Gap 7:Q = γe^{−(λ+μ)t} + λ/(λ+μ)(1−e^{−(λ+μ)t});t 缺省 → 稳态 λ/(λ+μ)。
             # μ = 1/mttr;γ = 需求失效概率(缺省 0)。MEF §5 / XFTA eq 6.5 / SCRAM Glm 同式。
@@ -76,9 +76,9 @@ class Parameter:
                 return lam / r
             if self.mission_time < 0:
                 raise ValueError(f"glm {self.id}: mission_time must be >= 0")
-            from math import exp
+            from math import exp, expm1
             e = exp(-r * self.mission_time)
-            return g * e + (lam / r) * (1.0 - e)
+            return g * e + (lam / r) * (-expm1(-r * self.mission_time))
         if self.kind == "weibull":
             # Gap 7:Q = 1−e^{−((t−t0)/α)^β},t≤t0 → 0(老化/早夭;β=1 退化为指数)
             if self.alpha is None or self.alpha <= 0:
@@ -106,8 +106,14 @@ class Parameter:
             x = lam * self.test_interval
             if x == 0.0:
                 return 0.0
-            from math import exp
-            return 1.0 - (1.0 - exp(-x)) / x
+            # review 365e7e5 G1:1−(1−e^{−x})/x 在 x≲1e-6 灾难性消去——x=1e-9 实测 56× 高估,
+            # 扫描 [1e-15,1e-6] 有 772/2000 点返回**负值**并静默流入概率通道。
+            # 小 x 用泰勒级数(x/2 − x²/6 + x³/24,截断误差 O(x⁴) 在 x<1e-4 时 <1e-17 相对),
+            # 大 x 用 expm1 无消去形;q̄∈[0,1] 由性质测试全域锁定。
+            if x < 1e-4:
+                return x / 2.0 - x * x / 6.0 + x ** 3 / 24.0
+            from math import expm1
+            return 1.0 + expm1(-x) / x
         if self.kind == "frequency":
             # 量纲护栏(规格 2026-07-13 §2.1):频率(/yr)不是概率,误入概率通道必须响亮——
             # 频率量化走 psaengine.quantify.frequency.fault_tree_frequency(每割集一频率规则)。

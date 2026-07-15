@@ -129,3 +129,23 @@ def test_exchange_rule_validation_loud():
     with pytest.raises(ValueError, match="source_prob"):
         PostRule.from_dict({"kind": "exchange", "events": ["H"], "source": "A",
                             "add_event": "A2", "prob": 0.1})
+
+
+def test_exchange_collision_dedup_no_double_count():
+    """review 365e7e5 G2:A→B 把 {A,C} 映射到既有 {B,C} → 去重合并,REA 不双计。"""
+    from psaengine.quantify.cutsets import CutSet
+    rule = PostRule.from_dict({"kind": "exchange", "events": ["C"], "source": "A",
+                               "add_event": "B", "prob": 0.2, "source_prob": 0.2})
+    cs = [CutSet(events=["B", "C"], order=2, probability=0.02),
+          CutSet(events=["A", "C"], order=2, probability=0.02)]
+    out, stats = apply_post_rules(cs, [rule])
+    assert len(out) == 1
+    assert out[0].events == ["B", "C"]
+    assert stats["merged"] == 1 and stats["exchanged"] == 1
+
+
+def test_exchange_source_equals_target_rejected():
+    """regime A(参数重绑定)不许走后门:source==add_event 响亮拒绝(v1)。"""
+    with pytest.raises(ValueError, match="regime A"):
+        PostRule.from_dict({"kind": "exchange", "events": ["H"], "source": "A",
+                            "add_event": "A", "prob": 0.5, "source_prob": 0.1})
