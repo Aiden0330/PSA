@@ -27,7 +27,7 @@ ledger is the single place that answers "how far are we?" — keep it current.
 | **Cut-set post-processing** (mutually-exclusive / delete / recovery) | ✅ 2026-07-09 | MCS-list-only by design — exact BDD channel untouched (guarded test); REA/MCUB over processed list. tests/unit/test_postprocess.py |
 | **Analysis cases** (report + uncertainty + importance auto-pin) | ✅ 2026-07-09 | version hash + engine version + settings + results per run; audit actions; dossier ledgers |
 | **Model compare / diff** | ✅ 2026-07-09 | Identity-keyed structural diff over canonical versions + dossier compare view. tests/backend/test_diff.py |
-| CUDD backend correctness (coherent + non-coherent) | ✅ 2026-07-09 | dd.cudd built on macOS arm64, parity tests live (0 skipped); complement-mark cofactor fix + NOT/XOR/success-branch locks; 1000-event closed-form; iterative Shannon traversal (no recursion cap) |
+| CUDD backend correctness (coherent + non-coherent) | ✅ 2026-07-09 · **Linux CI 阻断门 2026-07-15** | dd.cudd built on macOS arm64 + GitHub Actions Linux 源码编译(--fetch --cudd)首跑即过,continue-on-error 已移除(Gap 6b 收口);complement-mark cofactor fix + NOT/XOR/success-branch locks; 1000-event closed-form; iterative Shannon traversal |
 | **Initiating-event fault trees**(手动/FTA 双通道初因) | ✅ 2026-07-13 | fault_tree_frequency:每割集恰好一个频率事件,F=Σ 率×Π使能概率(与 RS/SAPHIRE 同法);双向量纲护栏(频率参数进概率通道 raise、非相干门 NOT/XOR 拒绝、limit_order 整体移除);engine-reviewer 两轮(round-1 FAIL 6 项→整改→round-2 PASS);spec 2026-07-13-ie-fault-tree-frequency.md。**2026-07-14 增 method="exact" 逐初因精确模式**(F=Σλ_i·P(使能析取) BDD 精确,恢复物理上界 F≤Σλ;engine-reviewer 两轮 PASS,300 例随机模型 vs 独立求值器 <1e-12;spec 2026-07-14-ie-frequency-exact-mode.md)。残留:load-time 独立性 lint、UI 精确/Σ 切换(chip 级) |
 | **Review/sign-off workflow**(状态机级) | ✅ exceeds 2026-07-12(商用工具均为外挂配置管理流程) | reviews 状态机(signed 终态 DB 触发器、每项目单在审部分唯一索引、角色快照入审计)+ 导出门=内容寻址幂等(签发页脚 vs 工作稿自动区分);spec 2026-07-12-phase5-review-signoff-spec.md |
 | **Multi-project portfolio**(跨项目组合总览) | ✅ 2026-07-14(对标产品无对应物) | /api/portfolio 只读已钉扎案例(绝不现算);review 锚最新版 + open_review 防"看不见还能签";矩阵口径与报告同源(前后端 25 格金表互锁);domain-reviewer 落审 6 裁决 + F1/F2 修复 |
@@ -36,7 +36,6 @@ ledger is the single place that answers "how far are we?" — keep it current.
 
 | # | Gap | Why it matters | Notes |
 |---|---|---|---|
-| 6b | CUDD CI job (Linux) + hybrid MCS-BDD fallback + 10k-event stress corpus | Reproducible scale proof in CI | Local macOS validation done 2026-07-09; CI inert until GitHub remote exists |
 | 7 | Exchange events; time-dependent Q(t) beyond core four; risk monitor | Long tail | Defer — not needed for BESS QRA near-term |
 | 8 | Boundary-condition / post-processing / CCF-per-barrier UI(engine+API done) | Analyst ergonomics | API-first shipped 2026-07-09; UI slot: analysis settings panel |
 | 9 | ~~逐初因精确模式~~(✅ 2026-07-14 关闭,见上)→ 收窄为:**序列级完整 LFT 集成**(IE 树与屏障树共享事件 → 合并 BDD 上 λ·P(E∧路径) 的序列频率) | 共享事件场景现被前端独立性 lint 拒绝而非精确处理 | = RS 序列割集法等价物;规格 2026-07-14 §6 |

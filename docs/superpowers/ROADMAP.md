@@ -221,6 +221,13 @@
   约束:稿 B 先于稿 A**(否则跨基准求和的聚合案例会钉进证据库)。至此 Fable
   优先清单①②③全清;实现均为"对锚点执行"级,可交低阶模型。
 
+- **GitHub 远程 + CI 上线(2026-07-15,用户建仓 Aiden1981/PSA)**:首跑三绿一红——
+  红点 = `test_real_archive_roundtrip_lossless` 读 gitignored 本机存档(`1e4df0e`
+  修:skipif + 合成富载荷覆盖;护栏审计补"依赖未追踪数据的测试"盲区,干净 venv ≠
+  干净克隆)。修复后四作业全绿,**CUDD Linux 源码编译首跑即过 → continue-on-error
+  移除,升为阻断门,parity Gap 6b 收口**。CI 四道物理门(py 351 / benchmark 24 /
+  CUDD parity / fe 287+build)自此对每次 push 生效。
+
 ---
 
 ### 0.1 上一基线:2026-06-30(Windows,历史记录)
