@@ -41,6 +41,9 @@ export function EtaWorkbench(
 ) {
   const { etaTabs, activeKey, checkedKeys, etModel, etFtsModel, pfds, writeEtModel, activeEta, P, docUndo, docRedo, docCanUndo, docCanRedo } = useActiveEta()
   const [templateNotice, setTemplateNotice] = useState<string | null>(null)
+  // 序列级 LFT 集成(规格 2026-07-15 §6):初因树与屏障共享基本事件不再是错误,而是集成通道的
+  // 工作情形——以信息提示(非报错)告知已启用「引擎精确量化」序列级精确集成。
+  const [sharedNotice, setSharedNotice] = useState<string | null>(null)
 
   // Gap8:ETA 分析设置(house 覆盖 / 命名边界条件集)—— 复用 FTA 的 AnalysisSettingsPanel(隐藏后处理规则)。
   // house 事件 = 各屏障 linkFt 故障树的 house 节点并集(引擎合并 PDAG 后按 id 全局覆盖);
@@ -52,9 +55,9 @@ export function EtaWorkbench(
   const etaHouses = listHouseEventsUnion(etFtsModel, linkedFtNames)
   const etaBcSets = etFtsModel.boundary_condition_sets ?? []
   const etEngineOptions = toEtEngineOptions(settings, etaBcSets)
-  // 切换活动 ETA → 重置分析设置(house 事件/命名集按 ETA 而异,不跨页携带)
+  // 切换活动 ETA → 重置分析设置(house 事件/命名集按 ETA 而异,不跨页携带)+ 清共享提示(按 ETA 而异)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setSettings(EMPTY_SETTINGS); setSettingsOpen(false) }, [activeKey])
+  useEffect(() => { setSettings(EMPTY_SETTINGS); setSettingsOpen(false); setSharedNotice(null) }, [activeKey])
   // 弹出面板外点击关闭(与 FtaWorkbench/MenuBar 同款既有模式)
   useEffect(() => {
     if (!settingsOpen) return
@@ -130,13 +133,16 @@ export function EtaWorkbench(
     setInitFtOpen(false)
     const active = P().present.etas.find((e) => e.key === P().activeKey)
     if (!active || active.model.initFreqSource !== 'ft') return
-    // 独立性护栏(规格 2026-07-13 §1):初因树与屏障树共享基本事件 ⇒ 可分离量化
-    // (F_IE × P_path)的独立性假设不成立,方向可能非保守 —— 拒绝并解释,绝不静默近似。
+    // 独立性 lint 翻转(规格 2026-07-15 §6):初因树与屏障共享基本事件时,两段式
+    // (F_IE × P_path)的独立性假设不成立 —— 但这不再是错误,而是**序列级精确集成的工作情形**。
+    // 不在此以两段式(/api/ft/frequency)更新初因频率(那对共享事件是错的);改由「引擎精确量化」
+    // 按 Σλ_i·P(E_i∧Path) 逐序列精确求值。仅信息提示,不阻断、不报错。
     const shared = sharedIeBarrierEvents(active.fts)
     if (shared.length) {
-      onError(`初因树与屏障故障树共享基本事件(${shared.join(', ')}):独立性假设不成立,初因频率未更新。请把共享逻辑移入屏障树,或为初因使用独立事件。`)
+      setSharedNotice(`初因树与屏障共享基本事件(${shared.join(', ')})→ 已启用序列级精确集成:请用「引擎精确量化」按序列精确计算(两段式独立近似不适用于共享事件,故初因频率头条不由其更新)。`)
       return
     }
+    setSharedNotice(null)
     try {
       // 频率通道(每割集恰好一个频率事件,F = Σ 率×Π使能概率)—— 不是概率端点
       const { frequency } = await ftFrequency(active.fts, '__init__')
@@ -150,11 +156,13 @@ export function EtaWorkbench(
   const onFtEdited = async (feId: string) => {
     const active = P().present.etas.find((e) => e.key === P().activeKey)
     if (!active) return
-    // review F3:独立性 lint 双侧生效 —— 屏障树编辑同样可能事后引入与初因树的共享事件;
-    // 屏障 PFD 本身仍照常更新(它自身无恙),但明确告知 F_IE × P_path 的独立性已破。
+    // 独立性 lint 双侧生效,但已翻转为信息提示(规格 2026-07-15 §6):屏障树编辑可能事后
+    // 引入与初因树的共享事件;屏障 PFD 照常更新,共享则提示改走「引擎精确量化」序列级集成(不报错)。
     if (active.model.initFreqSource === 'ft') {
       const shared = sharedIeBarrierEvents(active.fts)
-      if (shared.length) onError(`屏障树与初因树共享基本事件(${shared.join(', ')}):初因频率的独立性假设不成立,请调整树结构。`)
+      setSharedNotice(shared.length
+        ? `屏障树与初因树共享基本事件(${shared.join(', ')})→ 已启用序列级精确集成:初因频率将在「引擎精确量化」中按序列精确求值。`
+        : null)
     }
     try {
       const prob = (await quantify(active.fts, feId)).probability
@@ -217,6 +225,16 @@ export function EtaWorkbench(
         {persistence.archiveLocal && <span style={{ fontSize: 11.5, color: 'var(--psa-faint)' }} title="后端不可达,存档保存在此浏览器(localStorage)">离线存档</span>}
         <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--psa-faint)' }}>前端积式实时;引擎精确量化按需</span>
       </div>
+
+      {/* 序列级 LFT 集成提示(规格 2026-07-15 §6):共享事件已由「引擎精确量化」序列级集成处理——
+          信息提示,非报错(既往此处为整体拒绝);服务端合并护栏的 400 仍在检视器错误区响亮呈现。 */}
+      {sharedNotice && (
+        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: 'var(--psa-primary-soft)', borderBottom: '1px solid var(--psa-line-2)', fontSize: 11.5, color: 'var(--psa-primary-strong)' }}>
+          <Icon name="bolt" size={13} />
+          <span style={{ flex: 1 }}>{sharedNotice}</span>
+          <button onClick={() => setSharedNotice(null)} style={{ border: 0, background: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13 }}>✕</button>
+        </div>
+      )}
 
       {/* 4c2:模板为可编辑起点,数据多为示例/文献推断(C/D 级)——量化前须按项目实测替换 */}
       {templateNotice && (

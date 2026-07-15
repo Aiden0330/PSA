@@ -371,6 +371,13 @@ export function consequenceTotals(m: EventTreeModel): Record<string, number> {
 }
 
 // ---- ROADMAP A: 序列化为引擎精确量化请求 ----
+/** 序列级 LFT 集成的自包含初因块(规格 2026-07-15):树 + 类型化参数(初因 = frequency kind)。 */
+export interface IeFaultTreeBlock {
+  name: string
+  top: string
+  nodes: any[]
+  parameters: { id: string; kind: string; value: number }[]
+}
 export interface EtQuantifyRequest {
   init_event: string
   init_frequency: number
@@ -380,6 +387,8 @@ export interface EtQuantifyRequest {
   sequences: { path: Record<string, string>; end_state: string }[]
   consequence_bins: Record<string, string>
   ccf_groups?: any[]
+  // 初因源=故障树时附带:设置即走引擎「integrated」通道(响应带 method/ie_frequency)。
+  ie_fault_tree?: IeFaultTreeBlock
 }
 
 /** 叶按 DFS(成功优先, 与 layout 同序)枚举为 end_state L0,L1,...;path 仅含各分支显式 feId(子集路径)。
@@ -420,4 +429,48 @@ export function toEngineRequest(
     // 4a1:挂载工作区带 CCF 组时透传(合并 PDAG 上展开;空缺省略保持既有请求形状)
     ...(linked?.ccf_groups?.length ? { ccf_groups: linked.ccf_groups } : {}),
   }
+}
+
+/** 序列级 LFT 集成(规格 2026-07-15 §6):初因源=故障树(fts 内存有 `__init__` 树)时,把该树
+ *  作为自包含 `ie_fault_tree` 块并入「引擎精确量化 / 重要度」请求 → 服务端走 integrated 通道
+ *  (rate(s)=Σλ_i·P(E_i∧Path),共享事件在合并 BDD 上精确处理)。
+ *
+ *  参数分流是关键:
+ *  - 仅初因树引用(与任何屏障树不共享)的基本事件 → 进块的 typed parameters(**保留 kind**,
+ *    频率初因保持 `frequency`,不能走无类型 parameters 映射被强转 probability),并从无类型映射移除;
+ *  - 与屏障共享的基本事件 → **留在**无类型 parameters 映射(服务端按 id 合并统一;放进块会与请求
+ *    参数同 id 触发 F3 拒绝)。
+ *
+ *  非 ft 源 / fts 无 `__init__` 树 → 原样返回(单树通道,`init_frequency` 标量照旧;导出/报告
+ *  /不确定性等其它调用方不经本函数,请求逐字节不变)。 */
+export function withIeFaultTree(
+  req: EtQuantifyRequest,
+  m: EventTreeModel,
+  linked?: { fault_trees: any[]; parameters: any[] },
+): EtQuantifyRequest {
+  if (m.initFreqSource !== 'ft') return req
+  const trees = linked?.fault_trees ?? []
+  const ie = trees.find((f: any) => f.name === '__init__')
+  if (!ie) return req
+  // 屏障侧(除 __init__ 外所有树)引用的参数 id:必须留在无类型映射(共享事件正是要留下)。
+  const barrierRefs = new Set<string>()
+  for (const f of trees) {
+    if (!f || f.name === '__init__') continue
+    for (const n of f.nodes ?? []) if (n?.basic) barrierRefs.add(n.param_ref ?? n.id)
+  }
+  const paramById = new Map<string, any>((linked?.parameters ?? []).map((p: any) => [p.id, p]))
+  const parameters: Record<string, any> = { ...req.parameters }
+  const ieParams: { id: string; kind: string; value: number }[] = []
+  const seen = new Set<string>()
+  for (const n of ie.nodes ?? []) {
+    if (!n?.basic) continue
+    const ref = n.param_ref ?? n.id
+    if (barrierRefs.has(ref) || seen.has(ref)) continue     // 共享 → 留映射;去重
+    const p = paramById.get(ref)
+    if (!p) continue
+    seen.add(ref)
+    ieParams.push({ id: p.id, kind: p.kind, value: p.value })   // kind 保留(初因 = frequency)
+    delete parameters[ref]                                        // 从无类型映射移除,避免 F3 同 id 拒绝
+  }
+  return { ...req, parameters, ie_fault_tree: { name: '__init__', top: ie.top, nodes: ie.nodes, parameters: ieParams } }
 }

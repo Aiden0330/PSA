@@ -86,7 +86,13 @@ export interface LibraryData {
   initiating_events: { id: string; label: string; category: string; freq_prior: number; source: SourceRef }[]
 }
 export interface ScenarioItem { id: string; name: string }
-export interface EtQuantifyResult { sequences: Record<string, number>; consequences: Record<string, number> }
+export interface EtQuantifyResult {
+  sequences: Record<string, number>
+  consequences: Record<string, number>
+  // 序列级 LFT 集成(规格 2026-07-15):设了 ie_fault_tree 时后端附带;单树响应两者为 null。
+  method?: string | null
+  ie_frequency?: number | null
+}
 
 export const getExamples = () => jget<ExampleItem[]>('/examples')
 export const getModel = (id: string) => jget<ModelEnvelope>(`/model/${id}`)
@@ -130,7 +136,13 @@ export async function quantifyEventTree(req: any): Promise<EtQuantifyResult> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
   })
-  if (!r.ok) throw new Error(`event-tree quantify → ${r.status}`)
+  // integrated 通道的合并护栏(节点 id 碰撞 / IE 参与 CCF / 屏障引用频率参数 / IE 块参数同 id)
+  // 以 400 + 中文 detail 响亮拒绝 —— 原样上抛供 UI 显示,不吞成裸状态码。
+  if (!r.ok) {
+    let detail = ''
+    try { const d = await r.json(); detail = typeof d?.detail === 'string' ? d.detail : '' } catch {}
+    throw new Error(detail || `event-tree quantify → ${r.status}`)
+  }
   return r.json()
 }
 
@@ -168,7 +180,11 @@ export async function uncertaintyEventTree(req: any): Promise<EtBands> {
 }
 export async function importanceEventTree(req: any): Promise<EtImportance> {
   const r = await fetch(`${BASE}/event-tree/importance`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) })
-  if (!r.ok) throw new Error(`importance → ${r.status}`)
+  if (!r.ok) {
+    let detail = ''
+    try { const d = await r.json(); detail = typeof d?.detail === 'string' ? d.detail : '' } catch {}
+    throw new Error(detail || `importance → ${r.status}`)
+  }
   return r.json()
 }
 

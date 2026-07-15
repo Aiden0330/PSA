@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { EventTreeModel } from '../eventtree'
 import {
-  addFe, layout, toEngineRequest, CONSEQUENCES,
+  addFe, layout, toEngineRequest, withIeFaultTree, CONSEQUENCES,
   consequenceTotals, consLevel, consDef, reorderFe, isCascade, gradeLabel,
 } from '../eventtree'
 import type { PointerEvent as ReactPointerEvent } from 'react'
@@ -67,13 +67,16 @@ export function EventTreeEditor(
   const svgRef = useRef<SVGSVGElement>(null)
   const [expBusy, setExpBusy] = useState(false)
   const [engineSeq, setEngineSeq] = useState<Record<string, number> | null>(null)
+  // 序列级 LFT 集成回执(规格 2026-07-15):method='integrated' 时携带初因频率 ie_frequency,
+  // 供「量化结果」页以「集成口径」呈现;非集成(单树)响应此值为 null,头条口径不变。
+  const [engineMeta, setEngineMeta] = useState<{ method: string; ieFrequency: number | null } | null>(null)
   const [qBusy, setQBusy] = useState(false)
   const [qErr, setQErr] = useState<string | null>(null)
   const [imp, setImp] = useState<Record<string, { barrier: string; fv: number; raw: number }[]> | null>(null)
   const [impC, setImpC] = useState('C5')
   const [deepBusy, setDeepBusy] = useState(false)
 
-  useEffect(() => { setEngineSeq(null); setQErr(null); setImp(null) }, [model])
+  useEffect(() => { setEngineSeq(null); setEngineMeta(null); setQErr(null); setImp(null) }, [model])
 
   // 竖向分隔条:拖拽改变事件树画布高度,底部坞(事故序列/风险矩阵等)相应变矮;双击复位为自适应
   const treeRef = useRef<HTMLElement>(null)
@@ -143,14 +146,20 @@ export function EventTreeEditor(
 
   const onEngineQuantify = async () => {
     setQBusy(true); setQErr(null)
-    try { setEngineSeq((await quantifyEventTree({ ...toEngineRequest(model, linked), ...(etEngineOptions ?? {}) })).sequences) }
+    // 初因源=故障树 ⇒ 经 withIeFaultTree 并入 ie_fault_tree 块走 integrated 通道(共享事件精确)。
+    try {
+      const res = await quantifyEventTree({ ...withIeFaultTree(toEngineRequest(model, linked), model, linked), ...(etEngineOptions ?? {}) })
+      setEngineSeq(res.sequences)
+      setEngineMeta(res.method === 'integrated' ? { method: res.method, ieFrequency: res.ie_frequency ?? null } : null)
+    }
     catch (e: any) { setQErr(String(e?.message ?? e)) }
     finally { setQBusy(false) }
   }
   const onDeepen = async () => {
     setDeepBusy(true); setQErr(null)
     // 4a4:携带项目上下文 → 重要度运行自动钉扎为分析案例(证据链);Gap8:同带边界条件设置
-    try { const im = await importanceEventTree({ ...toEngineRequest(model, linked), ...(etEngineOptions ?? {}), ...(getReportContext?.() ?? {}) }); setImp(im.importance) }
+    // 初因源=故障树时同带 ie_fault_tree 块(重要度通道 v1 点估计;块使模型合并一致)。
+    try { const im = await importanceEventTree({ ...withIeFaultTree(toEngineRequest(model, linked), model, linked), ...(etEngineOptions ?? {}), ...(getReportContext?.() ?? {}) }); setImp(im.importance) }
     catch (e: any) { setQErr(String(e?.message ?? e)) }
     finally { setDeepBusy(false) }
   }
@@ -301,7 +310,7 @@ export function EventTreeEditor(
       {/* ============ INSPECTOR ============ */}
       <EtInspector
         model={model} onChange={onChange} sel={sel} onSelect={setSel} seqRows={seqRows}
-        engineSeq={engineSeq} imp={imp} impC={impC} onImpCChange={setImpC}
+        engineSeq={engineSeq} engineMeta={engineMeta} imp={imp} impC={impC} onImpCChange={setImpC}
         qBusy={qBusy} deepBusy={deepBusy} expBusy={expBusy} qErr={qErr}
         onEngineQuantify={onEngineQuantify} onDeepen={onDeepen} onExport={onExport} onExportImage={onExportImage}
         pfds={pfds} canEditFt={!!fts && !!ftsApi} onEditFt={setEditingFt}

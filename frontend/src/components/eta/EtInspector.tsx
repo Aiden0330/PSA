@@ -27,7 +27,7 @@ const mono = 'var(--psa-font-mono)'
  * 本组件仅持有页签与贝叶斯输入这两类局部 UI 态。
  */
 export function EtInspector(
-  { model, onChange, sel, onSelect, seqRows, engineSeq, imp, impC, onImpCChange,
+  { model, onChange, sel, onSelect, seqRows, engineSeq, engineMeta, imp, impC, onImpCChange,
     qBusy, deepBusy, expBusy, qErr, onEngineQuantify, onDeepen, onExport, onExportImage,
     pfds, canEditFt, onEditFt, onAttachFt, onDetachFt, libBarriers, onAddBarrier, onMoveFe, onEditInitFt }: {
     model: EventTreeModel
@@ -36,6 +36,8 @@ export function EtInspector(
     onSelect: (path: string[] | null) => void
     seqRows: SeqRow[]
     engineSeq: Record<string, number> | null
+    /** 序列级 LFT 集成回执:method='integrated' 时携带初因频率 ie_frequency(集成口径展示)。 */
+    engineMeta?: { method: string; ieFrequency: number | null } | null
     imp: Record<string, { barrier: string; fv: number; raw: number }[]> | null
     impC: string
     onImpCChange: (c: string) => void
@@ -406,7 +408,22 @@ export function EtInspector(
 
         {tab === 'quant' && (
           <div style={{ paddingTop: 14 }}>
-            <div style={{ fontSize: 12, color: 'var(--psa-muted)', marginBottom: 8 }}>各末态序列频率（{engineSeq ? '引擎精确' : '前端积式'}）· 点击联动下方</div>
+            {/* 序列级 LFT 集成口径(规格 2026-07-15):初因树与屏障共享事件时,序列频率按
+                Σλ_i·P(E_i∧Path) 在合并 BDD 上精确求值;ie_frequency 为守恒总频率 Σ 序列。 */}
+            {engineMeta?.method === 'integrated' && engineMeta.ieFrequency != null && (
+              <div style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--psa-primary-soft)', border: '1px solid var(--psa-line-2)', borderRadius: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--psa-primary-strong)', border: '1px solid var(--psa-primary)', borderRadius: 5, padding: '1px 6px' }}>集成口径</span>
+                  <span style={{ fontSize: 11.5, color: 'var(--psa-muted)' }}>初因频率 F</span>
+                  <span className="psa-num" style={{ fontSize: 14, fontWeight: 600, color: 'var(--psa-ink)' }}>{formatEtaNumber(engineMeta.ieFrequency)}</span>
+                  <span style={{ fontSize: 11, color: 'var(--psa-muted)' }}>/yr</span>
+                </div>
+                <div style={{ fontSize: 10.5, color: 'var(--psa-faint)', marginTop: 3, lineHeight: 1.5 }}>
+                  序列级精确集成:序列频率按 Σλ<sub>i</sub>·P(E<sub>i</sub>∧Path) 精确求值(共享事件自动正确;Σ 序列 = F,守恒)。
+                </div>
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: 'var(--psa-muted)', marginBottom: 8 }}>各末态序列频率（{engineSeq ? (engineMeta?.method === 'integrated' ? '引擎精确 · 集成' : '引擎精确') : '前端积式'}）· 点击联动下方</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {seqRows.map((r) => {
                 const active = selKey === r.lf.path.join('/')

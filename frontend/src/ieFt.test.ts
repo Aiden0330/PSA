@@ -4,7 +4,9 @@ import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { addBasic, attachStarterFt, setParamKind, sharedIeBarrierEvents } from './model'
 import type { ModelJson } from './model'
-import { ftFrequency } from './api'
+import { ftFrequency, quantifyEventTree } from './api'
+import { toEngineRequest, withIeFaultTree } from './eventtree'
+import type { EventTreeModel } from './eventtree'
 import { BarrierFtModal } from './components/BarrierFtModal'
 
 /** 初因故障树前端纯层(规格 2026-07-13 §2.3):种子量纲、量纲切换、独立性护栏、频率客户端;
@@ -119,6 +121,99 @@ describe('ftFrequency 客户端', () => {
     await ftFrequency({}, '__init__')
     const body = JSON.parse((fetchMock.mock.calls as unknown as [string, any][])[0][1].body)
     expect('method' in body).toBe(false)
+  })
+})
+
+/** 序列级 LFT 集成接线(规格 2026-07-15 §6):初因源=故障树 ⇒ 请求并入 ie_fault_tree 块;
+ *  共享事件从"整体拒绝"翻转为"路由到集成通道";响应 method/ie_frequency 解析。 */
+describe('withIeFaultTree 序列级集成请求', () => {
+  // 锚点 C 结构:IE=AND(I,S),屏障 B=OR(S,X);S 为初因树与屏障共享的基本事件,I 为频率初因,X 屏障独占。
+  const model: EventTreeModel = {
+    initEvent: 'TR', initFreq: 1e-3, initFreqSource: 'ft',
+    functionalEvents: [{ id: 'FE_B', label: '屏障B', failProb: 0.1, linkFt: 'FE_B' }],
+    root: { kind: 'branch', feId: 'FE_B', success: { kind: 'leaf', consequence: 'C1' }, failure: { kind: 'leaf', consequence: 'C3' } },
+  }
+  const linked = {
+    fault_trees: [
+      { name: '__init__', top: 'IE_TOP', nodes: [
+        { id: 'I', basic: true, param_ref: 'I' },
+        { id: 'S', basic: true, param_ref: 'S' },
+        { id: 'IE_TOP', op: 'and', args: ['I', 'S'] } ] },
+      { name: 'FE_B', top: 'B_TOP', nodes: [
+        { id: 'S', basic: true, param_ref: 'S' },
+        { id: 'X', basic: true, param_ref: 'X' },
+        { id: 'B_TOP', op: 'or', args: ['S', 'X'] } ] },
+    ],
+    parameters: [
+      { id: 'I', kind: 'frequency', value: 1e-3 },
+      { id: 'S', kind: 'probability', value: 0.2 },
+      { id: 'X', kind: 'probability', value: 0.1 },
+    ],
+  }
+
+  it('源=ft:并入 ie_fault_tree 块,初因参数保 frequency kind,共享事件 S 留在无类型 parameters 映射', () => {
+    const req = withIeFaultTree(toEngineRequest(model, linked), model, linked)
+    // 块:名/顶/节点取自 __init__ 树
+    expect(req.ie_fault_tree).toBeTruthy()
+    expect(req.ie_fault_tree!.name).toBe('__init__')
+    expect(req.ie_fault_tree!.top).toBe('IE_TOP')
+    expect(req.ie_fault_tree!.nodes).toEqual(linked.fault_trees[0].nodes)
+    // 仅初因独占参数 I 进块,且 kind 保留为 frequency(不被强转 probability)
+    expect(req.ie_fault_tree!.parameters).toEqual([{ id: 'I', kind: 'frequency', value: 1e-3 }])
+    // 共享事件 S 与屏障独占 X 留在无类型映射;初因独占 I 已从映射移除(避免服务端 F3 同 id 拒绝)
+    expect(Object.keys(req.parameters).sort()).toEqual(['S', 'X'])
+    expect('I' in req.parameters).toBe(false)
+  })
+
+  it('lint 翻转:共享事件不再抛错/阻断 —— withIeFaultTree 正常产出集成请求(共享是工作情形)', () => {
+    // 共享事件存在(sharedIeBarrierEvents 仍点名 S),但不再是错误路径
+    const fts: ModelJson = { model_data: { parameters: linked.parameters }, fault_trees: linked.fault_trees }
+    expect(sharedIeBarrierEvents(fts)).toEqual(['S'])
+    // 关键:不抛异常,且共享事件被正确路由(留在映射,块只含独占初因)
+    expect(() => withIeFaultTree(toEngineRequest(model, linked), model, linked)).not.toThrow()
+  })
+
+  it('源≠ft:原样返回(单树通道,无 ie_fault_tree,零扰动)', () => {
+    const manual: EventTreeModel = { ...model, initFreqSource: 'manual' }
+    const base = toEngineRequest(manual, linked)
+    const out = withIeFaultTree(base, manual, linked)
+    expect(out).toBe(base)                       // 同引用:未改写
+    expect(out.ie_fault_tree).toBeUndefined()
+  })
+
+  it('fts 无 __init__ 树:原样返回(未挂初因树时不越权造块)', () => {
+    const noIe = { fault_trees: [linked.fault_trees[1]], parameters: linked.parameters }
+    const base = toEngineRequest(model, noIe)
+    const out = withIeFaultTree(base, model, noIe)
+    expect(out).toBe(base)
+    expect(out.ie_fault_tree).toBeUndefined()
+  })
+})
+
+describe('quantifyEventTree 集成响应/护栏', () => {
+  it("method='integrated' 时解析 ie_frequency(集成口径头条)", async () => {
+    const okJson = { sequences: { S_FAIL: 2e-4, S_OK: 0 }, consequences: { C3: 2e-4, C1: 0 }, method: 'integrated', ie_frequency: 2e-4 }
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(okJson) })) as any)
+    const r = await quantifyEventTree({ ie_fault_tree: { name: '__init__' } })
+    expect(r.method).toBe('integrated')
+    expect(r.ie_frequency).toBe(2e-4)
+    expect(r.sequences.S_OK).toBe(0)
+  })
+
+  it('单树响应:method/ie_frequency 为 null(旧口径零扰动)', async () => {
+    const okJson = { sequences: { L0: 1e-4 }, consequences: { C3: 1e-4 }, method: null, ie_frequency: null }
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(okJson) })) as any)
+    const r = await quantifyEventTree({})
+    expect(r.method).toBeNull()
+    expect(r.ie_frequency).toBeNull()
+  })
+
+  it('服务端合并护栏 400:中文 detail 原样上抛(碰撞信息响亮,不吞成裸状态码)', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+      ok: false, status: 400,
+      json: () => Promise.resolve({ detail: "节点 id 'IE_TOP' 在初因树与屏障树碰撞(仅同参数基本事件可共享)" }),
+    })) as any)
+    await expect(quantifyEventTree({})).rejects.toThrow(/IE_TOP/)
   })
 })
 
