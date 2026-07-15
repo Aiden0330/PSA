@@ -178,8 +178,11 @@ def record_audit(cx: sqlite3.Connection, action: str, *, project_uuid: str | Non
                 json.dumps(d, ensure_ascii=False)))
 
 
-def ensure_project(puuid: str, name: str) -> bool:
-    """Create the project if missing; audit renames. Returns True if created."""
+def ensure_project(puuid: str, name: str, *, rename: bool = False) -> bool:
+    """Create the project if missing. 既有项目**默认不改名**(task_75694c92:_pin_case 曾以
+    scenario_name 作 hint 调本函数,导致每次报告导出把存档项目改名成场景名——名字是用户
+    资产,分析动作不得改写)。显式保存路径(用户给名)传 rename=True;改名进审计。
+    Returns True if created."""
     with _conn() as cx:
         row = cx.execute("SELECT name FROM projects WHERE uuid=?", (puuid,)).fetchone()
         if row is None:
@@ -187,7 +190,7 @@ def ensure_project(puuid: str, name: str) -> bool:
                        (puuid, name, _now(), _now()))
             record_audit(cx, "project.create", project_uuid=puuid, details={"name": name})
             return True
-        if row["name"] != name:
+        if rename and row["name"] != name:
             cx.execute("UPDATE projects SET name=?, modified_at=? WHERE uuid=?", (name, _now(), puuid))
             record_audit(cx, "project.rename", project_uuid=puuid,
                          details={"from": row["name"], "to": name})
@@ -258,7 +261,7 @@ def save_workspace_version(sid: str, name: str, payload: dict) -> dict:
     Raises ValueError for non-v2 payloads (caller preserves legacy behavior)."""
     puuid = legacy_project_uuid(sid)
     doc, sidecar = to_canonical(payload, puuid, project_name=name)
-    ensure_project(puuid, name)
+    ensure_project(puuid, name, rename=True)   # 用户显式给名的保存路径,改名合法且入审计
     ver = create_version(puuid, doc, sidecar, origin="save", message=f"saved:{sid}")
     return {"project_uuid": puuid, **ver}
 

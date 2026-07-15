@@ -65,8 +65,10 @@ def test_audit_log_is_append_only():
 
 
 def test_rename_is_audited():
+    # 语义更新(task_75694c92):改名仅发生在显式 rename=True 路径,且必入审计;
+    # 默认(钉扎 hint)不改名——见 test_ensure_project_does_not_rename_on_pin_path。
     store.ensure_project(PUUID, "旧名")
-    store.ensure_project(PUUID, "新名")
+    store.ensure_project(PUUID, "新名", rename=True)
     actions = [a["action"] for a in store.list_audit(PUUID)]
     assert "project.rename" in actions
     assert store.get_project(PUUID)["name"] == "新名"
@@ -98,3 +100,18 @@ def test_import_legacy_v2_and_prev2(tmp_path, monkeypatch):
     again = import_saved_dir()
     assert all(not r["created"] for r in again if r["ok"])
     assert len(store.list_versions(pu)) == 1
+
+
+def test_ensure_project_does_not_rename_on_pin_path():
+    """task_75694c92:分析钉扎(_pin_case)以场景名调 ensure_project 不得改写既有项目名;
+    显式保存路径 rename=True 才改名(且入审计)。名字是用户资产。"""
+    puuid = "3f2504e0-4f89-41d3-9a0c-0305e82c3399"
+    assert store.ensure_project(puuid, "用户的项目名") is True
+    # 钉扎路径:hint 不同 → 不改名、无 rename 审计
+    assert store.ensure_project(puuid, "电芯内短路") is False
+    assert store.get_project(puuid)["name"] == "用户的项目名"
+    assert all(e["action"] != "project.rename" for e in store.list_audit(puuid))
+    # 显式保存路径:rename=True → 改名 + 审计
+    store.ensure_project(puuid, "改名后的项目", rename=True)
+    assert store.get_project(puuid)["name"] == "改名后的项目"
+    assert any(e["action"] == "project.rename" for e in store.list_audit(puuid))
