@@ -13,6 +13,8 @@ def _param(d: dict) -> Parameter:
         dist = Distribution(d["distribution"]["family"], d["distribution"].get("params", {}))
     return Parameter(d["id"], d["kind"], d["value"], mttr=d.get("mttr"),
                      test_interval=d.get("test_interval"), mission_time=d.get("mission_time"),
+                     gamma=d.get("gamma"), alpha=d.get("alpha"), beta=d.get("beta"),
+                     t0=d.get("t0"),   # Gap 7 精确 Q(t) 模型字段透传
                      distribution=dist, source=d.get("source"), version=d.get("version"))
 
 def _pdag(ft: dict, lib: ParameterLibrary) -> PDAG:

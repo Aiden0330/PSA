@@ -82,3 +82,50 @@ def test_api_post_rules_exact_probability_untouched():
     bad = client.post("/api/quantify", json={"model": _model_json(), "fault_tree": "T",
                                              "post_rules": [{"kind": "nope"}]})
     assert bad.status_code == 400
+
+
+def test_exchange_rule_swaps_event_and_probability():
+    """exchange(Gap 7 裁决二,MEF §6 手算例):C={H,A} 满足假设 {H} 且含 source A
+    → 换成 {H,A'},概率 ×(q_A'/q_A):0.2×0.01=0.002 → 0.2×0.10=0.02(10×)。"""
+    from psaengine.quantify.cutsets import CutSet
+    rule = PostRule.from_dict({"kind": "exchange", "events": ["H"], "source": "A",
+                               "add_event": "A_prime", "prob": 0.10, "source_prob": 0.01})
+    cs = [CutSet(events=["A", "H"], order=2, probability=0.002)]
+    out, stats = apply_post_rules(cs, [rule])
+    assert len(out) == 1
+    assert out[0].events == ["A_prime", "H"]
+    assert out[0].probability == pytest.approx(0.02, rel=1e-12)
+    assert out[0].order == 2
+    assert stats.get("exchanged") == 1
+
+
+def test_exchange_rule_target_already_present_divides_only():
+    """target 已在割集 → 集合语义:仅移除 source、÷q_source,阶 −1。"""
+    from psaengine.quantify.cutsets import CutSet
+    rule = PostRule.from_dict({"kind": "exchange", "events": ["H"], "source": "A",
+                               "add_event": "B", "prob": 0.3, "source_prob": 0.01})
+    cs = [CutSet(events=["A", "B", "H"], order=3, probability=0.2 * 0.01 * 0.3)]
+    out, _ = apply_post_rules(cs, [rule])
+    assert out[0].events == ["B", "H"]
+    assert out[0].probability == pytest.approx(0.2 * 0.3, rel=1e-12)
+    assert out[0].order == 2
+
+
+def test_exchange_rule_not_applied_without_hypothesis_or_source():
+    from psaengine.quantify.cutsets import CutSet
+    rule = PostRule.from_dict({"kind": "exchange", "events": ["H"], "source": "A",
+                               "add_event": "A_prime", "prob": 0.10, "source_prob": 0.01})
+    keep = [CutSet(events=["A"], order=1, probability=0.01),          # 无 H
+            CutSet(events=["H", "X"], order=2, probability=0.002)]    # 无 source
+    out, stats = apply_post_rules(keep, [rule])
+    assert sorted(tuple(c.events) for c in out) == [("A",), ("H", "X")]
+    assert stats.get("exchanged", 0) == 0
+
+
+def test_exchange_rule_validation_loud():
+    with pytest.raises(ValueError, match="source"):
+        PostRule.from_dict({"kind": "exchange", "events": ["H"],
+                            "add_event": "A2", "prob": 0.1, "source_prob": 0.01})
+    with pytest.raises(ValueError, match="source_prob"):
+        PostRule.from_dict({"kind": "exchange", "events": ["H"], "source": "A",
+                            "add_event": "A2", "prob": 0.1})

@@ -18,16 +18,24 @@ class PostRule:
     - "delete_contains":   割集 ⊇ events → 删(RS delete rules)。
     - "recovery":          割集 ⊇ events → 追加恢复事件 add_event(概率 prob),
                             割集概率 ×prob、阶 +1(RS recovery rules)。
+    - "exchange":          割集满足假设(⊇ events)且含 source → 以 add_event(target,
+                            概率 prob)替换 source(source_prob),割集概率
+                            ×(prob/source_prob)(Gap 7 裁决二;MEF §6 exchange-event,
+                            XFTA §7.2:唯一不可布尔编译的替换——恰属本 MCS-list 通道)。
+                            target 已在割集 → 集合语义:仅除 source_prob,阶 −1。
     """
     kind: str
     events: list[str] = field(default_factory=list)
     add_event: str | None = None
     prob: float | None = None
+    source: str | None = None
+    source_prob: float | None = None
 
     @classmethod
     def from_dict(cls, d: dict) -> "PostRule":
-        r = cls(d["kind"], list(d.get("events", [])), d.get("add_event"), d.get("prob"))
-        if r.kind not in ("mutually_exclusive", "delete_contains", "recovery"):
+        r = cls(d["kind"], list(d.get("events", [])), d.get("add_event"), d.get("prob"),
+                d.get("source"), d.get("source_prob"))
+        if r.kind not in ("mutually_exclusive", "delete_contains", "recovery", "exchange"):
             raise ValueError(f"unknown post-processing rule kind '{r.kind}'")
         if r.kind == "mutually_exclusive" and len(r.events) < 2:
             raise ValueError("mutually_exclusive rule needs >=2 events")
@@ -38,6 +46,15 @@ class PostRule:
                 raise ValueError("recovery rule needs add_event")
             if r.prob is None or not 0.0 <= r.prob <= 1.0:
                 raise ValueError("recovery rule needs prob in [0,1]")
+        if r.kind == "exchange":
+            if not r.source:
+                raise ValueError("exchange rule needs source (被替换的基本事件)")
+            if not r.add_event:
+                raise ValueError("exchange rule needs add_event (target)")
+            if r.prob is None or not 0.0 <= r.prob <= 1.0:
+                raise ValueError("exchange rule needs prob in [0,1] (target 概率)")
+            if r.source_prob is None or not 0.0 < r.source_prob <= 1.0:
+                raise ValueError("exchange rule needs source_prob in (0,1](换出事件概率,除数)")
         return r
 
 
@@ -46,6 +63,7 @@ def apply_post_rules(cutsets: list[CutSet], rules: list[PostRule]) -> tuple[list
     幂等安全:recovery 不重复追加已含的恢复事件。"""
     removed = 0
     recovered = 0
+    exchanged = 0
     out: list[CutSet] = []
     for c in cutsets:
         ev = set(c.events)
@@ -68,6 +86,17 @@ def apply_post_rules(cutsets: list[CutSet], rules: list[PostRule]) -> tuple[list
                 order += 1
                 p *= float(r.prob)
                 recovered += 1
+            elif r.kind == "exchange" and set(r.events) <= ev and r.source in ev:
+                events.remove(r.source)
+                ev.discard(r.source)
+                p /= float(r.source_prob)
+                if r.add_event in ev:
+                    order -= 1                      # 集合语义:target 已在,仅除 source
+                else:
+                    events = sorted(events + [r.add_event])
+                    ev.add(r.add_event)
+                    p *= float(r.prob)
+                exchanged += 1
         out.append(CutSet(events, order, p))
     out.sort(key=lambda c: (-c.probability, c.order, c.events))
-    return out, {"removed": removed, "recovered": recovered}
+    return out, {"removed": removed, "recovered": recovered, "exchanged": exchanged}
