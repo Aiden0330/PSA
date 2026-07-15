@@ -74,11 +74,16 @@ class EtQuantifyRequest(BaseModel):
     # 4a4:携带项目上下文 → 不确定性/重要度运行同样自动钉扎为分析案例(ADR-2 证据链)
     project_uuid: Optional[str] = None
     project_payload: Optional[dict[str, Any]] = None
+    # 2026-07-15 序列级 LFT 集成:自包含 IE 块 {name?,top,nodes,parameters:[{id,kind,value}...]}
+    # ——参数必须带 kind(初因=frequency);设置即走 integrated 通道,响应附 method/ie_frequency。
+    ie_fault_tree: Optional[dict[str, Any]] = None
     scenario_name: Optional[str] = None
 
 class EtQuantifyResponse(BaseModel):
     sequences: dict[str, float]
     consequences: dict[str, float]
+    method: Optional[str] = None            # "integrated"(LFT 集成)时附;单树响应不变
+    ie_frequency: Optional[float] = None    # 集成模式:Σλ_i·P(E_i),供 UI 与频率通道对账
 
 class TreeSpec(BaseModel):
     """勾选集聚合(spec A)的单棵事件树载荷:与单树请求同形的每树字段 + 场景身份(key/name)

@@ -28,6 +28,15 @@ def build_model_from_request(req: dict) -> Model:
     for pid, spec in req.get("parameters", {}).items():
         val = spec["value"] if isinstance(spec, dict) else spec
         params.append({"id": pid, "kind": "probability", "value": float(val)})
+    ie = req.get("ie_fault_tree")
+    if ie:
+        # 序列级 LFT 集成:IE 块自带类型化参数(初因 kind=frequency)——不得走上面的
+        # probability 强转;树名默认 __init__,与前端频率模式存储约定一致。
+        name = ie.get("name", "__init__")
+        fault_trees.append({"name": name, "top": ie["top"], "nodes": ie["nodes"]})
+        for p in ie.get("parameters", []):
+            params.append({"id": p["id"], "kind": p.get("kind", "probability"),
+                           "value": float(p["value"])})
     model_dict = {
         "model_data": {"parameters": params},
         "fault_trees": fault_trees,

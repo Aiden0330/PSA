@@ -121,6 +121,15 @@ def api_event_tree_quantify(req: schemas.EtQuantifyRequest, _=Depends(require_ro
     from psaengine.eta.sequence import quantify_event_tree
     model = build_model_from_request(req.model_dump())
     try:
+        if req.ie_fault_tree:                        # 2026-07-15:序列级 LFT 集成通道
+            from psaengine.eta.sequence import quantify_event_tree_integrated
+            res = quantify_event_tree_integrated(
+                model, "TR", ie_ft_name=req.ie_fault_tree.get("name", "__init__"),
+                house_states=req.house_states or None,
+                boundary_condition_set=req.boundary_condition_set)
+            return schemas.EtQuantifyResponse(
+                sequences=res["sequences"], consequences=res["consequences"],
+                method=res["method"], ie_frequency=res["ie_frequency"])
         res = quantify_event_tree(model, "TR", house_states=req.house_states or None,
                                   boundary_condition_set=req.boundary_condition_set)
     except ValueError as e:

@@ -57,6 +57,40 @@ class FrequencyRuleError(ValueError):
     """违反「每割集恰好一个频率事件」——量纲无从成立,响亮拒绝(绝不静默近似)。"""
 
 
+def classify_frequency_params(model: Model, pdag) -> tuple[dict[str, float], dict[str, float]]:
+    """把 pdag 基本事件按参数 kind 分为 (初因率 λ, 使能概率 q)。频率通道与序列级
+    集成(2026-07-15 规格)共用;负 λ 源头拒绝(review F4/R-1 锁在参数层另有兜底)。"""
+    freq_value: dict[str, float] = {}
+    enabling_q: dict[str, float] = {}
+    for b in pdag.basic_events():
+        p = model.parameters.get(pdag.node(b).param_ref)
+        if p.kind == "frequency":
+            if p.value < 0:
+                raise ValueError(f"frequency {p.id}={p.value} must be >= 0")
+            freq_value[b] = p.value
+        else:
+            enabling_q[b] = p.unavailability()
+    return freq_value, enabling_q
+
+
+def group_enabler_sets(cuts, freq_value: dict[str, float]) -> dict[str, list[frozenset[str]]]:
+    """一频率规则校验(每最小割集恰好一个初因)+ 逐初因使能集分组。
+    频率通道(fault_tree_frequency)与序列级集成共用——校验语义单一来源。"""
+    enabler_sets: dict[str, list[frozenset[str]]] = {}
+    for c in cuts:
+        initiators = [e for e in c.events if e in freq_value]
+        if len(initiators) != 1:
+            hint = "(空割集:顶事件恒真——检查常量/house 输入)" if not c.events else ""
+            raise FrequencyRuleError(
+                f"cut set {sorted(c.events)} has {len(initiators)} frequency events "
+                f"({sorted(initiators)}); exactly one required — "
+                f"每个最小割集须恰好一个频率事件(初因率),其余为使能概率{hint}")
+        init = initiators[0]
+        enabler_sets.setdefault(init, []).append(
+            frozenset(e for e in c.events if e != init))
+    return enabler_sets
+
+
 def fault_tree_frequency(model: Model, ft_name: str, cutoff: float = 0.0,
                          method: str = "sum") -> dict:
     """量化 ft_name 为初因频率(/yr)。
@@ -85,32 +119,14 @@ def fault_tree_frequency(model: Model, ft_name: str, cutoff: float = 0.0,
     m = BddManager(order)
     root = build_from_pdag(m, pdag, pdag.top)
 
-    freq_value: dict[str, float] = {}
-    enabling_q: dict[str, float] = {}
-    for b in pdag.basic_events():
-        p = model.parameters.get(pdag.node(b).param_ref)
-        if p.kind == "frequency":
-            if p.value < 0:
-                raise ValueError(f"frequency {p.id}={p.value} must be >= 0")
-            freq_value[b] = p.value
-        else:
-            enabling_q[b] = p.unavailability()      # probability / rate(λ·MTTR 等)
-
+    freq_value, enabling_q = classify_frequency_params(model, pdag)
     cuts = minimal_cutsets(m, root, q=None)
+    enabler_sets = group_enabler_sets(cuts, freq_value)   # 一频率规则在此校验(共享语义)
 
     detailed: list[dict] = []
-    enabler_sets: dict[str, list[frozenset[str]]] = {}   # 初因 → 各割集的使能事件集
     for c in cuts:
-        initiators = [e for e in c.events if e in freq_value]
-        if len(initiators) != 1:
-            hint = "(空割集:顶事件恒真——检查常量/house 输入)" if not c.events else ""
-            raise FrequencyRuleError(
-                f"cut set {sorted(c.events)} has {len(initiators)} frequency events "
-                f"({sorted(initiators)}); exactly one required — "
-                f"每个最小割集须恰好一个频率事件(初因率),其余为使能概率{hint}")
-        init = initiators[0]
+        init = next(e for e in c.events if e in freq_value)
         enablers = frozenset(e for e in c.events if e != init)
-        enabler_sets.setdefault(init, []).append(enablers)
         f = freq_value[init] * prod(enabling_q[e] for e in enablers)
         detailed.append({"events": sorted(c.events), "order": c.order,
                          "frequency": f, "initiator": init})
