@@ -248,6 +248,20 @@
   console 零错)。过程发现(已挂 chip task_75694c92):_pin_case→ensure_project
   会把已存项目改名为 scenario_name(先于本改动存在,审计有痕)。
 
+- **Opus 批:后 Fable backlog 清空(2026-07-15,用户点题"remaining tasks with
+  opus 4.8")**:gh CLI 官方二进制直装(无 brew,SHA-256 校验)· Windows runbook
+  `12bcbcd`(WSL2 主线/原生 PowerShell 对照表/三部署形态;实证 FastAPI 已挂 dist
+  自托管 SPA,纠正任务书 CUDD skip 数 3≠4)· **规格 B 落地** `582e0c0`(逐模板三类
+  口径注记+电芯数对账式+ISC grade C→D(F6)+基准映射台账绊线;TD-001 §7 旧"系统级"
+  口径句由 Fable 亲改为舱级 canonical `138a82f`)· **规格 A 落地** `017a1fd`+`ad32763`
+  (联合抽样 aggregate_event_tree_uncertainty:单 RNG 流 × ref 名并集,结构性排除
+  两种被禁实现;锚 3 实测 joint p95=9.049e-4 vs independent 7.663e-4——判据生效;
+  单树响应键集字节锁;报告/CSV/台账/组合总览全表面 scope 标识;py 362·fe 293·
+  基准两跑 24/24)· **UI exact/Σ 切换** `81987e0`(BarrierFtModal 频率模式,
+  by_initiator 表,fe 296)。README 刷新 `391bab6`(用户点芯片,另会话)。
+  账本:IE 行残留仅剩 load-time lint;悬置项仅剩 AI 首跑(API key)与序列级 LFT
+  (Fable 规格先行)。附带发现挂链:task_75694c92(导出改写项目名,证据链相邻)。
+
 ---
 
 ### 0.1 上一基线:2026-06-30(Windows,历史记录)

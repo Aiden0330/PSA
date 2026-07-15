@@ -85,8 +85,8 @@ canonical 手册。基线:py 366 collected(含 24 benchmark 逐位)· fe 281 · 
 文档地图:`docs/README.md`。
 
 **悬置项**:GitHub 远程已建且 CI 四作业**全绿全阻断**(github.com/Aiden1981/PSA,
-2026-07-15;CUDD Linux 首跑即过,Gap 6b 收口);AI 真实供应商首跑待 API key
-(runbook 就绪);两份已裁决规格
-(IE 口径统一 → 聚合范围钉扎,**必须按此顺序**)与 UI exact/Σ 切换为待实现
-backlog(锚点齐备,Opus/Sonnet 级);parity 残余 = 序列级 LFT 集成(禁独改类,需 Fable 规格先行)与长尾 Gap 7/8。Windows 历史:`git-archive repo/`(ignored);被取代的旧手册
+2026-07-15;CUDD Linux 首跑即过,Gap 6b 收口);AI 真实供应商首跑待 API key(runbook 就绪);
+两份已裁决规格与 UI exact/Σ 切换 **已全部落地**(2026-07-15,Opus 批:582e0c0 /
+017a1fd+ad32763 / 81987e0,Windows runbook 12bcbcd);parity 残余 = 序列级 LFT 集成
+(禁独改类,需 Fable 规格先行)与长尾 Gap 7/8。Windows 历史:`git-archive repo/`(ignored);被取代的旧手册
 与技能蓝图在 `docs/archive/`。
