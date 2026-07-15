@@ -12,7 +12,7 @@
 | `superpowers/specs/` · `plans/` | 逐特性规格与计划,`YYYY-MM-DD-<slug>`。已完成的规格保留偏离记录(如 explorer-redesign §6)。 |
 | `reviews/` | 独立评审存档:数据溯源评审 ×2、change-quiz 答案卷。 |
 | `benchmark/engine-benchmark-validation.md` | SCRAM/OpenFTA 对标基准报告(引擎改动强制门)。 |
-| `design/` | 设计规范与策略:`restyle-spec.md`(UI 令牌语言)、`ai-model-strategy.md`(模型分层)、`ai-live-run-runbook.md`、`ai-eta-example.md`(AI 草案契约示例)、`mockups/`(历次方向稿,含 explorer 定稿 8 页)。 |
+| `design/` | 设计规范与策略:`restyle-spec.md`(UI 令牌语言)、`ai-model-strategy.md`(模型分层)、`ai-live-run-runbook.md`、`ai-eta-example.md`(AI 草案契约示例)、`windows-dev-runbook.md`(Windows/WSL2 开发与部署)、`mockups/`(历次方向稿,含 explorer 定稿 8 页)。 |
 | `reference-assets/templates-eta-claude.ts` | 前代工具模板原件(已迁入场景库,保留作对照)。 |
 
 ## 调研与外部资料(research/)

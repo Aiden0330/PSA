@@ -64,6 +64,8 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 ## 运行
 
+> Windows 开发见 [docs/design/windows-dev-runbook.md](docs/design/windows-dev-runbook.md)（推荐 WSL2 / 原生备选 / 部署形态 / 门禁）。
+
 macOS 一键运行（构建前端 + FastAPI 后端）：
 
 ```bash
