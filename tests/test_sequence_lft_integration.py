@@ -195,3 +195,109 @@ def test_integrated_propagates_frequency_rule_errors():
     m = _model(params, ie, barriers, seqs)
     with pytest.raises(FrequencyRuleError):
         quantify_event_tree_integrated(m, "TR", ie_ft_name="__init__")
+
+
+# ── review ed90116 F1/F2/F3 回归锁:碰撞护栏(五类探针全部改为响亮拒绝)──────
+
+def _mk(params, ie_build, barriers, seqs):
+    return _model(params, ie_build, barriers, seqs)
+
+
+def test_guard_ie_gate_id_collides_with_barrier_gate():
+    """审查探针第 1 行(88× 静默低估):IE 门 id == 屏障门 id → 响亮拒绝。"""
+    params = [Parameter("I", "frequency", 1e-3),
+              Parameter("A", "probability", 0.3), Parameter("B", "probability", 0.2),
+              Parameter("D", "probability", 0.1), Parameter("E", "probability", 0.05)]
+    def ie(g):
+        g.basic("I"); g.basic("A"); g.basic("B")
+        g.gate("EN", Op.OR, ["A", "B"]); g.gate("IE_TOP", Op.AND, ["I", "EN"])
+    barriers = {"FE_B": lambda g: (g.basic("D"), g.basic("E"),
+                                   g.gate("EN", Op.AND, ["D", "E"]),
+                                   g.gate("B_TOP", Op.OR, ["EN"]))}
+    seqs = [_seq({"FE_B": "failure"}, "S_FAIL"), _seq({"FE_B": "success"}, "S_OK")]
+    with pytest.raises(ValueError, match="EN"):
+        quantify_event_tree_integrated(_mk(params, ie, barriers, seqs), "TR",
+                                       ie_ft_name="__init__")
+
+
+def test_guard_ie_basic_id_collides_with_barrier_gate():
+    """审查探针第 2 行(5× 静默高估):IE 基本事件 id == 屏障门 id → 响亮拒绝。"""
+    params = [Parameter("I", "frequency", 1e-3), Parameter("SP", "probability", 0.2),
+              Parameter("X", "probability", 0.4), Parameter("Y", "probability", 0.1)]
+    def ie(g):
+        g.basic("I"); g.basic("S", param_ref="SP"); g.gate("IE_TOP", Op.AND, ["I", "S"])
+    barriers = {"FE_B": lambda g: (g.basic("X"), g.basic("Y"),
+                                   g.gate("S", Op.OR, ["X", "Y"]))}
+    seqs = [_seq({"FE_B": "failure"}, "S_FAIL"), _seq({"FE_B": "success"}, "S_OK")]
+    with pytest.raises(ValueError, match="'S'"):
+        quantify_event_tree_integrated(_mk(params, ie, barriers, seqs), "TR",
+                                       ie_ft_name="__init__")
+
+
+def test_guard_shared_basic_with_conflicting_param_ref():
+    """审查探针第 6 行:同 id 基本事件、param_ref 不同 → 拒绝(歧义模型)。"""
+    params = [Parameter("I", "frequency", 1e-3),
+              Parameter("PS_IE", "probability", 0.3), Parameter("PS_B", "probability", 0.1)]
+    def ie(g):
+        g.basic("I"); g.basic("S", param_ref="PS_IE"); g.gate("IE_TOP", Op.AND, ["I", "S"])
+    barriers = {"FE_B": lambda g: (g.basic("S", param_ref="PS_B"),
+                                   g.gate("B_TOP", Op.OR, ["S"]))}
+    seqs = [_seq({"FE_B": "failure"}, "S_FAIL"), _seq({"FE_B": "success"}, "S_OK")]
+    with pytest.raises(ValueError, match="param_ref"):
+        quantify_event_tree_integrated(_mk(params, ie, barriers, seqs), "TR",
+                                       ie_ft_name="__init__")
+
+
+def test_guard_ccf_member_collides_with_ie_gate_id():
+    """审查探针第 4 行(绕过旧守卫):CCF 成员撞 IE **门** id → 加宽后的守卫拒绝。"""
+    from psaengine.model.ccf import CCFGroup
+    params = [Parameter("I", "frequency", 1e-3),
+              Parameter("A", "probability", 0.3), Parameter("B", "probability", 0.2),
+              Parameter("M1", "probability", 0.1), Parameter("M2", "probability", 0.1)]
+    def ie(g):
+        g.basic("I"); g.basic("A"); g.basic("B")
+        g.gate("M1", Op.OR, ["A", "B"]); g.gate("IE_TOP", Op.AND, ["I", "M1"])
+    barriers = {"FE_B": lambda g: (g.basic("M1x", param_ref="M1"),
+                                   g.basic("M2x", param_ref="M2"),
+                                   g.gate("B_TOP", Op.OR, ["M1x", "M2x"]))}
+    seqs = [_seq({"FE_B": "failure"}, "S_FAIL"), _seq({"FE_B": "success"}, "S_OK")]
+    m = _mk(params, ie, barriers, seqs)
+    m.ccf_groups = [CCFGroup(id="g", members=["M1x", "M1"], model="beta",
+                             factors={"beta": 0.1})]
+    with pytest.raises(ValueError, match="CCF"):
+        quantify_event_tree_integrated(m, "TR", ie_ft_name="__init__")
+
+
+def test_guard_barrier_house_id_collides_with_ie_basic():
+    """审查探针第 5 行(违背"bc 仅屏障侧"):屏障 house id == IE 基本事件 id → 拒绝。"""
+    params = [Parameter("I", "frequency", 1e-3), Parameter("H", "probability", 0.25)]
+    def ie(g):
+        g.basic("I"); g.basic("H"); g.gate("IE_TOP", Op.AND, ["I", "H"])
+    def barrier(g):
+        g.basic("Z", param_ref="H"); g.house("H", True)
+        g.gate("B_TOP", Op.OR, ["Z", "H"])
+    seqs = [_seq({"FE_B": "failure"}, "S_FAIL"), _seq({"FE_B": "success"}, "S_OK")]
+    m = _mk(params, ie, {"FE_B": barrier}, seqs)
+    with pytest.raises(ValueError, match="'H'"):
+        quantify_event_tree_integrated(m, "TR", ie_ft_name="__init__")
+
+
+def test_guard_barrier_referencing_frequency_param_is_named_error():
+    """review F2:屏障树引用频率参数 → 点名拒绝(此前深处 KeyError → HTTP 500)。"""
+    params = [Parameter("I", "frequency", 1e-3), Parameter("S", "probability", 0.2)]
+    def ie(g):
+        g.basic("I"); g.basic("S"); g.gate("IE_TOP", Op.AND, ["I", "S"])
+    barriers = {"FE_B": lambda g: (g.basic("IB", param_ref="I"),
+                                   g.gate("B_TOP", Op.OR, ["IB"]))}
+    seqs = [_seq({"FE_B": "failure"}, "S_FAIL"), _seq({"FE_B": "success"}, "S_OK")]
+    with pytest.raises(ValueError, match="frequency-kind"):
+        quantify_event_tree_integrated(_mk(params, ie, barriers, seqs), "TR",
+                                       ie_ft_name="__init__")
+
+
+def test_guard_legitimate_sharing_unperturbed():
+    """护栏不得扰动合法共享:锚点 C 数值逐位不变(审查 round-2 明示要求)。"""
+    m = _model_C()
+    r = quantify_event_tree_integrated(m, "TR", ie_ft_name="__init__")
+    assert r["sequences"]["S_FAIL"] == pytest.approx(2e-4, rel=1e-12)
+    assert r["sequences"]["S_OK"] == pytest.approx(0.0, abs=1e-18)

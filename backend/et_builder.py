@@ -32,9 +32,16 @@ def build_model_from_request(req: dict) -> Model:
     if ie:
         # 序列级 LFT 集成:IE 块自带类型化参数(初因 kind=frequency)——不得走上面的
         # probability 强转;树名默认 __init__,与前端频率模式存储约定一致。
+        # review ed90116 F3:ParameterLibrary.add 后写胜出——IE 块参数若与请求参数同 id,
+        # 会静默改值/改型(探针:9× 且 200)。同 id 一律响亮拒绝。
         name = ie.get("name", "__init__")
+        existing_ids = {p["id"] for p in params}
         fault_trees.append({"name": name, "top": ie["top"], "nodes": ie["nodes"]})
         for p in ie.get("parameters", []):
+            if p["id"] in existing_ids:
+                raise ValueError(
+                    f"ie_fault_tree parameter '{p['id']}' duplicates a request parameter — "
+                    "IE 块参数不得与屏障侧参数同 id(后写覆盖会静默改值/改型)")
             params.append({"id": p["id"], "kind": p.get("kind", "probability"),
                            "value": float(p["value"])})
     model_dict = {

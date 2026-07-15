@@ -119,8 +119,8 @@ def api_event_tree_quantify(req: schemas.EtQuantifyRequest, _=Depends(require_ro
     """ROADMAP A: 前端序列化事件树 → 引擎精确否定定量(跨屏障共享事件精确)。"""
     from backend.et_builder import build_model_from_request
     from psaengine.eta.sequence import quantify_event_tree
-    model = build_model_from_request(req.model_dump())
     try:
+        model = build_model_from_request(req.model_dump())   # F3 守卫在 builder 内响亮
         if req.ie_fault_tree:                        # 2026-07-15:序列级 LFT 集成通道
             from psaengine.eta.sequence import quantify_event_tree_integrated
             res = quantify_event_tree_integrated(

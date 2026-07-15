@@ -70,3 +70,22 @@ def test_integrated_ccf_overlap_is_400():
     r = client.post("/api/event-tree/quantify", json=req)
     assert r.status_code == 400
     assert "CCF" in r.json()["detail"]
+
+
+def test_ie_block_param_duplicating_request_param_is_400():
+    """review F3:IE 块参数与请求参数同 id(后写覆盖 9× 且 200)→ 响亮 400。"""
+    req = _req_anchor_c()
+    req["ie_fault_tree"]["parameters"].append({"id": "X", "kind": "probability", "value": 0.9})
+    r = client.post("/api/event-tree/quantify", json=req)
+    assert r.status_code == 400
+    assert "duplicates" in r.json()["detail"]
+
+
+def test_collision_guard_reaches_api_as_400():
+    """review F1 端到端:门 id 碰撞经 API 必须 400(此前 200 + 88× 低估)。"""
+    req = _req_anchor_c()
+    # 屏障里造一个与 IE 顶同名的门
+    req["fault_trees"]["B"]["nodes"].append({"id": "IE_TOP", "op": "or", "args": ["S"]})
+    r = client.post("/api/event-tree/quantify", json=req)
+    assert r.status_code == 400
+    assert "IE_TOP" in r.json()["detail"]

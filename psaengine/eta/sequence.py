@@ -16,13 +16,11 @@ class EtBuild:
     params: object                      # CCF 展开后的参数库(未展开时 = model.parameters)
 
 
-def _build_event_tree(model: Model, et_name: str,
-                      house_states: dict[str, bool] | None = None,
-                      boundary_condition_set: str | None = None) -> EtBuild:
-    """合并各功能事件链接的故障树到一个 PDAG + 同一 BddManager + 各 FE 顶 BDD(建一次)。
-    跨序列共享基本事件因合并到同一 PDAG/管理器而自动正确(成功分支精确否定)。
-    边界条件(house 状态)在合并副本上生效;CCF 组在合并后的 PDAG 上展开一次:
-    跨屏障共享的共因事件同样精确否定。"""
+def _merged_barrier_pdag(model: Model, et_name: str,
+                         house_states: dict[str, bool] | None,
+                         boundary_condition_set: str | None):
+    """屏障侧合并 + 边界条件 + CCF 展开(_build_event_tree 与集成通道共用——
+    review ed90116 F5:此前两处各写一份,修一处会漏另一处)。"""
     et = model.event_trees[et_name]
     big = PDAG()
     fe_top: dict[str, str] = {}
@@ -40,6 +38,18 @@ def _build_event_tree(model: Model, et_name: str,
     if model.ccf_groups:
         from psaengine.preprocess.ccf_expand import apply_ccf
         big, params = apply_ccf(big, model.ccf_groups, params)
+    return et, big, fe_top, params
+
+
+def _build_event_tree(model: Model, et_name: str,
+                      house_states: dict[str, bool] | None = None,
+                      boundary_condition_set: str | None = None) -> EtBuild:
+    """合并各功能事件链接的故障树到一个 PDAG + 同一 BddManager + 各 FE 顶 BDD(建一次)。
+    跨序列共享基本事件因合并到同一 PDAG/管理器而自动正确(成功分支精确否定)。
+    边界条件(house 状态)在合并副本上生效;CCF 组在合并后的 PDAG 上展开一次:
+    跨屏障共享的共因事件同样精确否定。"""
+    et, big, fe_top, params = _merged_barrier_pdag(model, et_name,
+                                                   house_states, boundary_condition_set)
     all_basics = sorted(big.basic_events())
     m = BddManager(all_basics)
     fe_bdd = {fid: build_from_pdag(m, big, top) for fid, top in fe_top.items()}
@@ -102,35 +112,51 @@ def _build_integrated(model: Model, et_name: str, ie_ft_name: str,
         raise ValueError(f"IE tree {ie_ft_name} contains house events — 集成模式 v1 "
                          "边界条件仅作用于屏障侧(规格 §3 v1 排除)")
     ie_basics = ie_pdag.basic_events()
+    # review ed90116 F1(加宽):CCF 守卫覆盖 IE **全部**节点 id——成员撞 IE 门 id 时,
+    # 展开会把 E_i 劫持成 CCF 结构(探针实测 4.4× 静默低估),不止基本事件要挡。
+    ie_node_ids = set(ie_pdag.nodes)
     for grp in (model.ccf_groups or []):
-        shared = ie_basics & set(grp.members)
+        shared = ie_node_ids & set(grp.members)
         if shared:
-            raise ValueError(f"CCF group {grp.id} contains IE-tree events {sorted(shared)} — "
-                             "集成模式 v1 不支持 IE 事件参与 CCF 组(规格 §3 v1 排除)")
+            raise ValueError(f"CCF group {grp.id} overlaps IE-tree node ids {sorted(shared)} — "
+                             "集成模式 v1 不支持 IE 事件/节点参与 CCF 组(规格 §3 v1 排除)")
 
     freq_value, _ = classify_frequency_params(model, ie_pdag)
 
-    # 屏障侧合并(house/bc/CCF 照旧作用于屏障)+ IE 归一化图并入同一变量空间
-    et = model.event_trees[et_name]
-    big = PDAG()
-    fe_top: dict[str, str] = {}
-    for fe in et.functional_events:
-        ft = model.fault_trees[fe.link_ft]
-        for nid, n in ft.pdag.nodes.items():
-            if nid not in big.nodes:
-                big.nodes[nid] = n
-        fe_top[fe.id] = ft.top
-    from psaengine.preprocess.boundary import resolve_house_states, apply_house_states
-    states = resolve_house_states(model, house_states, boundary_condition_set)
-    if states:
-        big = apply_house_states(big, states)
-    params = model.parameters
-    if model.ccf_groups:
-        from psaengine.preprocess.ccf_expand import apply_ccf
-        big, params = apply_ccf(big, model.ccf_groups, params)
-    for nid, n in ie_pdag.nodes.items():                 # IE 图并入(共享基本事件按 id 统一)
+    # 屏障侧合并(house/bc/CCF 照旧只作用于屏障;共享 helper,review F5)
+    et, big, fe_top, params = _merged_barrier_pdag(model, et_name,
+                                                   house_states, boundary_condition_set)
+
+    # review ed90116 F2:屏障树引用频率参数 = 量纲违规(初因率混入概率路径),
+    # 在此响亮点名拒绝——否则 q 映射缺项,深处 KeyError 以 500 面目示人。
+    for bb in big.basic_events():
+        if params.get(big.nodes[bb].param_ref).kind == "frequency":
+            raise ValueError(
+                f"barrier-side basic event '{bb}' references frequency-kind parameter "
+                f"'{big.nodes[bb].param_ref}' — 屏障树不得引用初因率(量纲违规);"
+                "初因只属于 IE 树,经使能析取进入序列")
+
+    # review ed90116 F1:IE 图并入的碰撞护栏——同 id 仅允许「双方都是基本事件且
+    # param_ref 相同」(这是共享使能的**唯一**合法形态)。门/房/参数不一致一律响亮
+    # 拒绝:探针实测五类碰撞全部静默错数(最重 88× 低估且 HTTP 200)。
+    for nid, n in ie_pdag.nodes.items():
         if nid not in big.nodes:
             big.nodes[nid] = n
+            continue
+        existing = big.nodes[nid]
+        ok = (existing.is_basic and n.is_basic
+              and existing.param_ref == n.param_ref)
+        if not ok:
+            def _shape(x):
+                if x.is_basic:
+                    return f"basic(param_ref={x.param_ref})"
+                if x.is_house:
+                    return "house"
+                return f"gate({x.op.value if x.op else '?'})"
+            raise ValueError(
+                f"node id '{nid}' means different things in IE tree vs barrier side "
+                f"(IE: {_shape(n)} / barrier: {_shape(existing)}) — 集成模式共享仅限"
+                "同参数基本事件;请重命名冲突节点(id 是全局契约)")
 
     all_basics = sorted(big.basic_events())
     m = BddManager(all_basics)
