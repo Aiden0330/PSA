@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>BESS PSA/QRA 工具 · 技术文档与算法手册</title>
 <style>
 :root{
@@ -156,17 +157,17 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
 <!-- ═══════════ 刊头 ═══════════ -->
 <header class="masthead">
   <div class="docno">
-    <span>BESS-PSA · TD-001 · Rev B</span>
-    <span>2026-07-10 · 内部技术文档 · 中文</span>
+    <span>BESS-PSA · TD-001 · Rev C</span>
+    <span>2026-07-14 · 内部技术文档 · 中文</span>
   </div>
   <h1>储能电站锂电池热失控概率安全评估工具<br>技术文档与算法手册</h1>
-  <p class="sub">精确 BDD 定量内核 · 事件树/故障树一体化 · 证据链版本库 · AI 辅助建模 —— 面向监管评审的 BESS QRA 全栈参考</p>
+  <p class="sub">精确 BDD 定量内核 · 事件树/故障树一体化 · 证据链版本库 · 评审签发与多项目组合总览 · AI 辅助建模 —— 面向监管评审的 BESS QRA 全栈参考</p>
   <div class="badges">
-    <span class="badge">引擎测试 <b>240 通过</b></span>
+    <span class="badge">后端+引擎 pytest <b>366 收集</b></span>
     <span class="badge">SCRAM/OpenFTA 基准 <b>24/24 逐位</b></span>
-    <span class="badge">前端测试 <b>206 通过</b></span>
+    <span class="badge">前端测试 <b>281 通过</b></span>
     <span class="badge">参考库 <b>100 条</b>(C:22 / D:73 / IE:5)</span>
-    <span class="badge">离线单文件 <b>2.73 MB</b></span>
+    <span class="badge">离线单文件 <b>2.78 MB</b></span>
     <span class="badge warn">数据成熟度 <b>筛查级(C/D)</b></span>
   </div>
 </header>
@@ -178,26 +179,34 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   <div class="t">目录</div>
   <a href="#s1">1 摘要与定位</a>
   <a href="#s2">2 系统架构</a>
-  <a href="#s3">3 算法详解</a>
-  <a class="l2" href="#s3-1">3.1 ROBDD 精确概率内核</a>
-  <a class="l2" href="#s3-2">3.2 最小割集与截断</a>
-  <a class="l2" href="#s3-3">3.3 事件树精确量化</a>
-  <a class="l2" href="#s3-4">3.4 共因失效(CCF)</a>
-  <a class="l2" href="#s3-5">3.5 重要度度量</a>
-  <a class="l2" href="#s3-6">3.6 不确定性分析</a>
-  <a class="l2" href="#s3-7">3.7 边界条件与 house 事件</a>
-  <a class="l2" href="#s3-8">3.8 割集后处理规则</a>
-  <a class="l2" href="#s3-9">3.9 现场贝叶斯更新</a>
-  <a class="l2" href="#s3-10">3.10 模块化与素蕴涵项</a>
-  <a class="l2" href="#s3-11">3.11 内容寻址版本库</a>
-  <a class="l2" href="#s3-12">3.12 AI 生成管线</a>
-  <a href="#s4">4 工具手册</a>
-  <a href="#s5">5 工作示例</a>
-  <a href="#s6">6 数据分级与后果标尺</a>
-  <a href="#s7">7 文献综述</a>
-  <a href="#s8">8 SOTA 工具对比</a>
-  <a href="#s9">9 局限与路线图</a>
-  <a href="#s10">10 参考文献</a>
+  <a href="#s3">3 FTA/ETA 方法基础</a>
+  <a class="l2" href="#s3-1">3.1 故障树:自顶向下的演绎</a>
+  <a class="l2" href="#s3-2">3.2 事件树:自初因向前的归纳</a>
+  <a class="l2" href="#s3-3">3.3 两者协同与 BESS 语境</a>
+  <a href="#s4">4 算法详解</a>
+  <a class="l2" href="#s4-1">4.1 ROBDD 精确概率内核</a>
+  <a class="l2" href="#s4-2">4.2 最小割集与截断</a>
+  <a class="l2" href="#s4-3">4.3 事件树精确量化</a>
+  <a class="l2" href="#s4-4">4.4 共因失效(CCF)</a>
+  <a class="l2" href="#s4-5">4.5 重要度度量</a>
+  <a class="l2" href="#s4-6">4.6 不确定性分析</a>
+  <a class="l2" href="#s4-7">4.7 边界条件与 house 事件</a>
+  <a class="l2" href="#s4-8">4.8 割集后处理规则</a>
+  <a class="l2" href="#s4-9">4.9 现场贝叶斯更新</a>
+  <a class="l2" href="#s4-10">4.10 模块化与素蕴涵项</a>
+  <a class="l2" href="#s4-11">4.11 内容寻址版本库</a>
+  <a class="l2" href="#s4-12">4.12 AI 生成管线</a>
+  <a class="l2" href="#s4-13">4.13 初因事件故障树 → 频率通道</a>
+  <a class="l2" href="#s4-14">4.14 评审签发与多用户认证</a>
+  <a href="#s5">5 工具手册</a>
+  <a class="l2" href="#s5-5">5.5 AI 建模助手使用指南</a>
+  <a href="#s6">6 工作示例</a>
+  <a href="#s7">7 数据分级与后果标尺</a>
+  <a href="#s8">8 文献综述</a>
+  <a class="l2" href="#s8-4">8.4 AI 生成 FTA/ETA:SOTA 输入调研</a>
+  <a href="#s9">9 SOTA 工具对比</a>
+  <a href="#s10">10 局限与路线图</a>
+  <a href="#s11">11 参考文献</a>
 </nav>
 
 <main>
@@ -215,19 +224,20 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
     <li><strong>RiskSpectrum 对标后端</strong> —— 精确 BDD 顶事件概率、ZBDD/MOCUS 最小割集、
       NUREG/CR-5485 全套 CCF 模型(β/MGL/α/φ,含错峰检验)、边界条件集、割集后处理规则、
       重要度(B/FV/RAW/RRW/DIM)、蒙特卡洛不确定性、Open-PSA MEF XML 互换。其中
-      <strong>事件树成功分支的精确否定</strong>超越 RiskSpectrum 的 delete-term 近似(§3.3)。</li>
-    <li><strong>证据链版本库</strong> —— 保存即内容寻址版本(SHA-256 幂等),分析即自动钉扎
+      <strong>事件树成功分支的精确否定</strong>超越 RiskSpectrum 的 delete-term 近似(§4.3)。</li>
+    <li><strong>证据链版本库与评审签发</strong> —— 保存即内容寻址版本(SHA-256 幂等),分析即自动钉扎
       「分析案例」,报告页脚携带 <code>分析案例 # · 版本哈希 · 引擎版本</code>,审计日志只增不改
-      (SQLite 触发器强制,§3.11)。</li>
+      (SQLite 触发器强制,§4.11);评审/签发状态机 + 三角色本地认证把"谁在何时批准了哪个版本"
+      变成数据库物理事实(§4.14),多项目组合总览只呈现已钉扎的数字(§5.4)。</li>
     <li><strong>AI 辅助建模</strong> —— 基于参考库检索接地的草案生成、确定性校验-修复环
       (schema → 域 lint → 引擎试运行)、逐元素幽灵差异接受(ghost-diff)、金例评测门。
-      所有 AI 产物强制携带「AI 草案,待人工审核」溯源并默认 D 级置信(§3.12)。</li>
+      所有 AI 产物强制携带「AI 草案,待人工审核」溯源并默认 D 级置信(§4.12)。</li>
   </ul>
 
   <div class="kpis">
-    <div class="kpi"><span class="l">引擎单元/性质/解析测试</span><span class="v">240<small>通过</small></span></div>
+    <div class="kpi"><span class="l">后端+引擎 pytest</span><span class="v">366<small>收集(含基准)</small></span></div>
     <div class="kpi"><span class="l">SCRAM/OpenFTA 对标基准</span><span class="v">24/24<small>逐位一致</small></span></div>
-    <div class="kpi"><span class="l">前端 vitest</span><span class="v">206<small>通过</small></span></div>
+    <div class="kpi"><span class="l">前端 vitest</span><span class="v">281<small>通过</small></span></div>
     <div class="kpi"><span class="l">预置 ETA 模板</span><span class="v">7<small>个(逐条溯源)</small></span></div>
     <div class="kpi"><span class="l">参考库条目</span><span class="v">100<small>全带 citation</small></span></div>
     <div class="kpi"><span class="l">BDD 后端</span><span class="v">3<small>python/autoref/CUDD</small></span></div>
@@ -323,14 +333,192 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   </figure>
 </section>
 
-<!-- ═══════════ 3 算法 ═══════════ -->
+<!-- ═══════════ 3 方法基础 ═══════════ -->
 <section id="s3">
-  <h2><span class="no">3</span>算法详解</h2>
+  <h2><span class="no">3</span>FTA/ETA 方法基础</h2>
+  <p class="lead">本章为非 PSA 背景的读者铺底:故障树(FTA)与事件树(ETA)各自回答什么问题、
+  图形元素与数学语义如何对应、两者如何组合成一次完整的 BESS 热失控风险量化。已熟悉 PSA 的读者可
+  直接进入 §4 的算法实现。</p>
+
+  <h3 id="s3-1"><span class="no">3.1</span>故障树:自顶向下的演绎分析</h3>
+  <p>故障树回答"<strong>这个不期望事件为什么会发生</strong>":从一个<strong>顶事件</strong>
+  (如"舱级爆燃")出发,经逻辑门逐层分解到不可再分的<strong>基本事件</strong>(器件失效、
+  人因失误、点火源存在)。树是一个布尔函数:基本事件取真 = 该失效发生,顶事件的真值由门语义
+  逐层合成。图 3 给出一棵最小可用的教学树。</p>
+
+  <figure>
+    <div class="figbox">
+    <svg viewBox="0 0 880 330" width="880" role="img" aria-label="故障树基础示例">
+      <defs>
+        <marker id="arrF" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0 0.5 L7.5 4 L0 7.5 z" fill="var(--faint)"/>
+        </marker>
+      </defs>
+      <g font-size="12.5">
+        <!-- 顶事件 -->
+        <rect x="330" y="12" width="220" height="44" rx="8" fill="var(--primary-soft)" stroke="var(--primary)" stroke-width="1.3"/>
+        <text x="440" y="30" text-anchor="middle" font-weight="700" fill="var(--ink)">顶事件:舱级爆燃</text>
+        <text x="440" y="47" text-anchor="middle" class="mono" font-size="11.5" fill="var(--ink2)">P = 0.145 × 0.2 = 0.029(精确)</text>
+        <!-- AND 门 -->
+        <line x1="440" y1="56" x2="440" y2="72" stroke="var(--ink2)" stroke-width="1.4"/>
+        <path d="M 416 108 L 416 90 Q 416 74 440 74 Q 464 74 464 90 L 464 108 Z"
+              fill="var(--panel)" stroke="var(--ink2)" stroke-width="1.5"/>
+        <text x="440" y="98" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink2)">AND</text>
+        <line x1="416" y1="102" x2="240" y2="130" stroke="var(--ink2)" stroke-width="1.3"/>
+        <line x1="464" y1="102" x2="660" y2="140" stroke="var(--ink2)" stroke-width="1.3"/>
+        <!-- 中间事件 G1 -->
+        <rect x="130" y="132" width="220" height="42" rx="8" fill="var(--panel)" stroke="var(--line2)"/>
+        <text x="240" y="149" text-anchor="middle" font-weight="700" fill="var(--ink)">可燃气未被排除</text>
+        <text x="240" y="166" text-anchor="middle" class="mono" font-size="11.5" fill="var(--ink2)">P = 1−(1−0.05)(1−0.10) = 0.145</text>
+        <!-- OR 门 -->
+        <line x1="240" y1="174" x2="240" y2="188" stroke="var(--ink2)" stroke-width="1.4"/>
+        <path d="M 240 190 Q 266 204 262 226 Q 240 216 218 226 Q 214 204 240 190 Z"
+              fill="var(--panel)" stroke="var(--ink2)" stroke-width="1.5"/>
+        <text x="240" y="212" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink2)">OR</text>
+        <line x1="226" y1="224" x2="150" y2="252" stroke="var(--ink2)" stroke-width="1.3"/>
+        <line x1="254" y1="224" x2="330" y2="252" stroke="var(--ink2)" stroke-width="1.3"/>
+        <!-- 基本事件 -->
+        <circle cx="150" cy="284" r="30" fill="var(--teal-soft)" stroke="var(--teal)" stroke-width="1.4"/>
+        <text x="150" y="281" text-anchor="middle" font-size="11" fill="var(--ink)">离气探测</text>
+        <text x="150" y="295" text-anchor="middle" font-size="11" fill="var(--ink)">失效</text>
+        <text x="150" y="326" text-anchor="middle" class="mono" font-size="11.5" fill="var(--muted)">q = 0.05</text>
+        <circle cx="330" cy="284" r="30" fill="var(--teal-soft)" stroke="var(--teal)" stroke-width="1.4"/>
+        <text x="330" y="281" text-anchor="middle" font-size="11" fill="var(--ink)">强制排风</text>
+        <text x="330" y="295" text-anchor="middle" font-size="11" fill="var(--ink)">失效</text>
+        <text x="330" y="326" text-anchor="middle" class="mono" font-size="11.5" fill="var(--muted)">q = 0.10</text>
+        <circle cx="660" cy="176" r="30" fill="var(--teal-soft)" stroke="var(--teal)" stroke-width="1.4"/>
+        <text x="660" y="173" text-anchor="middle" font-size="11" fill="var(--ink)">点火源</text>
+        <text x="660" y="187" text-anchor="middle" font-size="11" fill="var(--ink)">存在</text>
+        <text x="660" y="220" text-anchor="middle" class="mono" font-size="11.5" fill="var(--muted)">q = 0.20</text>
+        <!-- 割集注记 -->
+        <rect x="520" y="248" width="344" height="66" rx="9" fill="var(--code-bg)" stroke="var(--line)"/>
+        <text x="536" y="270" font-size="12" fill="var(--ink2)">最小割集 MCS:{离气探测失效, 点火源} · {排风失效, 点火源}</text>
+        <text x="536" y="290" font-size="12" fill="var(--ink2)" class="mono">稀有事件近似 REA = 0.05×0.2 + 0.10×0.2 = 0.030</text>
+        <text x="536" y="307" font-size="12" fill="var(--ink2)" class="mono">精确(BDD)= 0.029 —— REA 恒保守(§4.2)</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><b>图 3</b> · 教学故障树:爆燃 = AND(可燃气未被排除, 点火源存在),
+    可燃气未被排除 = OR(探测失效, 排风失效)。独立假设下逐门合成概率;割集给出"哪些最小失效组合
+    足以引发顶事件"的工程视图。真实模型中共享事件/共因会使积式失效,见 §3.3 与 §4.3。</figcaption>
+  </figure>
+
+  <div class="tblwrap"><table>
+    <caption><b>表 1</b> · 门与事件符号语义(独立假设下的概率合成;k/n 表决门给出 2oo3 示例)</caption>
+    <thead><tr><th>元素</th><th>图形</th><th>语义</th><th>概率(独立)</th><th>本工具</th></tr></thead>
+    <tbody>
+      <tr><td><strong>基本事件</strong></td><td>圆</td><td>不可再分的失效/条件,挂可靠性模型(定值 q、λ-MTTR、λτ/2、λt)</td><td class="num">q 由参数层给出</td><td>参数库共享引用;单位纪律 §7</td></tr>
+      <tr><td><strong>OR 门</strong></td><td>尖顶盾形</td><td>任一输入发生即输出</td><td class="num">1 − Π(1−qᵢ)</td><td>●</td></tr>
+      <tr><td><strong>AND 门</strong></td><td>平底拱形</td><td>全部输入同时发生</td><td class="num">Π qᵢ</td><td>●</td></tr>
+      <tr><td><strong>k/n 表决门</strong></td><td>盾形标 k/n</td><td>n 路中 ≥k 路失效</td><td class="num">2oo3:3q²(1−q)+q³</td><td>● VOTE(CCF 常与之伴生,§4.4)</td></tr>
+      <tr><td><strong>NOT / XOR</strong></td><td>非相干逻辑</td><td>含否定的函数(检修互斥、状态切换)</td><td class="num">素蕴涵项取代 MCS</td><td>● BDD 精确(§4.10);频率通道显式拒绝(§4.13)</td></tr>
+      <tr><td><strong>house 事件</strong></td><td>小屋形</td><td>0/1 确定性开关(运行工况、边界条件)</td><td class="num">恒 0 或恒 1</td><td>● 命名边界条件集(§4.7)</td></tr>
+      <tr><td><strong>转移门</strong></td><td>三角</td><td>引用另一子树(复用/分页)</td><td class="num">—</td><td>● 模型内子树引用</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="s3-2"><span class="no">3.2</span>事件树:自初因向前的归纳分析</h3>
+  <p>事件树回答"<strong>初因发生之后会演成什么后果</strong>":从一个带年频率的<strong>初因事件</strong>
+  (IE,如"电芯内短路致热失控",单位 /yr)出发,按时间/因果顺序依次询问每道<strong>功能事件</strong>
+  (安全屏障)成功还是失败,展开成互斥的<strong>事故序列</strong>,每条序列终止于一个后果级
+  (本工具 C1–C5,§7)。序列频率为初因频率与沿途分支概率之积:</p>
+  <div class="eq"><span class="tag">(3-1)</span>
+    f<sub>seq</sub> = f<sub>IE</sub> · Π<sub>i∈路径</sub> p<sub>i</sub>,&nbsp;&nbsp;
+    p<sub>i</sub> = 失败分支取 PFD<sub>i</sub>,成功分支取 1−PFD<sub>i</sub>
+  </div>
+
+  <figure>
+    <div class="figbox">
+    <svg viewBox="0 0 880 300" width="880" role="img" aria-label="事件树基础示例">
+      <g font-size="12.5">
+        <!-- 表头 -->
+        <text x="60" y="28" text-anchor="middle" font-weight="700" fill="var(--ink)">初因事件</text>
+        <text x="250" y="20" text-anchor="middle" font-weight="700" fill="var(--ink)">离气探测+联动停机</text>
+        <text x="250" y="38" text-anchor="middle" class="mono" font-size="11" fill="var(--muted)">PFD 0.05</text>
+        <text x="450" y="20" text-anchor="middle" font-weight="700" fill="var(--ink)">舱级灭火</text>
+        <text x="450" y="38" text-anchor="middle" class="mono" font-size="11" fill="var(--muted)">PFD 0.10</text>
+        <text x="650" y="20" text-anchor="middle" font-weight="700" fill="var(--ink)">泄爆(NFPA 68)</text>
+        <text x="650" y="38" text-anchor="middle" class="mono" font-size="11" fill="var(--muted)">PFD 0.05</text>
+        <text x="800" y="28" text-anchor="middle" font-weight="700" fill="var(--ink)">后果 · 频率 /yr</text>
+        <line x1="16" y1="48" x2="864" y2="48" stroke="var(--line2)" stroke-width="1"/>
+        <!-- IE -->
+        <rect x="16" y="66" width="120" height="46" rx="8" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.3"/>
+        <text x="76" y="85" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">电芯内短路→TR</text>
+        <text x="76" y="103" text-anchor="middle" class="mono" font-size="11.5" fill="var(--ink2)">f = 1×10⁻³ /yr</text>
+        <!-- 主线(失败向下阶梯) -->
+        <g stroke="var(--ink2)" stroke-width="1.5" fill="none">
+          <path d="M 136 89 H 250"/>
+          <path d="M 250 89 H 740"/>            <!-- FE1 成功:水平至后果 -->
+          <path d="M 250 89 V 141 H 450"/>      <!-- FE1 失败:下阶 -->
+          <path d="M 450 141 H 740"/>           <!-- FE2 成功 -->
+          <path d="M 450 141 V 193 H 650"/>     <!-- FE2 失败 -->
+          <path d="M 650 193 H 740"/>           <!-- FE3 成功 -->
+          <path d="M 650 193 V 245 H 740"/>     <!-- FE3 失败 -->
+        </g>
+        <g font-size="10.5" fill="var(--muted)">
+          <text x="256" y="82">成功 0.95</text><text x="256" y="120">失败 0.05</text>
+          <text x="456" y="134">成功 0.90</text><text x="456" y="172">失败 0.10</text>
+          <text x="656" y="186">成功 0.95</text><text x="656" y="224">失败 0.05</text>
+        </g>
+        <!-- 后果 -->
+        <g font-size="12">
+          <rect x="744" y="76" width="42" height="24" rx="5" fill="var(--c1)"/><text x="765" y="93" text-anchor="middle" fill="#fff" font-weight="700">C1</text>
+          <text x="794" y="93" class="mono" fill="var(--ink2)">9.50×10⁻⁴</text>
+          <rect x="744" y="128" width="42" height="24" rx="5" fill="var(--c2)"/><text x="765" y="145" text-anchor="middle" fill="#fff" font-weight="700">C2</text>
+          <text x="794" y="145" class="mono" fill="var(--ink2)">4.50×10⁻⁵</text>
+          <rect x="744" y="180" width="42" height="24" rx="5" fill="var(--c3)"/><text x="765" y="197" text-anchor="middle" fill="#fff" font-weight="700">C3</text>
+          <text x="794" y="197" class="mono" fill="var(--ink2)">4.75×10⁻⁶</text>
+          <rect x="744" y="232" width="42" height="24" rx="5" fill="var(--c5)"/><text x="765" y="249" text-anchor="middle" fill="#fff" font-weight="700">C5</text>
+          <text x="794" y="249" class="mono" fill="var(--ink2)">2.50×10⁻⁷</text>
+        </g>
+        <text x="440" y="284" text-anchor="middle" font-size="12" fill="var(--muted)">守恒校核:Σf<tspan font-size="9" dy="2">seq</tspan><tspan dy="-2"> = 9.5×10⁻⁴ + 4.5×10⁻⁵ + 4.75×10⁻⁶ + 2.5×10⁻⁷ = 1.000×10⁻³ /yr ✓(序列互斥且完备)</tspan></text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><b>图 4</b> · 级联事件树(本工具的直角走线制式):每道屏障成功即出树到后果,
+    失败下阶梯继续。序列互斥 ⇒ 频率求和守恒到初因频率;同一性质使组合总览的"C3+C4+C5 求和"
+    是恒等式而非近似(§5.4)。屏障 PFD 可为手输值,也可由挂载的故障树顶概率给出(§3.3)。</figcaption>
+  </figure>
+
+  <div class="tblwrap"><table>
+    <caption><b>表 2</b> · FTA 与 ETA 的分工对照</caption>
+    <thead><tr><th></th><th>故障树 FTA</th><th>事件树 ETA</th></tr></thead>
+    <tbody>
+      <tr><td>推理方向</td><td>演绎:从顶事件回溯"为什么"</td><td>归纳:从初因前推"然后呢"</td></tr>
+      <tr><td>起点</td><td>顶事件(不期望状态)</td><td>初因事件(带频率 /yr)</td></tr>
+      <tr><td>输出</td><td>最小割集 + 顶事件概率/不可用度</td><td>互斥事故序列谱 + 各后果级频率</td></tr>
+      <tr><td>量纲</td><td>概率 / 按需 PFD(无量纲)</td><td>频率(/yr)——概率×频率不可混算(§4.13)</td></tr>
+      <tr><td>典型问题</td><td>"屏障为何失效?哪组失效最要命?"</td><td>"热失控发生后,几率多大烧到舱级?"</td></tr>
+      <tr><td>相互馈送</td><td>顶概率 → 屏障 PFD</td><td>屏障失败分支 ← FTA;初因频率 ← 频率型 FTA(§4.13)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="s3-3"><span class="no">3.3</span>两者协同与 BESS 语境</h3>
+  <p>完整的 QRA 是"<strong>ETA 定骨架、FTA 供血肉</strong>"的组合(bow-tie 视角:左半 FTA 解释初因,
+  右半 ETA 展开后果):</p>
+  <ul>
+    <li><strong>屏障挂树</strong>:事件树中每道功能事件的失败概率可由一棵挂载故障树的顶事件概率给出
+      ——BESS 场景如「离气探测联动」= OR(传感失效, 逻辑失效, 执行失效) 再叠加共因;</li>
+    <li><strong>共享事件是常态而非例外</strong>:多道屏障共用同一供电、同一 BMS、同一传感器时,
+      分支概率不再独立,图 4 的积式失效——必须在合并布尔模型上精确量化(§4.3 的 0.109 锚点即此);</li>
+    <li><strong>初因也可建树</strong>:初因频率可由"频率型故障树"合成(每割集恰一个频率事件,
+      §4.13),与手动输入并列为两条通道;</li>
+    <li><strong>尺度语境</strong>:BESS 模型跨电芯→模组→簇→舱四级,失效率单位随级别变化
+      (/cell·yr 与 /unit·yr 绝不静默换算,§7);后果级 C1(单体排气)到 C5(爆燃+毒气)
+      对应中电联严重度 0–IV(表 10)。</li>
+  </ul>
+  <div class="note"><b>阅读路线。</b>只想会用工具:直接跳 §5 手册与 §6 示例;要核算法:§4 每小节
+  都给出公式来源、实现文件与锁定测试;要评估数据可信度:§7 分级 + 参考库逐条 citation。</div>
+</section>
+
+<!-- ═══════════ 4 算法 ═══════════ -->
+<section id="s4">
+  <h2><span class="no">4</span>算法详解</h2>
   <p class="lead">定量内核的设计原则:<strong>能精确就不近似</strong>。顶事件概率与序列频率走 BDD 精确通道;
   割集/截断/REA/MCUB 仅作为大模型工程近似与后处理语义存在,且永不污染精确通道。每个算法的公式来源、
   实现位置与数值锚点在各小节标注。</p>
 
-  <h3 id="s3-1"><span class="no">3.1</span>ROBDD 精确概率内核</h3>
+  <h3 id="s4-1"><span class="no">4.1</span>ROBDD 精确概率内核</h3>
   <p>故障树先归一化为 PDAG(命题有向无环图:AND/OR/NOT/XOR/ATLEAST/NULL 门 + 基本事件 + house 常量),
   经环检测、常量传播与同型门合并后,以固定变量序编译为<strong>约简有序二叉决策图</strong>(ROBDD)。
   内核为自研纯 Python 实现(<code>psaengine/bdd/kernel.py</code>),两条约简规则:冗余节点消除
@@ -341,7 +529,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   在余因子操作中丢失导致非相干函数(含 NOT/XOR/成功分支)结果被破坏的缺陷,靠对拍测试锁定修复。
   规范型的可解释性优先于节点数,是面向监管工具的取舍。</p>
   <p>所有布尔运算统一经 <strong>ITE(if-then-else)算子</strong>实现,Shannon 展开逐层递归并记忆化:</p>
-  <div class="eq"><span class="tag">(3-1)</span>
+  <div class="eq"><span class="tag">(4-1)</span>
     ite(<var>f</var>,<var>g</var>,<var>h</var>) = <var>f</var>·<var>g</var> + ¬<var>f</var>·<var>h</var>
     = ⟨<var>v</var>, ite(<var>f</var><sub>v</sub>,<var>g</var><sub>v</sub>,<var>h</var><sub>v</sub>),
     ite(<var>f</var><sub>¬v</sub>,<var>g</var><sub>¬v</sub>,<var>h</var><sub>¬v</sub>)⟩,
@@ -352,7 +540,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   <span class="inm">rec(i,need)=ite(x<sub>i</sub>, rec(i+1,need−1), rec(i+1,need))</span> 构造,精确处理门下挂门。</p>
   <p><strong>精确概率</strong>沿 BDD 做单遍 Shannon 递归(实现为显式栈后序遍历,规避 Python 递归深度上限;
   万级事件深图实测无栈溢出,基准 24 例逐位不变):</p>
-  <div class="eq"><span class="tag">(3-2)</span>
+  <div class="eq"><span class="tag">(4-2)</span>
     P(<var>f</var>) = <var>q</var><sub>v</sub>·P(<var>f</var><sub>hi</sub>) + (1−<var>q</var><sub>v</sub>)·P(<var>f</var><sub>lo</sub>),
     &nbsp; P(⊤)=1, P(⊥)=0
   </div>
@@ -391,12 +579,12 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
         <text x="640" y="150" fill="var(--primary)" font-size="12.5" font-weight="700" class="mono">     = 0.109(精确)</text>
         <text x="640" y="180" fill="var(--muted)" font-size="12">对照:独立近似 1−(1−.1)(1−.01)</text>
         <text x="640" y="198" fill="var(--muted)" font-size="12">= 0.109 此例相同;共享事件场景</text>
-        <text x="640" y="216" fill="var(--muted)" font-size="12">下两者分离,见 §3.3 数值锚。</text>
+        <text x="640" y="216" fill="var(--muted)" font-size="12">下两者分离,见 §4.3 数值锚。</text>
       </g>
     </svg>
     </div>
-    <figcaption><b>图 3</b> · <span class="inm">f = A ∨ (B∧C)</span> 在变量序 A&lt;B&lt;C 下的 ROBDD 与
-    式(3-2)的逐节点求值。unique table 保证同构子图只存一份。</figcaption>
+    <figcaption><b>图 5</b> · <span class="inm">f = A ∨ (B∧C)</span> 在变量序 A&lt;B&lt;C 下的 ROBDD 与
+    式(4-2)的逐节点求值。unique table 保证同构子图只存一份。</figcaption>
   </figure>
 
   <p><strong>变量序</strong>采用 DFLM(depth-first left-most)启发式:按故障树深度优先遍历首次出现的顺序
@@ -406,26 +594,26 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   (验证用)与 <code>dd.cudd</code>(CUDD,万级事件,macOS arm64 编译实证)间共享同一遍历协议
   (<code>is_terminal/top_var_index/cofactor/var_name</code>),量化代码后端无关。</p>
 
-  <h3 id="s3-2"><span class="no">3.2</span>最小割集、截断与工程近似</h3>
+  <h3 id="s4-2"><span class="no">4.2</span>最小割集、截断与工程近似</h3>
   <p>割集提取走 <strong>BDD→ZBDD</strong> 路线:枚举 BDD 中使函数为真的正文字路径得到候选集族,
   转入零压缩决策图(ZBDD)做吸收律最小化(<span class="inm">minimize</span>),得到全部最小割集;
   同时提供教科书 <strong>MOCUS</strong>(自顶向下门展开)作为交叉验证器——性质测试断言两法在随机树上
   集族相等。非相干结构(含 NOT/XOR/成功逻辑)下"最小割集"不再良定义,内核提供<strong>素蕴涵项</strong>
-  (prime implicants)替代(§3.10)。</p>
+  (prime implicants)替代(§4.10)。</p>
   <p>截断按概率阈值与阶数双准则,并给出<strong>截断误差上界</strong>:被丢弃割集的概率和
   <span class="inm">ΔP<sub>k</sub> = Σ<sub>丢弃</sub> P(C<sub>i</sub>)</span> 随结果一并报告——用户看到的
-  永远是"值 + 该值可信到什么程度"。两个经典 MCS 概率近似仅在后处理语义下使用(§3.8):</p>
-  <div class="eq"><span class="tag">(3-3)</span>
+  永远是"值 + 该值可信到什么程度"。两个经典 MCS 概率近似仅在后处理语义下使用(§4.8):</p>
+  <div class="eq"><span class="tag">(4-3)</span>
     REA:&nbsp; P ≈ Σ<sub>i</sub> P(C<sub>i</sub>) &nbsp;&nbsp;&nbsp;
     MCUB:&nbsp; P ≈ 1 − ∏<sub>i</sub> (1 − P(C<sub>i</sub>))
   </div>
 
-  <h3 id="s3-3"><span class="no">3.3</span>事件树精确量化与成功分支精确否定</h3>
+  <h3 id="s4-3"><span class="no">4.3</span>事件树精确量化与成功分支精确否定</h3>
   <p>事件树各功能事件(屏障)可直接给 PFD,或链接一棵故障树。量化时把<strong>全部链接故障树合并进同一个
   PDAG 与同一个 BDD 管理器</strong>,每个屏障得到自己的顶 BDD <span class="inm">g<sub>i</sub></span>;
   序列表达式按路径逐屏障取"失效 = <span class="inm">g<sub>i</sub></span> / 成功 =
   ¬<span class="inm">g<sub>i</sub></span>"做 AND:</p>
-  <div class="eq"><span class="tag">(3-4)</span>
+  <div class="eq"><span class="tag">(4-4)</span>
     P(seq) = P( ⋀<sub>i∈失效</sub> g<sub>i</sub> ∧ ⋀<sub>j∈成功</sub> ¬g<sub>j</sub> ),&nbsp;
     freq(seq) = f<sub>IE</sub> · P(seq)
   </div>
@@ -434,11 +622,11 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   RiskSpectrum/SAPHIRE 系的 delete-term 割集删除近似。守护测试锁定的数值锚:两屏障均为
   <span class="inm">OR(S, X<sub>i</sub>)</span>、共享事件 <span class="inm">q<sub>S</sub></span>=0.1、
   独立事件 <span class="inm">q<sub>X</sub></span>=0.1(各顶值 0.19)时,双失效序列 LL 的精确概率为</p>
-  <div class="eq"><span class="tag">(3-5)</span>
+  <div class="eq"><span class="tag">(4-5)</span>
     P(F₁∧F₂) = q<sub>S</sub> + (1−q<sub>S</sub>)·q<sub>X₁</sub>q<sub>X₂</sub> = 0.1 + 0.9×0.01 =
     <mark>0.109</mark> &nbsp;≠&nbsp; 0.19² = 0.0361(独立乘积,低估 3 倍)
   </div>
-  <p>前端画布提供"积式实时"预览(独立乘积,毫秒级反馈),「引擎精确量化」按钮走式(3-4);两者数值分歧时
+  <p>前端画布提供"积式实时"预览(独立乘积,毫秒级反馈),「引擎精确量化」按钮走式(4-4);两者数值分歧时
   界面以 ▶ 标记提醒——快速反馈与精确真值各司其职,绝不混淆。事件树支持<strong>有序可跳过分支</strong>
   不变式:分支判定屏障必须按功能事件表顺序出现、允许跳过(子集路径),该契约由测试守护并与引擎请求形状
   绑定。McMicken 等模板的屏障口径统一为"TR 已触发,该屏障能否阻止升级到下一后果级"。</p>
@@ -487,18 +675,18 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
       </g>
     </svg>
     </div>
-    <figcaption><b>图 4</b> · 级联事件树(内短路模板前三道屏障,独立情形的积式数值)。屏障链接故障树且
-    存在共享事件/共因时,右列频率改由式(3-4)精确给出。叶色 = C1–C5 后果级(§6)。</figcaption>
+    <figcaption><b>图 6</b> · 级联事件树(内短路模板前三道屏障,独立情形的积式数值)。屏障链接故障树且
+    存在共享事件/共因时,右列频率改由式(4-4)精确给出。叶色 = C1–C5 后果级(§7)。</figcaption>
   </figure>
 
-  <h3 id="s3-4"><span class="no">3.4</span>共因失效(CCF):β / MGL / α / φ 全模型展开</h3>
+  <h3 id="s4-4"><span class="no">4.4</span>共因失效(CCF):β / MGL / α / φ 全模型展开</h3>
   <p>冗余通道(2oo3 传感、双接触器)被同一原因同时失效是 BESS 电气/控制系统的主导风险之一。
   实现遵循 NUREG/CR-5485<sup class="cite"><a href="#ref-5485">[5]</a></sup>,并与基准参考工具 SCRAM 的
   源码逐式核对。设组规模 <var>m</var>、单部件总失效概率 <span class="inm">Q<sub>t</sub></span>,
   <span class="inm">Q<sub>k</sub></span> 为<strong>某一特定 k 重共因基本事件</strong>的概率:</p>
 
   <div class="tblwrap"><table>
-    <caption><b>表 1</b> · CCF 参数模型与展开公式(实现:<code>psaengine/preprocess/ccf_expand.py::q_levels</code>)</caption>
+    <caption><b>表 3</b> · CCF 参数模型与展开公式(实现:<code>psaengine/preprocess/ccf_expand.py::q_levels</code>)</caption>
     <thead><tr><th>模型</th><th>Q<sub>k</sub> 公式</th><th>因子键</th><th>备注</th></tr></thead>
     <tbody>
       <tr><td><strong>β 因子</strong></td>
@@ -521,9 +709,9 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
 
   <p>mgl/α/φ 走<strong>全子集多层展开</strong>:每个 k≥2 的成员子集生成一个共因基本事件
   <code>CCF_{组}_{成员…}</code>,成员原位改写为
-  <span class="inm">OR(x__I, 含 x 的全部子集事件)</span>(图 5)。展开满足一致性恒等式
+  <span class="inm">OR(x__I, 含 x 的全部子集事件)</span>(图 7)。展开满足一致性恒等式
   (性质测试,m∈{2,3,4} × 随机因子 × 两种检验方案):</p>
-  <div class="eq"><span class="tag">(3-6)</span>
+  <div class="eq"><span class="tag">(4-6)</span>
     Σ<sub>k=1..m</sub> C(m−1, k−1) · Q<sub>k</sub> = Q<sub>t</sub>
   </div>
 
@@ -561,16 +749,16 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
       </g>
     </svg>
     </div>
-    <figcaption><b>图 5</b> · 多层 CCF 展开与数值锚。防误用护栏:组规模 &gt;6 拒绝(子集爆炸)、
+    <figcaption><b>图 7</b> · 多层 CCF 展开与数值锚。防误用护栏:组规模 &gt;6 拒绝(子集爆炸)、
     成员部分在树/组间重叠响亮报错(静默重归一会无声改写共因概率)、多层模型要求成员同质
     (异质提示改用 β 逐成员路径)。MEF <code>define-CCF-group</code> 解析/生成支持嵌套定义、
     无 level 属性顺次分配与错峰标志经 <code>attributes</code> 无损往返。</figcaption>
   </figure>
 
-  <h3 id="s3-5"><span class="no">3.5</span>重要度度量</h3>
+  <h3 id="s4-5"><span class="no">4.5</span>重要度度量</h3>
   <p>故障树基本事件级(BDD 上以条件概率精确计算,非割集近似):</p>
   <div class="tblwrap"><table>
-    <caption><b>表 2</b> · 重要度定义(P = 顶事件概率;P|x=1 表示强制事件 x 失效)</caption>
+    <caption><b>表 4</b> · 重要度定义(P = 顶事件概率;P|x=1 表示强制事件 x 失效)</caption>
     <thead><tr><th>度量</th><th>定义</th><th>工程含义</th></tr></thead>
     <tbody>
       <tr><td>Birnbaum <span class="inm">B<sub>i</sub></span></td><td class="num">P(f|x_i=1) − P(f|x_i=0)</td><td>结构敏感度:该事件"翻转"对顶事件的边际影响</td></tr>
@@ -585,15 +773,15 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   <span class="inm">RAW=R<sub>fail</sub>/R</span>。强制的是屏障顶而非其底事件——共享底事件下其他屏障
   不受污染。注意良性后果(需屏障成功才到达,如 C1)FV 可为负、RAW 可 &lt;1,属正常语义并在界面注明。</p>
 
-  <h3 id="s3-6"><span class="no">3.6</span>不确定性分析(蒙特卡洛)</h3>
+  <h3 id="s4-6"><span class="no">4.6</span>不确定性分析(蒙特卡洛)</h3>
   <p>参数不确定性以分布描述(对数正态以中位数+误差因子 EF 参数化,另支持正态/均匀/Beta)。
   对数正态抽样 <span class="inm">σ = ln(EF)/1.645</span>(EF 定义为 p95/p50)。<strong>共享底事件每次
   迭代只抽一次</strong>——跨屏障/跨序列的状态知识相关性(state-of-knowledge correlation)自动保持,
-  这在 MCS 近似框架里往往被丢失。BDD 建一次、每次迭代仅重算式(3-2)概率,N=1000 默认秒级。
+  这在 MCS 近似框架里往往被丢失。BDD 建一次、每次迭代仅重算式(4-2)概率,N=1000 默认秒级。
   输出各后果类 C1–C5 的 p05/p50/p95 分位带 + 点估计;龙卷风图给出各参数对输出方差的排序。
   不确定性运行与报告一样自动钉扎为分析案例(settings 含 samples/seed/EF,结果可复现)。</p>
 
-  <h3 id="s3-7"><span class="no">3.7</span>边界条件与 house 事件</h3>
+  <h3 id="s4-7"><span class="no">4.7</span>边界条件与 house 事件</h3>
   <p>house 事件是取值恒真/恒假的常量事件,用于表达运行工况(检修、旁路、季节配置)。归一化阶段做
   常量传播(OR 含真→真;AND 含假→假;否则剔除常量参数),BDD 编译前逻辑已化简。
   <strong>边界条件集</strong>是命名的 house 状态字典,可随模型定义、按名引用;显式
@@ -601,30 +789,30 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   (模型本体不可被分析改写——审计前提);未知 id 或指向非 house 节点响亮报 400(静默忽略会让边界条件
   悄悄失效);FTA/ETA/不确定性/重要度全通道接受同一组参数。</p>
 
-  <h3 id="s3-8"><span class="no">3.8</span>割集后处理规则</h3>
+  <h3 id="s4-8"><span class="no">4.8</span>割集后处理规则</h3>
   <p>对标 RiskSpectrum 的 MCS 后处理语义,三类规则:<strong>互斥组</strong>(割集同含组内 ≥2 成员→删,
   表达互斥维修态)、<strong>删除规则</strong>(割集 ⊇ 指定事件集→删)、<strong>恢复规则</strong>
   (割集 ⊇ 触发集→追加恢复事件,概率相乘、阶+1,幂等不重复追加)。<strong>设计边界:规则只作用于
-  提取出的 MCS 列表,精确 BDD 概率通道不受任何影响</strong>——处理后列表以式(3-3)REA/MCUB 给出
+  提取出的 MCS 列表,精确 BDD 概率通道不受任何影响</strong>——处理后列表以式(4-3)REA/MCUB 给出
   MCS 级估计,与精确顶值在界面/报告中分列展示,该不变式由 API 测试直接断言。</p>
 
-  <h3 id="s3-9"><span class="no">3.9</span>现场贝叶斯更新(Beta-二项)</h3>
+  <h3 id="s4-9"><span class="no">4.9</span>现场贝叶斯更新(Beta-二项)</h3>
   <p>把现场检验数据(需求次数 N、失败次数 k)融合进屏障 PFD。先验两种:以当前 PFD 为均值、等效样本量
   n₀ 的 Beta(<span class="inm">α₀=p·n₀, β₀=(1−p)·n₀</span>),或无信息 Jeffreys
   (<span class="inm">α₀=β₀=½</span>)。共轭后验:</p>
-  <div class="eq"><span class="tag">(3-7)</span>
+  <div class="eq"><span class="tag">(4-7)</span>
     p | N,k ~ Beta(α₀+k, β₀+N−k),&nbsp; E[p] = <span class="frac"><span>α₀+k</span><span>α₀+β₀+N</span></span>,
     &nbsp; p95 = Beta 分位数
   </div>
   <p>界面提供「采用后验均值 / 采用 95% 上限」两种保守度;采用即写入 PFD、置信升 A、
   并自动生成证据链文本(N、k、先验、日期)。这是内置库 C/D 级数据向项目 A 级演进的规范路径。</p>
 
-  <h3 id="s3-10"><span class="no">3.10</span>模块化与素蕴涵项</h3>
+  <h3 id="s4-10"><span class="no">4.10</span>模块化与素蕴涵项</h3>
   <p><strong>模块化</strong>(Dutuit–Rauzy 线性时间算法<sup class="cite"><a href="#ref-dr">[7]</a></sup>)
   识别独立子树,子树概率可独立求值后作为超级事件回代——大树的分治通道。<strong>素蕴涵项</strong>
   面向非相干函数:含否定逻辑时以 PI 取代 MCS 的语义(RiskSpectrum 不提供,本工具作为超集能力保留)。</p>
 
-  <h3 id="s3-11"><span class="no">3.11</span>内容寻址版本库与审计</h3>
+  <h3 id="s4-11"><span class="no">4.11</span>内容寻址版本库与审计</h3>
   <p>存储为单文件 SQLite(WAL,零外部依赖)四表:<code>projects / versions / audit_log / analysis_cases</code>
   (+ <code>ai_drafts</code>)。核心机制:</p>
   <ul>
@@ -640,7 +828,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
       前后)——对标 RiskSpectrum Model Compare,前端报告页内置对比视图。</li>
   </ul>
 
-  <h3 id="s3-12"><span class="no">3.12</span>AI 生成管线(ADR-3)</h3>
+  <h3 id="s4-12"><span class="no">4.12</span>AI 生成管线(ADR-3)</h3>
   <figure>
     <div class="figbox">
     <svg viewBox="0 0 880 218" width="880" role="img" aria-label="AI 管线">
@@ -672,21 +860,63 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
       </g>
     </svg>
     </div>
-    <figcaption><b>图 6</b> · AI 草案管线。三条铁律:数值必须引用参考库条目(<code>library_ref</code>)或
+    <figcaption><b>图 8</b> · AI 草案管线。三条铁律:数值必须引用参考库条目(<code>library_ref</code>)或
     显式标注 <code>ungrounded</code>;AI 自评 A/B 级=校验错误(AI 产物强制 D 级、「AI 草案,待人工审核」);
     草案永不直接落库——逐元素接受后才进入文档,拒绝的屏障经 <code>delFe</code> 语义正确折叠。</figcaption>
   </figure>
+
+  <h3 id="s4-13"><span class="no">4.13</span>初因事件故障树 → 频率通道</h3>
+  <p>初因事件的量纲是<strong>频率(/yr)</strong>,不是概率——把初因树喂给概率端点会产出
+  无量纲数再错标为 /yr(OR 门按 1−Π(1−q) 封顶 1、AND 门得 1/yr² 之类的量纲灾难)。本工具为此
+  建有独立的频率量化通道,采用与 RiskSpectrum / SAPHIRE / CAFTA 一致的
+  <strong>initiator–enabler</strong> 约定(Isograph FaultTree+ 亦提供同类初因-使能分析
+  <sup class="cite"><a href="#ref-isograph">[21]</a></sup>):每个最小割集<strong>恰好包含一个</strong>
+  频率型事件(initiator,λ /yr),其余为使能条件(enabler,无量纲概率 q):</p>
+  <div class="eq"><span class="tag">(4-8)</span>
+    F<sub>IE</sub> = Σ<sub>k∈MCS</sub> λ<sub>k</sub> · Π<sub>e∈k</sub> q<sub>e</sub> &nbsp;&nbsp;[/yr]
+  </div>
+  <p>频率是计数强度,互斥割集的并直接<strong>求和</strong>(绝不做 1−Π(1−·));共享
+  <strong>使能事件</strong>跨割集时该式仍精确,共享<strong>初因事件</strong>时为保守上界
+  (非稀有区间无界,文档化)。护栏全部"响亮失败":</p>
+  <ul>
+    <li>任一割集含 0 或 ≥2 个频率事件 → <code>FrequencyRuleError</code>(400,中文 detail 点名割集);</li>
+    <li>非相干门(NOT/XOR)在规范化图上直接拒绝——静默错数比报错危险(评审 round-1 F1);</li>
+    <li>双向量纲护栏:频率参数进概率语境即 raise,负 λ / 负时间参数在源头拒绝;</li>
+    <li>前端频率模式:量纲切换、频率不钳位 ≤1、IE 树与屏障树共享基本事件的独立性 lint(双侧编辑路径均拦截并解释)。</li>
+  </ul>
+  <p>初因由此获得<strong>手动输入 / 频率型故障树</strong>两条并列通道;种子树 = 单频率事件 =
+  当前手动值,迁移零意外(预览实测 0.004 逐位不变)。该通道经 engine-reviewer 两轮对抗审查
+  (round-1 六项发现全修,round-2 PASS),规格含已知局限清单。</p>
+
+  <h3 id="s4-14"><span class="no">4.14</span>评审签发与多用户认证</h3>
+  <p>面向监管的"谁在何时批准了哪个版本"在本工具是<strong>数据库物理事实</strong>,不是流程约定。
+  两层机制:</p>
+  <ul>
+    <li><strong>评审状态机</strong>(台账签发式):草稿(无评审行)→ <mark>送审中</mark> →
+      <mark>已签发</mark>(终态)/ <mark>退回</mark>(须填理由,理由即证据)。数据库层双保险:
+      已签发行 <code>BEFORE UPDATE/DELETE</code> 触发器直接 ABORT;部分唯一索引保证每项目至多一行在审。
+      签发写入签发人、时刻、版本哈希与<strong>角色快照</strong>(授权依据可从只增链重建,不依赖可变账户表);</li>
+    <li><strong>导出门 = 内容寻址幂等</strong>:报告导出自动钉扎的版本若与已签发版本内容逐字节一致
+      (同哈希),页脚落签发行;任何未保存改动都是新哈希 → 自动成为「工作稿 — 未经签发」。
+      无需引入"冻结"概念,不可伪造盖章是存储层性质;</li>
+    <li><strong>认证为部署开关</strong>:<code>PSA_AUTH=off</code>(默认)单机离线零摩擦——这是最高
+      不变式;<code>local</code> 模式启用本地账户:argon2id 口令(RFC 9106 默认参数)、会话令牌
+      <strong>散列落库</strong>(库文件泄露 ≠ 会话劫持)、12 h TTL 过半滑动续期、未知用户走等时垫片
+      (枚举防御);三角色 <code>analyst / reviewer / admin</code> 路由守卫(分析-评审职责分离),
+      保存走乐观并发(基线哈希不符 → 409 冲突对话,绝不静默覆盖);每条审计行携带
+      <code>auth:off|local</code> 标记,OS 用户行与认证账户行在同一追踪链中可区分。</li>
+  </ul>
 </section>
 
 <!-- ═══════════ 4 手册 ═══════════ -->
-<section id="s4">
-  <h2><span class="no">4</span>工具手册</h2>
+<section id="s5">
+  <h2><span class="no">5</span>工具手册</h2>
 
-  <h3><span class="no">4.1</span>安装与常用命令</h3>
+  <h3><span class="no">5.1</span>安装与常用命令</h3>
   <p>环境:macOS(主平台)· Python 3.12(uv 管理 <code>.venv</code>)· Node 20(nvm;非交互 shell 先
   <code>source ~/.nvm/nvm.sh</code>)。版本钉扎:Vite 5 / React 18 / echarts 5 / ag-grid 32,不升级。</p>
   <div class="tblwrap"><table>
-    <caption><b>表 3</b> · Makefile 目标</caption>
+    <caption><b>表 5</b> · Makefile 目标</caption>
     <thead><tr><th>命令</th><th>作用</th></tr></thead>
     <tbody>
       <tr><td><code>make backend</code></td><td>FastAPI 后端 · <code>127.0.0.1:8000</code>(uvicorn)</td></tr>
@@ -702,23 +932,29 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   (或 <code>PSA_LLM_API_KEY</code>)供真实供应商;<code>PSA_LLM_PROVIDER=fake</code> 为离线确定性客户端
   (测试/演示)。金例评测:<code>python -m backend.ai_eval submit|status&nbsp;&lt;id&gt;|fetch&nbsp;&lt;id&gt;</code>。</p>
 
-  <h3><span class="no">4.2</span>界面导览(八个主页签)</h3>
+    <h3><span class="no">5.2</span>界面导览(探索者壳 + 多项目)</h3>
+  <p>2026-07 起工作台采用<strong>探索者壳</strong>:顶部菜单栏(文件/编辑/视图/分析/数据/评审/帮助),
+  左侧项目树(多项目并开、存档库、全局页),底部状态栏(活动项目 · 项目 UUID⁸ · 版本哈希⁸ · 打开数)。
+  <strong>多项目隔离是结构性的</strong>:非活动项目整槽停放(撤销历史/派生缓存/身份/FMEA 随槽迁移),
+  切换绝不串染;点击已打开项目 = 仅聚焦,绝不重载(保护未保存编辑)。⌘K / Ctrl+K 命令板可达全部动作。</p>
   <div class="tblwrap"><table>
-    <caption><b>表 4</b> · 工作台页签与职责(⌘K / Ctrl+K 打开命令板可达全部动作;左上抽屉 = 项目树)</caption>
-    <thead><tr><th>页签</th><th>内容</th><th>关键动作</th></tr></thead>
+    <caption><b>表 6</b> · 页面与职责(项目树导航;前五项属单项目,组合总览跨项目)</caption>
+    <thead><tr><th>页面</th><th>内容</th><th>关键动作</th></tr></thead>
     <tbody>
-      <tr><td><strong>总览</strong>(落地页)</td><td>项目驾驶舱:KPI 带、ETA 卡片网格、汇总风险矩阵、版本/案例活动流</td><td>进入画布 · 保存项目 · 打开场景/存档</td></tr>
-      <tr><td><strong>事件树(ETA)</strong></td><td>SVG 级联画布 + 冻结表头 + 检视器(属性/量化/重要度)+ 序列路径表 + 多 ETA 汇总矩阵</td><td>添加屏障 · 挂载 FTA · 从模板/场景新建 · 引擎精确量化 · 现场贝叶斯 · AI 建模助手 · 报告导出</td></tr>
-      <tr><td><strong>故障树(FTA)</strong></td><td>reactflow 画布(ETA 挂载树 / 示例 / 自建),右列属性 + <strong>分析设置</strong>(house 覆盖、后处理规则)+ 量化结果(割集/重要度热力/龙卷风)</td><td>门/事件增删连线 · 从库加基本事件 · MEF 导入 · 量化</td></tr>
+      <tr><td><strong>项目总览</strong></td><td>驾驶舱:KPI 带、ETA 卡片网格、汇总风险矩阵、版本/案例活动流</td><td>进入画布 · 保存项目 · 打开场景/存档</td></tr>
+      <tr><td><strong>事件树(ETA)</strong></td><td>SVG 直角级联画布,<strong>滚轮缩放 0.4–2.5×(指针锚定)/拖拽平移/一键适配</strong>;检视器(属性/量化/重要度);底部序列坞默认折叠一瞥,展开为序列/风险矩阵/参与清单三面板</td><td>添加屏障 · 挂载 FTA · 初因手动/频率树双通道 · 引擎精确量化 · 现场贝叶斯 · AI 建模助手 · 报告导出</td></tr>
+      <tr><td><strong>故障树(FTA)</strong></td><td>reactflow 画布 + 缩放工具组 + 小地图;割集/重要度结果坞(折叠一瞥⇄展开);「⚙ 分析设置」弹出(house 覆盖、后处理规则)</td><td>门/事件增删连线 · 从库加基本事件 · MEF 导入 · 频率模式(初因树)· 量化</td></tr>
       <tr><td><strong>参数库 / CCF</strong></td><td>共享参数表(ag-grid)+ CCF 组管理(β/MGL/α/φ + 错峰)</td><td>改值 · 建组 · 选模型填因子</td></tr>
-      <tr><td><strong>参考库</strong></td><td>100 条分级数据(器件失效率/屏障 PFD/初因频率),A–D 彩色分级、按级筛选、覆盖层增删改、导入导出</td><td>检索 · 引用到模型 · 覆盖层管理</td></tr>
-      <tr><td><strong>后果</strong></td><td>C1–C5 定义编辑(文字内涵 + 等级映射)</td><td>逐级改写</td></tr>
-      <tr><td><strong>FMEA</strong></td><td>RPN 工作台(ag-grid),失效模式↔屏障映射</td><td>行编辑 · 映射配置</td></tr>
-      <tr><td><strong>报告</strong></td><td>证据文档页:导出即钉扎;分析案例台账(哈希+引擎徽章)、版本台账、<strong>版本对比</strong></td><td>Word/PDF/CSV 导出 · 版本 diff</td></tr>
+      <tr><td><strong>参考库</strong></td><td>100 条分级数据,A–D 彩色分级、按级筛选、覆盖层增删改、导入导出</td><td>检索 · 引用到模型 · 现场贝叶斯更新</td></tr>
+      <tr><td><strong>后果定义</strong></td><td>C1–C5 定义编辑(文字内涵 + 等级映射)</td><td>逐级改写</td></tr>
+      <tr><td><strong>FMEA</strong></td><td>RPN 工作台,失效模式↔屏障映射;内容随项目槽走</td><td>行编辑 · 映射配置</td></tr>
+      <tr><td><strong>报告与证据链</strong></td><td>导出即钉扎;分析案例台账、版本台账(评审状态徽章:草稿/送审中/已签发/已退回)、签发/退回操作、版本对比</td><td>Word/PDF/CSV 导出 · 送审 · 签发(复核口令)· 版本 diff</td></tr>
+      <tr><td><strong>多项目组合总览</strong></td><td>跨项目风险画像表 + C3+C4+C5 对数条形对比 + 组合风险矩阵(项目标记落格)+ 评审队列;数字只取已钉扎案例(§5.4)</td><td>点行打开项目 · 队列直达报告页</td></tr>
+      <tr><td><strong>登录墙</strong>(local 模式)</td><td>认证门:未登录时工作台整体不挂载;角色徽章入菜单栏</td><td>登录/登出 · 账户管理(admin)</td></tr>
     </tbody>
   </table></div>
 
-  <h3><span class="no">4.3</span>典型工作流</h3>
+  <h3><span class="no">5.3</span>典型工作流</h3>
   <ol>
     <li><strong>建模</strong>:总览 → 打开场景(5 个内置 TR 场景)或「从模板…」(7 个溯源模板,建页横幅
       提醒替换取值)或 AI 建模助手(自然语言目标 → 幽灵草案 → 逐元素接受);</li>
@@ -727,12 +963,61 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
     <li><strong>量化</strong>:画布积式实时预览 → 「引擎精确量化」→ 重要度 FV/RAW → 不确定性分位带;
       FTA 页可加后处理规则(精确值不受影响,分列展示);</li>
     <li><strong>交付</strong>:保存项目(即内容寻址版本)→ 报告页导出 Word/PDF/CSV —— 页脚自动携带
-      「分析案例 # · 版本哈希 · 引擎版本」,台账即时可回查;版本对比用于评审答复"这版改了什么"。</li>
+      「分析案例 # · 版本哈希 · 引擎版本」,台账即时可回查;版本对比用于评审答复"这版改了什么";</li>
+    <li><strong>评审签发</strong>(§4.14):报告页版本台账「送审」→ 评审人核对后「签发」(复核口令,
+      终态)或「退回」(必填理由);签发版本再导出 = 页脚落签发行,任何后续编辑自动回到工作稿;</li>
+    <li><strong>组合视角</strong>:多项目并开(项目树),「多项目组合总览」横向比较各项目已钉扎的
+      风险数字与评审进度(§5.4)。</li>
   </ol>
 
-  <h3><span class="no">4.4</span>REST API 参考</h3>
+
+  <h3 id="s5-4"><span class="no">5.4</span>多项目与组合总览</h3>
+  <p>项目树支持同时打开多个项目:非活动项目<strong>整槽停放</strong>(文档 + 撤销历史 + 派生缓存 +
+  身份 + FMEA),任一时刻每个项目只存在于一处——跨项目串染按溯源违规级缺陷对待,由结构 + 13 条
+  锁测 + 独立对抗审查三重保障(异步保存期间切换项目,身份写回仍精确落在发起槽)。</p>
+  <p>「多项目组合总览」的<strong>证据链纪律</strong>:</p>
+  <ul>
+    <li>风险数字<strong>只取各项目最近一次已钉扎分析案例</strong>(案例 # · 版本哈希 · 场景随行显示),
+      绝不现算;无案例项目显示「未量化」,不补零冒充;</li>
+    <li>案例钉在旧版本上时,行内亮琥珀徽章「<mark>数字非当前版本</mark>」——不要求读者肉眼比对哈希;</li>
+    <li>累计列名即公式「C3+C4+C5 /yr」(后果类别口径;与单项目页"≥III 累计"=C4+C5 的危险等级口径
+      刻意区分),口径脚注为可见文字,截图不丢;</li>
+    <li>矩阵落格与最劣格由后端 <code>risk_placement</code> 给定,阈值与单项目报告矩阵同源
+      (前后端各有一张 25 格金表互锁防漂移);对数条形显式标注「对数刻度,以数值为准」;</li>
+    <li>评审队列按<strong>挂起评审行</strong>过滤(送审后又存新版的项目不会从队列消失,
+      标「已有更新版本」),点「前往报告页」直达该项目报告页。</li>
+  </ul>
+  <div class="warn"><b>口径边界。</b>每个案例覆盖导出/运行当时的<strong>单棵事件树(场景)</strong>,
+  组合总览据此比较的是"各项目最近钉扎场景",非项目全部 ETA 之和——页脚已披露;
+  按勾选集合并导出的"聚合范围钉扎"列于路线图(§10)。</div>
+
+  <h3 id="s5-5"><span class="no">5.5</span>AI 建模助手使用指南</h3>
+  <p><strong>前置</strong>:后端环境变量 <code>PSA_AI_ENABLED=1</code> + <code>ANTHROPIC_API_KEY</code>
+  (离线演示可用 <code>PSA_LLM_PROVIDER=fake</code>);未启用时按钮给出明确提示而非静默失败。
+  入口:事件树页工具条「AI 建模助手」。</p>
+  <p><strong>你需要提供的输入</strong>(与 §8.4 的 SOTA 输入需求对照,本工具走"轻输入 + 强校验"路线):</p>
+  <ul>
+    <li><strong>一句话建模目标</strong>(自然语言,中文即可)——这是唯一必填项。
+      好目标 = 场景 + 关注点:「电池舱液冷泄漏导致外短,重点关注探测与灭火两道屏障」优于「帮我建个模型」;</li>
+    <li><strong>模式</strong>四选一:<code>new_eta</code> 新建事件树 / <code>complete_eta</code>
+      补全当前树 / <code>fta_for_barrier</code> 为选定屏障生成故障树(需先选屏障)/
+      <code>standalone_fta</code> 独立故障树;</li>
+    <li>其余上下文<strong>自动携带</strong>:当前项目载荷、活动 ETA、参考库压缩摘要——AI 检索
+      <code>search_reference_library</code> 为数值找出处,不允许编造。</li>
+  </ul>
+  <p><strong>生成 → 审阅 → 应用</strong>:草案先过确定性校验门(schema 严格校验 → 域 lint →
+  <strong>引擎试运行</strong>,不可量化的结构直接打回,≤3 轮自动修复);到达后以
+  <strong>幽灵差异</strong>叠加在画布上——逐元素勾选接受/拒绝(拒绝的屏障整链正确折叠),
+  「应用」才写入文档并落审计回执。三条铁律:数值必须带 <code>library_ref</code> 或显式标注
+  <code>ungrounded</code>;AI 产物强制 D 级置信 +「AI 草案,待人工审核」溯源(自评 A/B = 校验错误);
+  草案永不直接落库,<strong>人是唯一提交者</strong>。切换项目会清空未应用草案(草案是项目上下文的产物)。</p>
+  <div class="note"><b>排错。</b>400「PSA_AI_ENABLED」= 未开开关;「校验未通过(N 轮)」= 结构反复
+  不可量化,换更具体的目标重试;生成很慢 = 正常(检索 + 试运行两道门);金例评测
+  <code>python -m backend.ai_eval submit</code> 用于换模型/提示词前的回归把关。</div>
+
+  <h3><span class="no">5.6</span>REST API 参考</h3>
   <div class="tblwrap"><table>
-    <caption><b>表 5</b> · 主要端点(全部 JSON;<code>charset=utf-8</code>)</caption>
+    <caption><b>表 7</b> · 主要端点(全部 JSON;<code>charset=utf-8</code>;<code>PSA_AUTH=local</code> 时分析/评审/管理端点受三角色守卫)</caption>
     <thead><tr><th>端点</th><th>方法</th><th>作用与关键字段</th></tr></thead>
     <tbody>
       <tr><td><code>/api/quantify</code></td><td>POST</td><td>故障树量化:model, fault_tree, method(exact/rea/mcub), cutoff, limit_order, <strong>house_states, boundary_condition_set, post_rules</strong> → probability(精确)+ cutsets + importance + post(可选)</td></tr>
@@ -742,6 +1027,10 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
       <tr><td><code>/api/report?format=docx|pdf|csv</code></td><td>POST</td><td>报告导出;携带项目上下文 → auto-pin 版本+案例+证据页脚</td></tr>
       <tr><td><code>/api/saved</code>(CRUD)</td><td>GET/POST/DELETE</td><td>工作区存档;POST 双写规范版本(响应含 version 块);GET 单档附 project_uuid</td></tr>
       <tr><td><code>/api/projects…</code></td><td>GET</td><td>版本库只读面:项目/版本(?include_doc)/案例/审计/<strong>diff?from&amp;to</strong></td></tr>
+      <tr><td><code>/api/ft/frequency</code></td><td>POST</td><td>初因故障树 → 频率(/yr):每割集恰一频率事件(§4.13);违规 400 点名割集</td></tr>
+      <tr><td><code>/api/portfolio</code></td><td>GET</td><td>组合总览:每项目一行——已钉扎案例数字(scenario/版本哈希)、最新版评审态、挂起评审 <code>open_review</code>、矩阵落格 <code>risk</code>(§5.4)</td></tr>
+      <tr><td><code>/api/projects/{p}/reviews</code></td><td>GET/POST</td><td>评审台账 / 送审(version_id);<code>…/{vid}/sign|return</code> 签发(终态)/退回(必填理由);<code>…/versions/{vid}/comments</code> 评论(§4.14)</td></tr>
+      <tr><td><code>/api/auth/login|logout|me</code></td><td>POST/GET</td><td>本地认证(local 模式):HttpOnly 会话 cookie;统一 401 文案(枚举防御);off 模式 /me 报 <code>mode:off</code></td></tr>
       <tr><td><code>/api/import/mef</code></td><td>POST</td><td>Open-PSA MEF XML → 模型 JSON(含 CCF 组)</td></tr>
       <tr><td><code>/api/ai/draft-model</code></td><td>POST</td><td>AI 草案(需 PSA_AI_ENABLED);返回草案+validation+provenance</td></tr>
       <tr><td><code>/api/schema/project-document/1.0</code></td><td>GET</td><td>规范文档 JSON Schema(严格模式)</td></tr>
@@ -751,10 +1040,10 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
 </section>
 
 <!-- ═══════════ 5 示例 ═══════════ -->
-<section id="s5">
-  <h2><span class="no">5</span>工作示例</h2>
+<section id="s6">
+  <h2><span class="no">6</span>工作示例</h2>
 
-  <h3><span class="no">5.1</span>α 因子 CCF 手算(2oo3 传感通道)</h3>
+  <h3><span class="no">6.1</span>α 因子 CCF 手算(2oo3 传感通道)</h3>
   <p>三取二气体探测,单通道 <span class="inm">Q<sub>t</sub></span>=1×10⁻²,α=(0.95, 0.03, 0.02),非错峰。
   <span class="inm">α<sub>t</sub></span>=1×0.95+2×0.03+3×0.02=1.07:</p>
   <div class="eq">
@@ -762,15 +1051,15 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
     Q₂ = (2/2)·(0.03/1.07)·10⁻² = 2.804×10⁻⁴ &nbsp;·&nbsp;
     Q₃ = 3·(0.02/1.07)·10⁻² = 5.607×10⁻⁴
   </div>
-  <p>校核式(3-6):<span class="inm">Q₁+2Q₂+Q₃ = 8.879e-3 + 5.607e-4 + 5.607e-4 = 1.000e-2 ✓</span>。
+  <p>校核式(4-6):<span class="inm">Q₁+2Q₂+Q₃ = 8.879e-3 + 5.607e-4 + 5.607e-4 = 1.000e-2 ✓</span>。
   2oo3 系统失效由 BDD 在展开模型上精确给出;近似看量级:三对 Q₂ 贡献 ≈3×2.8e-4,三重 Q₃ ≈5.6e-4,
   共因主导(独立双失效仅 ≈3×(8.9e-3)²≈2.4e-4)——正是 α 模型对冗余通道"打折"的原因。</p>
 
-  <h3><span class="no">5.2</span>McMicken 2019 真实事故对标</h3>
+  <h3><span class="no">6.2</span>McMicken 2019 真实事故对标</h3>
   <p>预置模板 <code>bess-case-mcmicken</code> 按 DNV 事故报告<sup class="cite"><a href="#ref-dnv">[11]</a></sup>
   的<strong>反循环原则</strong>建模:仅把报告记录的装备缺失编码为近失败,其余取库先验。</p>
   <div class="tblwrap"><table>
-    <caption><b>表 6</b> · McMicken 屏障链(IE = 5×10⁻³ /yr,内短路致 TR;全部 D 级,逐条 DNV 根因注记)</caption>
+    <caption><b>表 8</b> · McMicken 屏障链(IE = 5×10⁻³ /yr,内短路致 TR;全部 D 级,逐条 DNV 根因注记)</caption>
     <thead><tr><th>#</th><th>屏障</th><th class="num">失败率</th><th>口径注记</th></tr></thead>
     <tbody>
       <tr><td>1</td><td>早期离气探测+联动停机</td><td class="num">0.10</td><td>探测有限、未触发有效干预</td></tr>
@@ -785,7 +1074,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   (引擎精确量化与手算一致)。对标价值在<strong>反事实</strong>:把热障/泄爆复原到库先验后 C5 频率显著回落
   ——结构解释与事故一致,而非数字拟合。</p>
 
-  <h3><span class="no">5.3</span>边界条件 API 调用</h3>
+  <h3><span class="no">6.3</span>边界条件 API 调用</h3>
   <pre><code>POST /api/quantify
 {
   "model": { …, "boundary_condition_sets": [
@@ -796,7 +1085,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
 }
 → { "probability": 0.208, "cutsets": [...], ... }   // 模型本体不被改写</code></pre>
 
-  <h3><span class="no">5.4</span>后处理规则:互斥维修态</h3>
+  <h3><span class="no">6.4</span>后处理规则:互斥维修态</h3>
   <pre><code>POST /api/quantify
 { …, "post_rules": [
     { "kind": "mutually_exclusive", "events": ["M1_维修", "M2_维修"] },
@@ -806,21 +1095,21 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
     "post": { "removed": 1, "recovered": 2,
               "probability_rea": 1.12e-2, "probability_mcub": 1.11e-2 } }</code></pre>
 
-  <h3><span class="no">5.5</span>共享事件为何不能用乘积:数值复现</h3>
-  <p>§3.3 锚点的完整复现:屏障 F₁=OR(S,X₁)、F₂=OR(S,X₂),q 均 0.1。独立近似把 LL 序列算成
+  <h3><span class="no">6.5</span>共享事件为何不能用乘积:数值复现</h3>
+  <p>§4.3 锚点的完整复现:屏障 F₁=OR(S,X₁)、F₂=OR(S,X₂),q 均 0.1。独立近似把 LL 序列算成
   0.19×0.19=0.0361;精确 BDD 给 0.109 —— <strong>低估 3.0 倍</strong>。同一机制反向作用于"一成功一失败"
   序列(独立近似高估)。任何含共享传感/电源/共因事件的 BESS 事件树都处在该误差暴露面上,
   这正是"引擎精确量化"按钮存在的意义。</p>
 </section>
 
 <!-- ═══════════ 6 表格 ═══════════ -->
-<section id="s6">
-  <h2><span class="no">6</span>数据分级与后果标尺</h2>
+<section id="s7">
+  <h2><span class="no">7</span>数据分级与后果标尺</h2>
   <div class="tblwrap"><table>
-    <caption><b>表 7</b> · 数据置信分级(内置库仅 C/D;A/B 须项目层产生)</caption>
+    <caption><b>表 9</b> · 数据置信分级(内置库仅 C/D;A/B 须项目层产生)</caption>
     <thead><tr><th>级</th><th>含义</th><th>产生途径</th><th>报告处理</th></tr></thead>
     <tbody>
-      <tr><td><span class="gr gA">A</span></td><td>本项目实测/现场数据</td><td>现场贝叶斯更新采用(§3.9)、项目试验</td><td>直接可交付,证据链自动生成</td></tr>
+      <tr><td><span class="gr gA">A</span></td><td>本项目实测/现场数据</td><td>现场贝叶斯更新采用(§4.9)、项目试验</td><td>直接可交付,证据链自动生成</td></tr>
       <tr><td><span class="gr gB">B</span></td><td>同型设备厂商数据(经核)</td><td>用户覆盖层录入并附厂商报告引文</td><td>标注来源,需评审确认适用性</td></tr>
       <tr><td><span class="gr gC">C</span></td><td>行业统计(EPRI/NFPA/标准)</td><td>内置库(22 条)</td><td>筛查可用;正式 QRA 建议升级</td></tr>
       <tr><td><span class="gr gD">D</span></td><td>文献推断/类比/示例</td><td>内置库(73 条)、AI 草案强制 D</td><td>必须显式声明;不得冒充实测</td></tr>
@@ -828,7 +1117,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   </table></div>
 
   <div class="tblwrap"><table>
-    <caption><b>表 8</b> · C1–C5 后果分级与中电联 6×5 矩阵映射(单位:频率 /yr;文字内涵可按项目改写)</caption>
+    <caption><b>表 10</b> · C1–C5 后果分级与中电联 6×5 矩阵映射(单位:频率 /yr;文字内涵可按项目改写)</caption>
     <thead><tr><th>级</th><th>默认内涵</th><th>严重度(中电联)</th><th>典型物理状态</th></tr></thead>
     <tbody>
       <tr><td><span class="cchip"><i style="background:var(--c1)"></i><b>C1</b></span></td><td>单体安全排气</td><td>0 级</td><td>开阀排气,无蔓延</td></tr>
@@ -846,9 +1135,9 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
 </section>
 
 <!-- ═══════════ 7 文献综述 ═══════════ -->
-<section id="s7">
-  <h2><span class="no">7</span>文献综述</h2>
-  <h3><span class="no">7.1</span>方法学基础:从割集到决策图</h3>
+<section id="s8">
+  <h2><span class="no">8</span>文献综述</h2>
+  <h3><span class="no">8.1</span>方法学基础:从割集到决策图</h3>
   <p>故障树定量的第一代方法围绕最小割集:Fussell 的 MOCUS 自顶向下展开<sup class="cite"><a href="#ref-mocus">[3]</a></sup>
   确立了 MCS 作为工程语言的地位,NUREG-0492《Fault Tree Handbook》<sup class="cite"><a href="#ref-0492">[4]</a></sup>
   将其规范化;概率则依赖稀有事件/最小割集上界近似。范式转移来自 Bryant 的 ROBDD 规范型
@@ -862,14 +1151,14 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   互操作层面,Open-PSA 模型交换格式(MEF)<sup class="cite"><a href="#ref-openpsa">[10]</a></sup>是
   跨工具语料与基准(XFTA/SCRAM/SAPHSOLVE 对比研究<sup class="cite"><a href="#ref-bench">[14]</a></sup>)的通用底座。</p>
   <p>共因失效参数模型的权威源是 NUREG/CR-5485<sup class="cite"><a href="#ref-5485">[5]</a></sup>
-  (β/MGL/α/φ,错峰与非错峰检验方案)——本工具公式与 SCRAM 实现逐式核对(§3.4)。</p>
+  (β/MGL/α/φ,错峰与非错峰检验方案)——本工具公式与 SCRAM 实现逐式核对(§4.4)。</p>
 
-  <h3><span class="no">7.2</span>BESS 安全域</h3>
+  <h3><span class="no">8.2</span>BESS 安全域</h3>
   <p>事实基线:EPRI 储能失效事件数据库及其 2024 白皮书<sup class="cite"><a href="#ref-epri">[12]</a></sup>
   (81 起事件、26 起可归因;单位容量失效率 2018→2025 下降约 97–99%;根因重心从电芯缺陷转向
   <strong>集成与运行阶段</strong>缺口,与 PNNL/TWAICE 联合分析一致)。事故解剖学的标杆是 DNV 的
   McMicken 技术分析<sup class="cite"><a href="#ref-dnv">[11]</a></sup>(串级五重屏障缺失:热障、灭火剂
-  对 TR 无效、无泄爆、开门引气)——本工具将其编码为可反事实检验的预置模板(§5.2)。2025-01 Moss Landing
+  对 TR 无效、无泄爆、开门引气)——本工具将其编码为可反事实检验的预置模板(§6.2)。2025-01 Moss Landing
   事件再次抬升监管关注度。标准框架:UL 9540A(单元级蔓延测试)、NFPA 855/68/69(选址/泄爆/防爆)、
   IEC 62933-5-2 与 62619(系统/电芯安全)、GB/T 36276 等;探测窗口的实证研究(Sandia 离气/VOC 传感,
   JES 2024<sup class="cite"><a href="#ref-sandia">[13]</a></sup>)支撑预警屏障 PFD 取值。学术侧
@@ -877,7 +1166,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   <sup class="cite"><a href="#ref-mdpi">[15]</a></sup>——共同短板是数据分级与可追溯性弱,恰是本工具
   以证据链机制正面回应的问题。</p>
 
-  <h3><span class="no">7.3</span>AI × PRA</h3>
+  <h3><span class="no">8.3</span>AI × PRA</h3>
   <p>生成式模型进入 PRA 的文献仍在早期:综述与立场论文(如 arXiv:2406.01133
   <sup class="cite"><a href="#ref-llmpra">[16]</a></sup>)划定"受控使用"条件;FTA 副驾驶研究
   <sup class="cite"><a href="#ref-genfta">[17]</a></sup>一致结论是 <strong>LLM 提议、人类裁决</strong>
@@ -885,65 +1174,114 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   数值判断不可靠)同向。本工具的 ADR-3 管线把这些原则工程化:检索接地强制数值有出处、确定性校验门
   (含引擎试运行)把关结构可算性、幽灵差异保证人是唯一提交者、金例评测门管控模型/提示词升级——
   据我们所知,这是 BESS QRA 场景下首个把「AI 草案不可信」作为架构前提而非免责声明的实现。</p>
+
+  <h3 id="s8-4"><span class="no">8.4</span>AI 生成 FTA/ETA:SOTA 方法的输入需求调研</h3>
+  <p>"自动生成故障树/事件树"存在两条成熟度截然不同的路线,其<strong>输入需求</strong>构成一个从重到轻的
+  谱系——工具选型的第一个问题不是"生成质量多高",而是"你手上有什么可以喂给它":</p>
+  <div class="tblwrap"><table>
+    <caption><b>表 11</b> · 自动/AI 生成 FTA-ETA 的代表性方法与输入需求(2026-07 调研)</caption>
+    <thead><tr><th>路线 / 代表</th><th>必需输入</th><th>输出</th><th>特性与边界</th></tr></thead>
+    <tbody>
+      <tr><td><strong>MBSA · HiP-HOPS</strong><sup class="cite"><a href="#ref-hiphops">[22]</a></sup></td>
+        <td>系统架构模型(组件拓扑)+ <strong>逐组件失效注记</strong>(输入偏差→输出偏差的局部失效逻辑)</td>
+        <td>自动合成的系统级故障树 + FMEA</td>
+        <td>确定性、可重复、可认证语境;前置建模投入大,注记质量决定一切</td></tr>
+      <tr><td><strong>MBSA · AltaRica 3.0</strong><sup class="cite"><a href="#ref-altarica">[23]</a></sup></td>
+        <td>专用语言书写的系统<strong>行为模型</strong>(状态机 + 流传播)</td>
+        <td>编译出故障树 / Markov 链等分析模型</td>
+        <td>表达力最强(动态、重构);语言门槛高,航空/铁路侧应用为主</td></tr>
+      <tr><td><strong>LLM 文本驱动 · FTA 副驾驶</strong><sup class="cite"><a href="#ref-genfta">[17]</a> <a href="#ref-saegen">[24]</a></sup></td>
+        <td><strong>自然语言系统描述 + 危害/顶事件定义</strong>(可选:设计文档、FMEA 表、事故报告)</td>
+        <td>故障树草案(结构与事件建议)</td>
+        <td>输入门槛最低;一致结论 = LLM 提议、人裁决,<strong>数值不可信</strong>;结构需领域审查</td></tr>
+      <tr><td><strong>LLM · FMEA 增强</strong><sup class="cite"><a href="#ref-aifmea">[25]</a></sup></td>
+        <td>功能描述 / 设计文档(+本体约束)</td>
+        <td>FMEA 行(失效模式/影响/建议)</td>
+        <td>发散性头脑风暴有效;向 ETA 屏障清单的转化仍是人工步骤</td></tr>
+      <tr><td><strong>评测基准 · JFTA-Bench</strong><sup class="cite"><a href="#ref-jfta">[26]</a></sup></td>
+        <td>既有故障树 + 故障场景/日志</td>
+        <td>LLM 读树/析障能力评分</td>
+        <td>评估"理解"而非"生成"——生成侧尚无公认基准</td></tr>
+      <tr><td><strong>本工具 · ADR-3 管线</strong>(§4.12)</td>
+        <td><strong>一句话目标</strong> + 项目上下文(自动)+ 分级参考库(检索接地,自动)</td>
+        <td>ETA / FTA 草案,经「schema→域 lint→<strong>引擎试运行</strong>」硬门,ghost-diff 逐元素人审</td>
+        <td>轻输入 + 强校验:数值强制 <code>library_ref</code>/<code>ungrounded</code> 二选一、
+          恒 D 级;不可量化结构无法通过管线</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>调研结论。</strong>① 输入谱系两极分明:MBSA 要完整工程模型(重前置、确定性输出),
+  LLM 路线只要文本(零前置、输出需裁决)——中间地带(半结构化输入 + 确定性校验)是空档,本工具的
+  「轻输入 + 引擎试运行硬门 + 检索接地」正落位于此;② <strong>事件树生成侧 SOTA 显著稀薄</strong>:
+  MBSA 家族面向故障树/FMEA 合成,LLM 文献集中在 FTA、FMEA 与 HAZOP,面向 ETA 的端到端生成
+  (含后果分级与频率量纲)未见成熟工具——本工具的 ETA 草案 + 序列量化闭环在该空档内;
+  ③ 全部 LLM 文献与我们的 ADR-3 同一底线:<strong>生成物是提案不是结论</strong>,
+  数值出处与人工裁决是不可省略的架构组件,而非免责声明。</p>
 </section>
 
 <!-- ═══════════ 8 SOTA 对比 ═══════════ -->
-<section id="s8">
-  <h2><span class="no">8</span>SOTA 工具对比</h2>
-  <p>对比对象:核工业三大主流(RiskSpectrum、SAPHIRE、CAFTA)、开放生态两件(XFTA、SCRAM)与
-  FinPSA。信息来自公开资料与基准研究<sup class="cite"><a href="#ref-rs">[18]</a>
-  <a href="#ref-saphire">[19]</a> <a href="#ref-cafta">[20]</a> <a href="#ref-bench">[14]</a></sup>;
+<section id="s9">
+  <h2><span class="no">9</span>SOTA 工具对比</h2>
+  <p>对比对象:核工业三大主流(RiskSpectrum、SAPHIRE、CAFTA)、跨行业可靠性套件
+  <strong>Isograph FaultTree+</strong>(Reliability Workbench,航空/轨道/国防装备侧主力)、
+  开放生态两件(XFTA、SCRAM)与 FinPSA。信息来自公开资料与基准研究<sup class="cite"><a href="#ref-rs">[18]</a>
+  <a href="#ref-saphire">[19]</a> <a href="#ref-cafta">[20]</a> <a href="#ref-isograph">[21]</a>
+  <a href="#ref-bench">[14]</a></sup>;
   本工具列的每一项能力均有仓库内测试背书。</p>
 
   <div class="tblwrap"><table>
-    <caption><b>表 9</b> · 能力矩阵(●=完整 ◐=部分/近似 ○=无 · 依公开资料,商用工具以其文档口径为准)</caption>
-    <thead><tr><th>能力</th><th>RiskSpectrum PSA</th><th>SAPHIRE 8</th><th>CAFTA</th><th>XFTA</th><th>SCRAM</th><th>FinPSA</th><th><strong>本工具</strong></th></tr></thead>
+    <caption><b>表 12</b> · 能力矩阵(●=完整 ◐=部分/近似 ○=无 · 依公开资料,商用工具以其文档口径为准)</caption>
+    <thead><tr><th>能力</th><th>RiskSpectrum PSA</th><th>SAPHIRE 8</th><th>CAFTA</th><th>Isograph FT+</th><th>XFTA</th><th>SCRAM</th><th>FinPSA</th><th><strong>本工具</strong></th></tr></thead>
     <tbody>
-      <tr><td>定量主通道</td><td>MCS + MCS-BDD 校准</td><td>MCS(REA/MCUB)</td><td>MCS</td><td>MCS/REA 族</td><td>MOCUS/ZBDD/<strong>BDD 精确</strong></td><td>MCS</td><td><strong>BDD 精确</strong>(MCS 为视图)</td></tr>
-      <tr><td>成功分支处理</td><td>delete-term 近似</td><td>delete-term 近似</td><td>MCS 域处理</td><td>非相干可精确</td><td>BDD 下精确</td><td>MCS 域</td><td><span class="yes">合并图布尔精确否定</span>(锚 0.109)</td></tr>
-      <tr><td>CCF 模型</td><td>β/MGL/α 全</td><td>α 为主</td><td>插件/手工</td><td>β/MGL/α/φ</td><td>β/MGL/α/φ</td><td>有</td><td><span class="yes">β/MGL/α/φ + 错峰</span>(NUREG 锚 + SCRAM 对拍)</td></tr>
-      <tr><td>非相干/素蕴涵项</td><td>○</td><td>○</td><td>○</td><td>●</td><td>●</td><td>○</td><td><span class="yes">●</span></td></tr>
-      <tr><td>边界条件集 / house</td><td>●</td><td>●(变更集)</td><td>◐</td><td>●</td><td>●</td><td>●(hazard 表)</td><td><span class="yes">●</span> 命名集+覆盖,模型不可变</td></tr>
-      <tr><td>割集后处理/恢复规则</td><td>●</td><td>●</td><td>●(配套件)</td><td>◐</td><td>○</td><td>◐</td><td><span class="yes">●</span> 且精确通道隔离</td></tr>
-      <tr><td>不确定性(相关抽样)</td><td>●</td><td>●</td><td>配套 UNCERT</td><td>●</td><td>●</td><td>●</td><td><span class="yes">●</span> 共享事件单抽</td></tr>
-      <tr><td>现场贝叶斯更新</td><td>○</td><td>○</td><td>○</td><td>○</td><td>○</td><td>○</td><td><span class="yes">●</span> Beta-二项内置(§3.9)</td></tr>
-      <tr><td>Open-PSA MEF</td><td>◐(导出)</td><td>◐</td><td>○</td><td>●(原生)</td><td>●(原生)</td><td>◐</td><td><span class="yes">●</span> 含 CCF 组往返</td></tr>
-      <tr><td>版本化+审计+案例钉扎</td><td>◐(工程库)</td><td>◐</td><td>◐</td><td>○</td><td>○</td><td>◐</td><td><span class="yes">●</span> 内容寻址+只增审计+报告页脚证据</td></tr>
-      <tr><td>模型对比(diff)</td><td>●(Model Compare)</td><td>◐</td><td>◐</td><td>○</td><td>○</td><td>◐</td><td><span class="yes">●</span> UUID 对齐规范 diff</td></tr>
-      <tr><td>AI 辅助建模(接地+校验)</td><td>○</td><td>○</td><td>○</td><td>○</td><td>○</td><td>○</td><td><span class="yes">●</span> ADR-3 管线(§3.12)</td></tr>
-      <tr><td>形态 / 许可</td><td>桌面·商业(全球 60% 核电站采用)</td><td>桌面·NRC 资助(受限分发)</td><td>桌面·EPRI 商业(美国机队主力)</td><td>CLI·免费</td><td>CLI·开源 GPL</td><td>桌面·商业(VTT)</td><td>Web+离线单文件·自研全栈</td></tr>
+      <tr><td>定量主通道</td><td>MCS + MCS-BDD 校准</td><td>MCS(REA/MCUB)</td><td>MCS</td><td>MCS + 精确上界后处理</td><td>MCS/REA 族</td><td>MOCUS/ZBDD/<strong>BDD 精确</strong></td><td>MCS</td><td><strong>BDD 精确</strong>(MCS 为视图)</td></tr>
+      <tr><td>成功分支处理</td><td>delete-term 近似</td><td>delete-term 近似</td><td>MCS 域处理</td><td>●(厂商:成功态完全处理)</td><td>非相干可精确</td><td>BDD 下精确</td><td>MCS 域</td><td><span class="yes">合并图布尔精确否定</span>(锚 0.109)</td></tr>
+      <tr><td>CCF 模型</td><td>β/MGL/α 全</td><td>α 为主</td><td>插件/手工</td><td>β/MGL/α/β-BFR</td><td>β/MGL/α/φ</td><td>β/MGL/α/φ</td><td>有</td><td><span class="yes">β/MGL/α/φ + 错峰</span>(NUREG 锚 + SCRAM 对拍)</td></tr>
+      <tr><td>非相干/素蕴涵项</td><td>○</td><td>○</td><td>○</td><td>○</td><td>●</td><td>●</td><td>○</td><td><span class="yes">●</span></td></tr>
+      <tr><td>边界条件集 / house</td><td>●</td><td>●(变更集)</td><td>◐</td><td>●</td><td>●</td><td>●</td><td>●(hazard 表)</td><td><span class="yes">●</span> 命名集+覆盖,模型不可变</td></tr>
+      <tr><td>割集后处理/恢复规则</td><td>●</td><td>●</td><td>●(配套件)</td><td>●(含初因-使能)</td><td>◐</td><td>○</td><td>◐</td><td><span class="yes">●</span> 且精确通道隔离</td></tr>
+      <tr><td>不确定性(相关抽样)</td><td>●</td><td>●</td><td>配套 UNCERT</td><td>●</td><td>●</td><td>●</td><td>●</td><td><span class="yes">●</span> 共享事件单抽</td></tr>
+      <tr><td>现场贝叶斯更新</td><td>○</td><td>○</td><td>○</td><td>○</td><td>○</td><td>○</td><td>○</td><td><span class="yes">●</span> Beta-二项内置(§4.9)</td></tr>
+      <tr><td>Open-PSA MEF</td><td>◐(导出)</td><td>◐</td><td>○</td><td>○</td><td>●(原生)</td><td>●(原生)</td><td>◐</td><td><span class="yes">●</span> 含 CCF 组往返</td></tr>
+      <tr><td>版本化+审计+案例钉扎</td><td>◐(工程库)</td><td>◐</td><td>◐</td><td>◐(工程库)</td><td>○</td><td>○</td><td>◐</td><td><span class="yes">●</span> 内容寻址+只增审计+报告页脚证据</td></tr>
+      <tr><td>评审签发工作流</td><td>◐(外挂流程)</td><td>◐</td><td>◐</td><td>◐</td><td>○</td><td>○</td><td>◐</td><td><span class="yes">●</span> 状态机+签发终态触发器+导出门(§4.14)</td></tr>
+      <tr><td>模型对比(diff)</td><td>●(Model Compare)</td><td>◐</td><td>◐</td><td>○</td><td>○</td><td>○</td><td>◐</td><td><span class="yes">●</span> UUID 对齐规范 diff</td></tr>
+      <tr><td>AI 辅助建模(接地+校验)</td><td>○</td><td>○</td><td>○</td><td>○</td><td>○</td><td>○</td><td>○</td><td><span class="yes">●</span> ADR-3 管线(§4.12)</td></tr>
+      <tr><td>形态 / 许可</td><td>桌面·商业(全球 60% 核电站采用)</td><td>桌面·NRC 资助(受限分发)</td><td>桌面·EPRI 商业(美国机队主力)</td><td>桌面·商业(RW 套件:FTA/ETA/Markov/RBD)</td><td>CLI·免费</td><td>CLI·开源 GPL</td><td>桌面·商业(VTT)</td><td>Web+离线单文件·自研全栈</td></tr>
     </tbody>
   </table></div>
 
-  <p><strong>定位解读。</strong>与 RiskSpectrum/SAPHIRE/CAFTA 相比,本工具的差异化不在"更多功能",
+  <p><strong>定位解读。</strong>与 RiskSpectrum/SAPHIRE/CAFTA/Isograph 相比,本工具的差异化不在"更多功能",
   而在三点结构性选择:① <strong>精确为默认</strong>(BDD 通道无近似,成功分支布尔精确——商用工具的
-  delete-term 在共享事件密集的 BESS 模型上系统性偏差,§5.5);② <strong>证据链为一等公民</strong>
+  delete-term 在共享事件密集的 BESS 模型上系统性偏差,§6.5);② <strong>证据链为一等公民</strong>
   (商用工具的配置管理是外挂流程,这里是内容寻址存储的物理性质);③ <strong>AI 辅助 + Web 原生 UX</strong>
   (全体传统工具为桌面范式)。与 XFTA/SCRAM 等开放引擎相比,本工具补上了它们缺失的应用层
   (画布、版本库、报告、领域数据)并以其为基准语料持续对拍。诚实边界:核级 Level-2/火灾/地震 PSA 的
-  专用模块、数十年监管认可积累,均是商用工具的护城河,本工具不声称覆盖(§9)。</p>
+  专用模块、数十年监管认可积累,均是商用工具的护城河,本工具不声称覆盖(§10)。</p>
 </section>
 
 <!-- ═══════════ 9 局限 ═══════════ -->
-<section id="s9">
-  <h2><span class="no">9</span>局限与路线图</h2>
+<section id="s10">
+  <h2><span class="no">10</span>局限与路线图</h2>
   <ul>
     <li><strong>数据成熟度</strong>:内置库全为 C/D 级(设计如此)——正式 QRA 交付前须项目实测/贝叶斯升级;
       模板 IE 频率与场景库存在口径差(10 MWh 系统级 vs 通用舱级先验),文档已注明,须按项目统一;</li>
     <li><strong>规模</strong>:纯 Python 内核舒适区数百事件;万级事件走 CUDD 后端(macOS 已实证编译,
       Linux CI 待 GitHub 远程激活);无动态变量重排;</li>
     <li><strong>范围</strong>:静态 FTA/ETA——不做动态故障树(SPARE/SEQ 门)、不做 Level-2 物理后果耦合
-      (C1–C5 为频率分级接口);交换事件、时变 Q(t) 超出核心四模型的部分在账本长尾;</li>
-    <li><strong>单用户</strong>:多用户(认证→服务端权威→CRDT 评估→评审工作流)为 Phase 5,现阶段以
-      版本库+审计承载"事后可追",不承载"实时协同";</li>
-    <li><strong>AI 上线</strong>:管线离线全绿,真实供应商首跑与金例 Batch 基线待 API key(runbook 就绪);
-      手改数值清置信快照、FTA 窄视口响应式两项跟进中。</li>
+      (C1–C5 为频率分级接口);初因频率通道为"每割集一初因"约定,逐初因分组的精确模式列账本 Gap #9;</li>
+    <li><strong>协同</strong>:评审签发 + 本地三角色认证已落地(§4.14),实时协同(CRDT)经评估后
+      <strong>明确裁剪</strong>——版本库 + 乐观并发已覆盖团队串行协作;GitHub 远程仓库未建,
+      CI / CUDD Linux 验证 / 异地协作因此待激活;</li>
+    <li><strong>组合总览口径</strong>:分析案例覆盖导出当时的单棵事件树,跨项目比较已在页面披露该口径;
+      按勾选集合并导出的"聚合范围钉扎"为路线图候选(§5.4);</li>
+    <li><strong>AI 上线</strong>:管线离线全绿,真实供应商首跑与金例 Batch 基线待 API key(runbook 就绪);</li>
+    <li><strong>已知 UI 跟进</strong>:FTA 画布 <500px 视口塌缩(桌面不受影响)、开发模式 StrictMode
+      下 reactflow 缩放按钮空操作(生产构建正常)——均已建跟进任务。</li>
   </ul>
 </section>
 
 <!-- ═══════════ 10 参考文献 ═══════════ -->
-<section id="s10">
-  <h2><span class="no">10</span>参考文献</h2>
+<section id="s11">
+  <h2><span class="no">11</span>参考文献</h2>
   <ol class="refs">
     <li id="ref-bryant"><span class="n">[1]</span> Bryant, R.E. “Graph-Based Algorithms for Boolean Function Manipulation.” <i>IEEE Trans. Computers</i> C-35(8), 1986.</li>
     <li id="ref-rauzy93"><span class="n">[2]</span> Rauzy, A. “New Algorithms for Fault Trees Analysis.” <i>Reliability Engineering &amp; System Safety</i> 40(3), 1993.</li>
@@ -965,11 +1303,17 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
     <li id="ref-rs"><span class="n">[18]</span> <a href="https://www.riskspectrum.com/riskspectrum-psa">RiskSpectrum PSA 产品页</a> 与 <a href="https://www.lr.org/en/riskspectrum/technical-information/psa/">技术信息</a>(Lloyd's Register;全球约 60% 核电站采用)。</li>
     <li id="ref-saphire"><span class="n">[19]</span> <a href="https://www.nrc.gov/reading-rm/doc-collections/nuregs/contract/cr7039/v3/index">SAPHIRE 8 用户指南</a>(NUREG/CR-7039,NRC/INL);<a href="https://www.osti.gov/biblio/1471515">事件树成功分支处理(OSTI)</a>.</li>
     <li id="ref-cafta"><span class="n">[20]</span> <a href="https://www.epri.com/research/products/000000003002004316">EPRI CAFTA 产品资料</a> 与 <a href="https://polestartechnicalservices.com/cafta-software/">CAFTA 技术包</a>;FinPSA 见 <a href="https://simulationstore.com/finpsa">VTT FinPSA</a>;SCRAM 见 <a href="https://scram-pra.org/">scram-pra.org</a>.</li>
+    <li id="ref-isograph"><span class="n">[21]</span> Isograph. <a href="https://www.isograph.com/software/reliability-workbench/fault-tree-analysis-software/fault-tree-analysis/">FaultTree+ 故障树分析</a> 与 <a href="https://www.isograph.com/software/reliability-workbench/event-tree-analysis/event-tree-analysis-intro/">事件树分析模块</a>(Reliability Workbench 产品文档;MCS+精确上界、β/MGL/α/β-BFR CCF、初因-使能分析、成功态处理口径)。</li>
+    <li id="ref-hiphops"><span class="n">[22]</span> Papadopoulos, Y. 等. HiP-HOPS(Hierarchically Performed Hazard Origin &amp; Propagation Studies)——架构模型+组件失效注记的故障树/FMEA 自动合成;AADL 侧同类见 <a href="https://www.researchgate.net/publication/316872679_Automated_Fault_Tree_Analysis_from_AADL_Models">Automated FTA from AADL Models</a>.</li>
+    <li id="ref-altarica"><span class="n">[23]</span> Batteux, M., Prosvirnova, T., Rauzy, A. <a href="https://www.researchgate.net/publication/271479142_The_AltaRica_30_Project_for_Model-Based_Safety_Assessment">“The AltaRica 3.0 Project for Model-Based Safety Assessment.”</a></li>
+    <li id="ref-saegen"><span class="n">[24]</span> Shetiya 等. “Fault Tree Analysis Generation Using GenAI with an Autonomy Sensor Use-case.” <i>SAE Int. J. of Connected and Automated Vehicles</i>, 2026.</li>
+    <li id="ref-aifmea"><span class="n">[25]</span> El Hassani 等. <a href="https://www.cambridge.org/core/journals/proceedings-of-the-design-society/article/integrating-large-language-models-for-improved-failure-mode-and-effects-analysis-fmea-a-framework-and-case-study/486CCE3DD5C2127697AAB864C6C89372">“Integrating LLMs for Improved FMEA: Framework and Case Study.”</a> <i>Design Science / Proc. Design Society</i>, 2025.</li>
+    <li id="ref-jfta"><span class="n">[26]</span> <a href="https://arxiv.org/pdf/2603.22978">“JFTA-Bench: Evaluate LLM's Ability of Tracking and Analyzing Malfunctions Using Fault Trees.”</a> arXiv:2603.22978, 2026.</li>
   </ol>
   <hr class="sect">
-  <p class="small">文档编号 BESS-PSA-TD-001 Rev B · 2026-07-10 · 由项目仓库状态生成:测试计数、数值锚点与
+  <p class="small">文档编号 BESS-PSA-TD-001 Rev C · 2026-07-14 · 由项目仓库状态生成:测试计数、数值锚点与
   能力声明均可在 <code>tests/</code>、<code>tests/benchmark/</code> 与 <code>docs/superpowers/</code>
-  中复核。本工具输出用于工程决策前,请确认数据分级满足交付要求(表 7)。</p>
+  中复核。本工具输出用于工程决策前,请确认数据分级满足交付要求(表 9);表 12 能力矩阵中商用工具各列以其公开文档口径为准。</p>
 </section>
 
 </main>
