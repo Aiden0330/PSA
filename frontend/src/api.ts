@@ -405,12 +405,21 @@ export interface QuantifyOptions {
 }
 // ── 初因事件故障树频率(规格 2026-07-13):每割集一频率规则,违规 → 后端 400 中文 detail 原样上抛 ──
 export interface FreqCutSet { events: string[]; order: number; frequency: number; initiator: string }
-export interface FtFrequencyResult { frequency: number; cutsets: FreqCutSet[] }
-export async function ftFrequency(model: any, fault_tree: string): Promise<FtFrequencyResult> {
+// 逐初因精确模式(规格 2026-07-14 §4):把最小割集按初因分组,F_i = λ_i·P(使能析取)。
+export type FtFrequencyMethod = 'sum' | 'exact'
+export interface FreqByInitiator { initiator: string; rate: number; enabling_probability: number; frequency: number }
+export interface FtFrequencyResult {
+  frequency: number
+  cutsets: FreqCutSet[]
+  method?: FtFrequencyMethod          // 后端透传(exact/sum 均回);旧后端缺省 → 视作 sum
+  by_initiator?: FreqByInitiator[]    // 仅 exact 附带,按频率降序(规格 §4:Σcutsets ≥ 头条,并存即披露)
+}
+export async function ftFrequency(model: any, fault_tree: string, method?: FtFrequencyMethod): Promise<FtFrequencyResult> {
   const r = await fetch(`${BASE}/ft/frequency`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, fault_tree }),
+    // method 省略 → 键被 JSON.stringify 丢弃 → 请求体与既有 sum 调用逐字节一致(默认 sum,零扰动)
+    body: JSON.stringify({ model, fault_tree, method }),
   })
   if (!r.ok) {
     let detail = ''
