@@ -93,8 +93,9 @@ class Parameter:
             dt = self.mission_time - shift
             if dt <= 0:
                 return 0.0
-            from math import exp
-            return 1.0 - exp(-((dt / self.alpha) ** self.beta))
+            from math import expm1
+            # −expm1 与 exponential 同形(round-3 注记 2):β=1 时与 exponential 逐位退化
+            return -expm1(-((dt / self.alpha) ** self.beta))
         if self.kind == "periodic_test":
             # Gap 7:周期平均 q̄ = 1−(1−e^{−λτ})/(λτ)(3 参形逐周期积分,
             # Vesely/NUREG-0492;λτ/2 为其一阶近似,恒高估)。瞬时曲线/10 参 Complete 留 v2。
@@ -108,8 +109,8 @@ class Parameter:
                 return 0.0
             # review 365e7e5 G1:1−(1−e^{−x})/x 在 x≲1e-6 灾难性消去——x=1e-9 实测 56× 高估,
             # 扫描 [1e-15,1e-6] 有 772/2000 点返回**负值**并静默流入概率通道。
-            # 小 x 用泰勒级数(x/2 − x²/6 + x³/24,截断误差 O(x⁴) 在 x<1e-4 时 <1e-17 相对),
-            # 大 x 用 expm1 无消去形;q̄∈[0,1] 由性质测试全域锁定。
+            # 小 x 用泰勒级数(x/2 − x²/6 + x³/24;x=1e-4 处截断误差绝对 ~8e-19、相对 ~1.7e-14,
+            # 远小于 rel-1e-9 锁);大 x 用 expm1 无消去形;q̄∈[0,1] 由性质测试全域锁定。
             if x < 1e-4:
                 return x / 2.0 - x * x / 6.0 + x ** 3 / 24.0
             from math import expm1

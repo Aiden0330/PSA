@@ -120,3 +120,11 @@ def test_periodic_test_q_in_unit_interval_property():
         lam = 10 ** rng.uniform(-8, 0)
         q = Parameter("PT", "periodic_test", lam, test_interval=x / lam).unavailability()
         assert 0.0 <= q <= 1.0
+
+
+def test_weibull_beta_one_degenerates_to_exponential_bitwise():
+    """round-3 注记 2 恢复为不变量:β=1、α=1/λ 时 weibull ≡ exponential(同 −expm1 形,逐位)。"""
+    lam, t = 1e-3, 100.0
+    w = Parameter("W", "weibull", 0.0, alpha=1.0 / lam, beta=1.0, mission_time=t).unavailability()
+    e = Parameter("E", "exponential", lam, mission_time=t).unavailability()
+    assert w == e            # 逐位
