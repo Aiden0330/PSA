@@ -21,7 +21,7 @@ Deep dives: `.claude/skills/psa-engine`, `psa-frontend`, `psa-evidence-chain`
 
 - `make test` (py+fe) · `make benchmark` · `make check` (full pre-commit gate)
   · `make backend` (:8000) · `make frontend` (:5173) · `make run` · `make bundle`.
-  `run.ps1` is Windows legacy.
+  Windows legacy runner archived at `docs/archive/run.ps1`.
 - Python 3.12 via uv (`.venv`); Node 20 via nvm — in non-interactive shells
   `source ~/.nvm/nvm.sh` first. 前端类型门是 **`npx tsc -b`**(构建同款项目引用
   配置;`--noEmit` 解析更宽松的 config,有漏错前科)。

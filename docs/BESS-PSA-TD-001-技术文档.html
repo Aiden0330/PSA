@@ -205,8 +205,11 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   <a href="#s8">8 文献综述</a>
   <a class="l2" href="#s8-4">8.4 AI 生成 FTA/ETA:SOTA 输入调研</a>
   <a href="#s9">9 SOTA 工具对比</a>
-  <a href="#s10">10 局限与路线图</a>
-  <a href="#s11">11 参考文献</a>
+  <a href="#s10">10 开发方法与质量保障</a>
+  <a class="l2" href="#s10-1">10.1 多代理工作流</a>
+  <a class="l2" href="#s10-3">10.3 规格驱动交付流程</a>
+  <a href="#s11">11 局限与路线图</a>
+  <a href="#s12">12 参考文献</a>
 </nav>
 
 <main>
@@ -989,7 +992,7 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   </ul>
   <div class="warn"><b>口径边界。</b>每个案例覆盖导出/运行当时的<strong>单棵事件树(场景)</strong>,
   组合总览据此比较的是"各项目最近钉扎场景",非项目全部 ETA 之和——页脚已披露;
-  按勾选集合并导出的"聚合范围钉扎"列于路线图(§10)。</div>
+  按勾选集合并导出的"聚合范围钉扎"列于路线图(§11)。</div>
 
   <h3 id="s5-5"><span class="no">5.5</span>AI 建模助手使用指南</h3>
   <p><strong>前置</strong>:后端环境变量 <code>PSA_AI_ENABLED=1</code> + <code>ANTHROPIC_API_KEY</code>
@@ -1255,12 +1258,168 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   (商用工具的配置管理是外挂流程,这里是内容寻址存储的物理性质);③ <strong>AI 辅助 + Web 原生 UX</strong>
   (全体传统工具为桌面范式)。与 XFTA/SCRAM 等开放引擎相比,本工具补上了它们缺失的应用层
   (画布、版本库、报告、领域数据)并以其为基准语料持续对拍。诚实边界:核级 Level-2/火灾/地震 PSA 的
-  专用模块、数十年监管认可积累,均是商用工具的护城河,本工具不声称覆盖(§10)。</p>
+  专用模块、数十年监管认可积累,均是商用工具的护城河,本工具不声称覆盖(§11)。</p>
 </section>
 
-<!-- ═══════════ 9 局限 ═══════════ -->
+<!-- ═══════════ 10 开发方法 ═══════════ -->
 <section id="s10">
-  <h2><span class="no">10</span>局限与路线图</h2>
+  <h2><span class="no">10</span>开发方法与质量保障</h2>
+  <p class="lead">安全工具的可信度不止于算法正确,还取决于<strong>它是怎么被构建与验证的</strong>。
+  本工具采用"多代理分工 + 独立对抗评审 + 规格驱动"的工程方法:模型按任务的安全关键度分派,
+  评审者与实现者上下文隔离,每个特性带着规格、验证记录与偏离日志进入主干。本章即软件质量保障
+  (SQA)说明——监管评审询问"工具本身的开发质量"时,以本章与仓库内证据回答。</p>
+
+  <h3 id="s10-1"><span class="no">10.1</span>多代理工作流</h3>
+  <figure>
+    <div class="figbox">
+    <svg viewBox="0 0 880 400" width="880" role="img" aria-label="多代理开发工作流">
+      <defs>
+        <marker id="arrW" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0 0.5 L7.5 4 L0 7.5 z" fill="var(--primary)"/>
+        </marker>
+        <marker id="arrR" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0 0.5 L7.5 4 L0 7.5 z" fill="var(--amber)"/>
+        </marker>
+      </defs>
+      <g font-size="12">
+        <!-- 协调者 -->
+        <rect x="330" y="14" width="220" height="52" rx="10" fill="var(--primary-soft)" stroke="var(--primary)" stroke-width="1.4"/>
+        <text x="440" y="36" text-anchor="middle" font-weight="700" fill="var(--ink)">协调者(旗舰模型)</text>
+        <text x="440" y="54" text-anchor="middle" fill="var(--ink2)" font-size="11">规格·任务书·逐批验收(verify-then-dispatch)</text>
+        <!-- 三档实现 -->
+        <rect x="26" y="120" width="256" height="66" rx="9" fill="var(--panel)" stroke="var(--line2)"/>
+        <text x="154" y="142" text-anchor="middle" font-weight="700" fill="var(--ink)">Fable 5 —— 安全关键核心</text>
+        <text x="154" y="160" text-anchor="middle" fill="var(--muted)" font-size="11">密码学/会话/身份 · 多项目状态层</text>
+        <text x="154" y="176" text-anchor="middle" fill="var(--muted)" font-size="11">ADR/引擎数学 · 对抗审查落修</text>
+        <rect x="312" y="120" width="256" height="66" rx="9" fill="var(--panel)" stroke="var(--line2)"/>
+        <text x="440" y="142" text-anchor="middle" font-weight="700" fill="var(--ink)">Opus —— 结构与后端</text>
+        <text x="440" y="160" text-anchor="middle" fill="var(--muted)" font-size="11">脚手架/路由守卫/壳替换</text>
+        <text x="440" y="176" text-anchor="middle" fill="var(--muted)" font-size="11">聚合端点/收口探针</text>
+        <rect x="598" y="120" width="256" height="66" rx="9" fill="var(--panel)" stroke="var(--line2)"/>
+        <text x="726" y="142" text-anchor="middle" font-weight="700" fill="var(--ink)">Sonnet · frontend-dev 子代理</text>
+        <text x="726" y="160" text-anchor="middle" fill="var(--muted)" font-size="11">按规格执行 UI(后台运行,断点续跑)</text>
+        <text x="726" y="176" text-anchor="middle" fill="var(--muted)" font-size="11">串行分批防文件冲突 · 禁碰清单</text>
+        <line x1="380" y1="66" x2="180" y2="118" stroke="var(--primary)" stroke-width="1.5" marker-end="url(#arrW)"/>
+        <line x1="440" y1="66" x2="440" y2="118" stroke="var(--primary)" stroke-width="1.5" marker-end="url(#arrW)"/>
+        <line x1="500" y1="66" x2="700" y2="118" stroke="var(--primary)" stroke-width="1.5" marker-end="url(#arrW)"/>
+        <text x="200" y="96" fill="var(--faint)" font-size="10.5">按安全关键度分批派单</text>
+        <!-- 评审带 -->
+        <rect x="26" y="228" width="828" height="64" rx="9" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.3"/>
+        <text x="440" y="250" text-anchor="middle" font-weight="700" fill="var(--ink)">独立评审(与实现者上下文隔离,两轮制:round-1 发现 → 整改 → round-2 复核)</text>
+        <text x="440" y="270" text-anchor="middle" fill="var(--ink2)" font-size="11.5">engine-reviewer(数值对抗)· domain-reviewer(方法学/口径/出处)· 冷读对抗审查(隔离/状态机/并发,含时序探针)</text>
+        <line x1="154" y1="186" x2="154" y2="226" stroke="var(--amber)" stroke-width="1.4" marker-end="url(#arrR)"/>
+        <line x1="440" y1="186" x2="440" y2="226" stroke="var(--amber)" stroke-width="1.4" marker-end="url(#arrR)"/>
+        <line x1="726" y1="186" x2="726" y2="226" stroke="var(--amber)" stroke-width="1.4" marker-end="url(#arrR)"/>
+        <!-- 验证门与收口 -->
+        <rect x="26" y="324" width="500" height="56" rx="9" fill="var(--teal-soft)" stroke="var(--teal)" stroke-width="1.3"/>
+        <text x="276" y="346" text-anchor="middle" font-weight="700" fill="var(--ink)">验证门(verify-psa)</text>
+        <text x="276" y="364" text-anchor="middle" fill="var(--ink2)" font-size="11">pytest 366 · vitest 281 · tsc -b · 基准 24/24 逐位 · 浏览器 DOM 实测</text>
+        <rect x="556" y="324" width="298" height="56" rx="9" fill="var(--panel)" stroke="var(--line2)"/>
+        <text x="705" y="346" text-anchor="middle" font-weight="700" fill="var(--ink)">收口</text>
+        <text x="705" y="364" text-anchor="middle" fill="var(--ink2)" font-size="11">ROADMAP 台账 · change-quiz · 离线包重建</text>
+        <line x1="276" y1="292" x2="276" y2="322" stroke="var(--teal)" stroke-width="1.4" marker-end="url(#arrW)"/>
+        <line x1="705" y1="292" x2="705" y2="322" stroke="var(--faint)" stroke-width="1.4" marker-end="url(#arrW)"/>
+      </g>
+    </svg>
+    </div>
+    <figcaption><b>图 9</b> · 多代理工作流。要点:实现者与评审者<strong>上下文隔离</strong>
+    (评审代理冷读代码,不继承实现叙事);协调者逐批独立验收(门禁 + 浏览器实测)后才派下一批;
+    子代理后台运行,进程中断可原地续跑。模型分派策略详见 <code>docs/design/ai-model-strategy.md</code>。</figcaption>
+  </figure>
+
+  <div class="claim"><b>评审拦截实录(为什么坚持独立评审)。</b>同作者的测试会遗传同作者的盲区
+  ——本项目四次实证:①模板迁移时 LLM 曾<strong>凭空发明</strong>第四道屏障并改 PFD,自写测试
+  全绿,domain-reviewer 抓获(逐字还原 + 护栏测试);②初因频率通道 round-1 六项发现,含 UI
+  可达的非相干门静默错数 +67%;③多项目隔离层 8 条自测锁全绿,冷读对抗审查 40 分钟判 FAIL
+  (9 项,2 项 CRITICAL 跨项目存档覆盖,全部探针证实后修复);④组合总览夹具伪造数据形状,
+  遮蔽"真实不确定性运行显示为未量化"的反保守缺陷。由此立规:<strong>隔离/状态机/并发类改动,
+  套件全绿仍必须冷读对抗审查</strong>(verify-psa 升级规则)。</div>
+
+  <h3><span class="no">10.2</span>技能与代理体系</h3>
+  <p>项目知识以<strong>技能文件</strong>沉淀(<code>.claude/skills/</code>,5 域 + 9 流程),
+  代理开工前按触发词加载对应技能——架构地图、硬性规则、已付学费的陷阱因此跨会话、跨代理继承,
+  而不是留在某次对话里:</p>
+  <div class="tblwrap"><table>
+    <caption><b>表 13</b> · 技能与代理清单(每项一句话;完整内容见 <code>.claude/skills/*/SKILL.md</code>)</caption>
+    <thead><tr><th>类别</th><th>名称</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="5"><strong>域技能</strong></td><td><code>psa-engine</code></td><td>定量引擎架构/既定偏离(无补边 ROBDD、精确成功否定)/验证门(benchmark 强制)</td></tr>
+      <tr><td><code>psa-frontend</code></td><td>探索者壳+多项目槽架构、硬性规则(tsc -b、槽钉定)、开发环境陷阱</td></tr>
+      <tr><td><code>psa-evidence-chain</code></td><td>版本库/审计/评审签发/认证/组合总览的九条不变量与已付学费清单</td></tr>
+      <tr><td><code>bess-tr-model</code></td><td>热失控事件序列/屏障框架/后果分级/标准映射(UL 9540A、NFPA 855…)</td></tr>
+      <tr><td><code>eta-reference-data</code></td><td>参考库维护:分级/引文/单位纪律/贝叶斯更新路径</td></tr>
+      <tr><td rowspan="9"><strong>流程技能</strong></td><td><code>blindspot-pass</code></td><td>动工前的未知盲区探查(新领地强制;曾揪出在产量纲 bug)</td></tr>
+      <tr><td><code>interview-me</code></td><td>逐题访谈锁定会改变设计的决策(一次一题)</td></tr>
+      <tr><td><code>design-directions</code></td><td>3–4 个分歧方向 HTML 样机,真实数据,用户挑选(壳/评审 UX 均由此定)</td></tr>
+      <tr><td><code>reference-hunt</code></td><td>复刻既有工具行为前先取证其精确语义(SCRAM 源码/RS 手册/NUREG)</td></tr>
+      <tr><td><code>plan-feature</code></td><td>规格+计划,按"最可能变更"排序,存 docs/superpowers/</td></tr>
+      <tr><td><code>verify-psa</code></td><td>分级验证门 + 对抗审查升级规则 + 夹具真实性(§10.1)</td></tr>
+      <tr><td><code>change-quiz</code></td><td>合并前用户理解关卡(可显式免试,答案卷存档 docs/reviews/)</td></tr>
+      <tr><td><code>riskspectrum-parity</code></td><td>活对标台账:已达/超越(带证据与日期)vs 差距(排序)</td></tr>
+      <tr><td><code>regulatory-traceability</code></td><td>监管面向输出的证据链清单(数字→版本→设置→出处)</td></tr>
+      <tr><td rowspan="3"><strong>评审/实现代理</strong></td><td><code>engine-reviewer</code></td><td>数值对抗评审(psaengine/bess 改动强制;两轮制)</td></tr>
+      <tr><td><code>domain-reviewer</code></td><td>PSA 方法学/数据分级/报告口径评审(聚合声明、AI 产物)</td></tr>
+      <tr><td><code>frontend-dev</code></td><td>按规格执行 UI 的实现代理(Sonnet;禁碰清单/收口门内建)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="s10-3"><span class="no">10.3</span>规格驱动交付流程</h3>
+  <figure>
+    <div class="figbox">
+    <svg viewBox="0 0 880 190" width="880" role="img" aria-label="规格驱动交付流程">
+      <defs>
+        <marker id="arrP" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0 0.5 L7.5 4 L0 7.5 z" fill="var(--teal)"/>
+        </marker>
+      </defs>
+      <g font-size="11.5">
+        <!-- 七站 -->
+        <rect x="14" y="52" width="96" height="56" rx="9" fill="var(--panel)" stroke="var(--line2)"/>
+        <text x="62" y="76" text-anchor="middle" font-weight="700" fill="var(--ink)">盲区探查</text>
+        <text x="62" y="94" text-anchor="middle" fill="var(--muted)" font-size="10">新领地强制</text>
+        <rect x="136" y="52" width="96" height="56" rx="9" fill="var(--panel)" stroke="var(--line2)"/>
+        <text x="184" y="76" text-anchor="middle" font-weight="700" fill="var(--ink)">逐题访谈</text>
+        <text x="184" y="94" text-anchor="middle" fill="var(--muted)" font-size="10">决策点收敛</text>
+        <rect x="258" y="52" width="118" height="56" rx="9" fill="var(--primary-soft)" stroke="var(--primary)" stroke-width="1.3"/>
+        <text x="317" y="72" text-anchor="middle" font-weight="700" fill="var(--ink)">规格 + 计划</text>
+        <text x="317" y="88" text-anchor="middle" fill="var(--ink2)" font-size="10">样机比选 · 对标取证</text>
+        <text x="317" y="102" text-anchor="middle" fill="var(--muted)" font-size="10">docs/superpowers/</text>
+        <rect x="402" y="52" width="100" height="56" rx="9" fill="var(--panel)" stroke="var(--line2)"/>
+        <text x="452" y="76" text-anchor="middle" font-weight="700" fill="var(--ink)">TDD 实现</text>
+        <text x="452" y="94" text-anchor="middle" fill="var(--muted)" font-size="10">失败测试先行</text>
+        <rect x="528" y="52" width="100" height="56" rx="9" fill="var(--teal-soft)" stroke="var(--teal)" stroke-width="1.3"/>
+        <text x="578" y="76" text-anchor="middle" font-weight="700" fill="var(--ink)">验证门</text>
+        <text x="578" y="94" text-anchor="middle" fill="var(--muted)" font-size="10">套件+实测</text>
+        <rect x="654" y="52" width="104" height="56" rx="9" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.3"/>
+        <text x="706" y="76" text-anchor="middle" font-weight="700" fill="var(--ink)">对抗审查</text>
+        <text x="706" y="94" text-anchor="middle" fill="var(--muted)" font-size="10">两轮制 · 升级规则</text>
+        <rect x="784" y="52" width="82" height="56" rx="9" fill="var(--panel)" stroke="var(--line2)"/>
+        <text x="825" y="76" text-anchor="middle" font-weight="700" fill="var(--ink)">收口</text>
+        <text x="825" y="94" text-anchor="middle" fill="var(--muted)" font-size="10">台账+quiz</text>
+        <g stroke="var(--teal)" stroke-width="1.5">
+          <line x1="110" y1="80" x2="134" y2="80" marker-end="url(#arrP)"/>
+          <line x1="232" y1="80" x2="256" y2="80" marker-end="url(#arrP)"/>
+          <line x1="376" y1="80" x2="400" y2="80" marker-end="url(#arrP)"/>
+          <line x1="502" y1="80" x2="526" y2="80" marker-end="url(#arrP)"/>
+          <line x1="628" y1="80" x2="652" y2="80" marker-end="url(#arrP)"/>
+          <line x1="758" y1="80" x2="782" y2="80" marker-end="url(#arrP)"/>
+        </g>
+        <path d="M 706 110 Q 706 150 452 150 Q 452 130 452 112" fill="none" stroke="var(--amber)" stroke-width="1.5" marker-end="url(#arrP)"/>
+        <text x="580" y="166" text-anchor="middle" fill="var(--amber)" font-size="10.5" font-weight="650">round-1 发现 → 整改 → round-2 复核(FAIL 不带病收口)</text>
+        <text x="317" y="30" text-anchor="middle" fill="var(--faint)" font-size="10.5">已完成规格保留「偏离记录」——实现与规格的差异成文,不静默(如 explorer §6)</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption><b>图 10</b> · 每特性交付流水线。产物均入库可查:规格/计划
+    (<code>docs/superpowers/specs|plans/</code>,日期命名)、评审记录(规格内或
+    <code>docs/reviews/</code>)、收口台账(<code>ROADMAP.md</code> 逐条带提交哈希)。
+    quiz 可由用户显式免试,免试与答案卷同样存档——流程留痕本身就是证据链的一部分。</figcaption>
+  </figure>
+</section>
+
+<!-- ═══════════ 11 局限 ═══════════ -->
+<section id="s11">
+  <h2><span class="no">11</span>局限与路线图</h2>
   <ul>
     <li><strong>数据成熟度</strong>:内置库全为 C/D 级(设计如此)——正式 QRA 交付前须项目实测/贝叶斯升级;
       模板 IE 频率与场景库存在口径差(10 MWh 系统级 vs 通用舱级先验),文档已注明,须按项目统一;</li>
@@ -1280,8 +1439,8 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
 </section>
 
 <!-- ═══════════ 10 参考文献 ═══════════ -->
-<section id="s11">
-  <h2><span class="no">11</span>参考文献</h2>
+<section id="s12">
+  <h2><span class="no">12</span>参考文献</h2>
   <ol class="refs">
     <li id="ref-bryant"><span class="n">[1]</span> Bryant, R.E. “Graph-Based Algorithms for Boolean Function Manipulation.” <i>IEEE Trans. Computers</i> C-35(8), 1986.</li>
     <li id="ref-rauzy93"><span class="n">[2]</span> Rauzy, A. “New Algorithms for Fault Trees Analysis.” <i>Reliability Engineering &amp; System Safety</i> 40(3), 1993.</li>

@@ -181,7 +181,12 @@
   frontend-dev 代理同步(槽钉定/tsc -b/vite 缓存)。docs/ 重组:新 `README.md`
   地图 + `research/`(RiskSpectrum 调研、compass ×3 自根目录迁入)+ `archive/`
   (USER_GUIDE/ALGORITHM_DESIGN 加迁移注记归档——内容已并入 TD-001;skill-blueprints;
-  早期样例报告);CLAUDE.md 架构表/现状/门禁刷新。
+  早期样例报告);CLAUDE.md 架构表/现状/门禁刷新。**续(同日):TD-001 增 §10
+  开发方法与质量保障**(图 9 多代理工作流:三档模型分派/独立评审带/验证门;表 13
+  技能与代理 17 行清单;图 10 规格驱动七站流水线 + 两轮制回路;评审拦截实录四例成文
+  ——SQA 章节,监管问"工具本身怎么保证质量"时的应答点),原 §10/11 顺延,Word 同步
+  重建(10 图/12 章),Artifact 同 URL 更新;根目录收尾:run.ps1 归档 docs/archive、
+  清除误生成的根级 node_modules/.vite,根现仅存 6 个 tracked 配置/文档文件。
 
 ---
 
