@@ -1132,8 +1132,10 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
   </table></div>
 
   <div class="warn"><b>单位纪律。</b>失效率单位是承载语义的:<code>/cell·yr</code>(电芯级)、
-  <code>/unit·yr</code>(设备级)、<code>/demand</code>(按需 PFD)绝不静默换算;初因频率为系统级
-  <code>/yr</code>,「×电芯数折算」只允许出现在推导注记里。库内每条数据 = 值 + 单位 + 分级 + 引文 +
+  <code>/unit·yr</code>(设备级)、<code>/demand</code>(按需 PFD)绝不静默换算;初因频率 canonical
+  口径为<strong>舱级</strong>(<code>/unit·yr</code>,舱 = 事件树演化单元;裁决
+  2026-07-14),站级/系统级数字属项目层换算,「×/÷电芯数折算」只允许显式出现在推导注记里。
+  库内每条数据 = 值 + 单位 + 分级 + 引文 +
   (可选)探测维度;5 条初因频率条目全部带推导链。系统级↔舱级换算必须显式(电芯数维度),电芯派生的舱级值隐含 cells/舱 假设(库锚定 1×10⁴),跨产品体系引用须按实际 cells/舱 重算。</div>
 </section>
 
