@@ -122,6 +122,30 @@ def test_portfolio_scenario_passthrough_for_disclosure():
                       results={"consequences": {"C5": 1e-5}})
     row = next(r for r in store.portfolio() if r["uuid"] == PUUID)
     assert row["latest_case"]["scenario"] == "电芯内短路"
+    # spec A:旧案例/单场景案例无 scope 键 → 语义 = single,tree_count 不虚构(零迁移)。
+    assert row["latest_case"]["scope"] == "single"
+    assert row["latest_case"]["tree_count"] is None
+
+
+def test_portfolio_checked_set_scope_passthrough_for_badge():
+    # spec A §2.4:checked_set 钉扎 → scope + tree_count 透传,前端徽章「聚合 n 树」
+    # 替代场景名;数字仍取自钉扎的聚合值(绝不现算),矩阵落格用聚合后果。
+    store.ensure_project(PUUID, "P")
+    v = store.create_version(PUUID, *to_canonical(_payload(), PUUID))
+    store.create_case(PUUID, v["id"], "report",
+                      settings={"scenario_name": "勾选集聚合", "scope": "checked_set",
+                                "scenarios": [{"key": "t1", "name": "电芯内短路"},
+                                              {"key": "t2", "name": "BMS 过充"}]},
+                      results={"consequences": {"C1": 2.5e-3, "C2": 5e-4},
+                               "per_tree": [
+                                   {"key": "t1", "name": "电芯内短路", "consequences": {"C1": 9e-4, "C2": 1e-4}},
+                                   {"key": "t2", "name": "BMS 过充", "consequences": {"C1": 1.6e-3, "C2": 4e-4}}]})
+    row = next(r for r in store.portfolio() if r["uuid"] == PUUID)
+    lc = row["latest_case"]
+    assert lc["scope"] == "checked_set"
+    assert lc["tree_count"] == 2
+    assert lc["consequences"]["C1"] == 2.5e-3       # 聚合值逐位取自钉扎,未被重算
+    assert lc["risk"]["worst"] is not None          # 矩阵落格收到的即聚合字典
 
 
 def test_portfolio_review_state_anchored_to_latest_version():

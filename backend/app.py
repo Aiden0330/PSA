@@ -145,28 +145,63 @@ def _pin_case(project_uuid: str, project_payload, kind: str, name_hint: str | No
             "engine_version": store.engine_version()}
 
 
+def _checked_set_trees(req) -> list:
+    """spec A:校验并构建勾选集聚合的逐树模型。空集响亮 400;逐树边界条件暂不支持(拒绝,
+    绝不静默忽略分析设置——UI 序列化不产生该字段,出现即异常调用方)。"""
+    from backend.et_builder import build_model_from_request
+    if len(req.trees) < 1:
+        raise HTTPException(400, "scope=checked_set 需要至少 1 棵勾选事件树(trees 为空)")
+    for t in req.trees:
+        if t.house_states or t.boundary_condition_set:
+            raise HTTPException(400, "勾选集聚合暂不支持逐树边界条件(house_states/boundary_condition_set)")
+    out = []
+    for t in req.trees:
+        try:
+            model = build_model_from_request(t.model_dump())
+        except (KeyError, ValueError) as e:
+            raise HTTPException(400, f"勾选树「{t.name}」无法构建模型: {e}")
+        out.append({"model": model, "key": t.key, "name": t.name, "labels": t.labels,
+                    "consequence_defs": t.consequence_defs, "init_note": t.init_note})
+    return out
+
+
 @app.post("/api/report")
 def api_report(req: schemas.ReportRequest, format: str = "docx", _=Depends(require_role(*ANALYST))):
-    """由当前 ETA 重算 → 生成 Word/PDF/CSV 报告下载。"""
+    """由当前 ETA 重算 → 生成 Word/PDF/CSV 报告下载。scope=checked_set(spec A)时按勾选集
+    聚合:逐级求和点估计 + 同 ref 名联合抽样分位带 + 逐树分解页脚;默认 single 零扰动。"""
     import base64
     from backend.et_builder import build_model_from_request
     from backend import report_export as rx
     if format not in ("docx", "pdf", "csv"):
         raise HTTPException(400, "format must be docx|pdf|csv")
     dumped = req.model_dump()
-    model = build_model_from_request(dumped)
-    linked_ids = [fe["id"] for fe in dumped["functional_events"] if fe.get("link_ft")]
-    data = rx.build_report_data(model, "TR", consequence_defs=req.consequence_defs, labels=req.labels,
-                                linked_fe_ids=linked_ids, samples=req.samples, seed=req.seed,
-                                error_factor=req.error_factor)
+    if req.scope == "checked_set":
+        trees = _checked_set_trees(req)
+        data = rx.build_aggregate_report_data(trees, samples=req.samples, seed=req.seed,
+                                              error_factor=req.error_factor)
+        pin_settings = {"format": format, "samples": req.samples, "seed": req.seed,
+                        "error_factor": req.error_factor, "scenario_name": req.scenario_name,
+                        "scope": "checked_set",
+                        "scenarios": [{"key": t["key"], "name": t["name"]} for t in trees]}
+        # §2.3 钉扎形状:consequences 聚合值 + per_tree 分解(不带注记,纯 {key,name,consequences})
+        pin_results = {"consequences": data["consequences"], "bands": data["bands"],
+                       "per_tree": [{"key": p["key"], "name": p["name"], "consequences": p["consequences"]}
+                                    for p in data["aggregate"]["per_tree"]]}
+    else:
+        model = build_model_from_request(dumped)
+        linked_ids = [fe["id"] for fe in dumped["functional_events"] if fe.get("link_ft")]
+        data = rx.build_report_data(model, "TR", consequence_defs=req.consequence_defs, labels=req.labels,
+                                    linked_fe_ids=linked_ids, samples=req.samples, seed=req.seed,
+                                    error_factor=req.error_factor)
+        pin_settings = {"format": format, "samples": req.samples, "seed": req.seed,
+                        "error_factor": req.error_factor, "scenario_name": req.scenario_name}
+        pin_results = {"consequences": data["consequences"], "bands": data["bands"]}
     # ADR-2 自动钉扎:携带项目上下文的报告 → 版本(幂等)+ 分析案例 + 页脚证据链。
     evidence, case_id = None, None
     if req.project_uuid and req.project_payload is not None:
         from datetime import datetime, timezone
         pinned = _pin_case(req.project_uuid, req.project_payload, "report", req.scenario_name,
-                           settings={"format": format, "samples": req.samples, "seed": req.seed,
-                                     "error_factor": req.error_factor, "scenario_name": req.scenario_name},
-                           results={"consequences": data["consequences"], "bands": data["bands"]},
+                           settings=pin_settings, results=pin_results,
                            audit_action="report.export")
         case_id = pinned["case_id"]
         evidence = {**pinned,
@@ -281,9 +316,29 @@ def api_saved_delete(sid: str):
 
 @app.post("/api/event-tree/uncertainty")
 def api_event_tree_uncertainty(req: schemas.EtUncertaintyRequest, _=Depends(require_role(*ANALYST))):
-    """事件树蒙特卡洛不确定性带(C1–C5 的 p05/p50/p95 + 点估计)。"""
+    """事件树蒙特卡洛不确定性带(C1–C5 的 p05/p50/p95 + 点估计)。
+    scope=checked_set(spec A):同 ref 名联合抽样跨树聚合;默认 single 零扰动。"""
     from backend.et_builder import build_model_from_request
-    from psaengine.eta.uncertainty import event_tree_uncertainty
+    from psaengine.eta.uncertainty import event_tree_uncertainty, aggregate_event_tree_uncertainty
+    if req.scope == "checked_set":
+        trees = _checked_set_trees(req)
+        agg = aggregate_event_tree_uncertainty([(t["model"], "TR") for t in trees],
+                                               samples=req.samples, seed=req.seed,
+                                               error_factor=req.error_factor)
+        per_tree = [{"key": t["key"], "name": t["name"], "consequences": row}
+                    for t, row in zip(trees, agg["per_tree"])]
+        res = {"point": agg["point"], "bands": agg["bands"],
+               "scope": "checked_set", "per_tree": per_tree}
+        if req.project_uuid and req.project_payload is not None:
+            pinned = _pin_case(req.project_uuid, req.project_payload, "uncertainty", req.scenario_name,
+                               settings={"samples": req.samples, "seed": req.seed,
+                                         "error_factor": req.error_factor, "scope": "checked_set",
+                                         "scenarios": [{"key": t["key"], "name": t["name"]} for t in trees]},
+                               results={"consequences": agg["point"], "bands": agg["bands"],
+                                        "per_tree": per_tree},
+                               audit_action="analysis.uncertainty")
+            res = {**res, "case": pinned}
+        return res
     model = build_model_from_request(req.model_dump())
     res = event_tree_uncertainty(model, "TR", samples=req.samples, seed=req.seed, error_factor=req.error_factor,
                                  house_states=req.house_states or None,

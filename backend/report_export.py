@@ -106,6 +106,74 @@ def build_report_data(model, et_name: str = "TR", *, consequence_defs: dict | No
             "importance": imp, "consequence_defs": consequence_out, "sequences": sequences, "fta": fta}
 
 
+# ── 勾选集聚合报告(spec A §2.1/§2.2/§2.4)────────────────────────────────────
+# 页脚免责三句(裁决 §2.1/§2.2,逐字口径):MECE + 重复/重叠告警(方向保守高估)、
+# 分位不可加、IE 频率按定值处理。逐树基准注记随分解表带出(spec B)。
+_AGG_DISCLOSURES = [
+    "聚合前提:各勾选树初因事件互斥(MECE),计不相交的物理事件集。若同时勾选了重复建模"
+    "(同一初因的多棵派生树)或重叠建模(如邻舱辐射引燃与内短树 C4/C5 后果重叠)的树,聚合"
+    "方向为保守高估(同一初因被计多次)——请对逐树分解核对。",
+    "分位数不可加:逐树分解为点估计(nominal 取值),Σ逐树 p95 ≠ 聚合 p95;聚合分位来自跨树"
+    "联合抽样(同 ref 名参数共享同一次抽样)。",
+    "初因(IE)频率按定值处理,其认知不确定性未计入分位带(初因频率是本领域最大不确定性来源)。",
+]
+_AGG_DISCLOSURES_EN = [   # PDF 无 CJK 字体时的等义英文(与中文逐句对应)
+    "Aggregation assumes mutually exclusive (MECE) initiating events; duplicated or overlapping "
+    "trees bias the sum conservatively upward — check the per-tree breakdown.",
+    "Quantiles are not additive: per-tree rows are point estimates; sum of per-tree p95 != "
+    "aggregate p95 (bands come from joint sampling over shared parameter ref names).",
+    "IE frequencies are treated as fixed values; their epistemic uncertainty is not in the bands.",
+]
+
+
+def build_aggregate_report_data(trees: list, *, samples: int = 1000, seed: int = 42,
+                                error_factor: float = 3.0, top_n: int = TOP_N) -> dict:
+    """勾选集聚合报告数据。trees=[{"model",  "key","name","labels","consequence_defs","init_note"}]。
+
+    聚合后果 = 各树同级逐级求和(精确,期望线性);聚合分位带 = 跨树联合抽样(同 ref 名)。
+    风险矩阵沿用同一 consequences 路径(只是收到聚合字典)。逐树分解 + 基准注记进 aggregate 块。
+    重要度/FTA 为逐树概念、无聚合语义 → 聚合报告不出该两节(渲染层按 aggregate 存在与否分流)。"""
+    from psaengine.eta.uncertainty import aggregate_event_tree_uncertainty
+    specs = [(t["model"], "TR") for t in trees]
+    agg = aggregate_event_tree_uncertainty(specs, samples=samples, seed=seed, error_factor=error_factor)
+    consequences = {c: float(agg["point"].get(c, 0.0)) for c in _SEV}
+
+    per_tree = []
+    for t, row in zip(trees, agg["per_tree"]):
+        per_tree.append({"key": t["key"], "name": t["name"],
+                         "consequences": {c: float(row.get(c, 0.0)) for c in _SEV},
+                         "init_note": t.get("init_note")})
+
+    # 主导事故序列:跨树全局 Top-N(频率均为绝对 /yr,可直接比较);end_state 冠以树名消歧。
+    all_seqs = []
+    for t in trees:
+        for s in event_tree_sequences(t["model"], "TR"):
+            all_seqs.append({"end_state": f'{t["name"]}·{s["end_state"]}',
+                             "path_summary": _path_summary(s["path"], t.get("labels")),
+                             "consequence": s["consequence"], "frequency": s["frequency"]})
+    all_seqs.sort(key=lambda s: s["frequency"], reverse=True)
+
+    # 后果内涵:逐级取首个非空的树自定义,回退内置(canonical C1–C5 语义应一致)。
+    merged_defs = {}
+    for c in _SEV:
+        val = next((cd for t in trees if (cd := (t.get("consequence_defs") or {}).get(c))), None)
+        merged_defs[c] = val or _C_LABEL[c]
+
+    return {
+        "consequences": consequences, "bands": agg["bands"],
+        "importance": {}, "consequence_defs": merged_defs, "sequences": all_seqs[:top_n], "fta": {},
+        "aggregate": {"tree_count": len(trees),
+                      "scenarios": [{"key": t["key"], "name": t["name"]} for t in trees],
+                      "per_tree": per_tree},
+    }
+
+
+def _agg_scope_label(data: dict) -> str:
+    """『勾选集聚合(n 树)』标识;非聚合报告返回空串(单报告零扰动)。"""
+    agg = data.get("aggregate")
+    return f"勾选集聚合({agg['tree_count']} 树)" if agg else ""
+
+
 _WORKING_MARK = "工作稿 — 未经签发"
 
 
@@ -129,18 +197,23 @@ def report_csv(data: dict, evidence: dict | None = None) -> bytes:
     buf = io.StringIO()
     w = csv.writer(buf)
     cdefs = data.get("consequence_defs", {})
+    agg = data.get("aggregate")
     if not _is_signed(evidence):
         w.writerow([f"# {_WORKING_MARK}"])
+    if agg:   # spec A §2.4:CSV 口径元数据行(scope + n 树 + 场景名)
+        w.writerow(["# 口径", "勾选集聚合", f"{agg['tree_count']} 树",
+                    "、".join(s["name"] for s in agg["scenarios"])])
     w.writerow(["后果", "内涵", "点估计/yr", "p05", "p50", "p95"])
     for c in _SEV:
         b = data["bands"].get(c, {})
         w.writerow([c, cdefs.get(c, _C_LABEL[c]), f"{data['consequences'].get(c, 0.0):.4e}",
                     f"{b.get('p05', 0.0):.4e}", f"{b.get('p50', 0.0):.4e}", f"{b.get('p95', 0.0):.4e}"])
-    w.writerow([])
-    w.writerow(["后果", "屏障", "FV", "RAW"])
-    for c in _SEV:
-        for r in data["importance"].get(c, []):
-            w.writerow([c, r["barrier"], f"{r['fv']:.4f}", f"{r['raw']:.4f}"])
+    if data.get("importance"):   # 聚合报告无逐树重要度语义(空 dict → 整节不出)
+        w.writerow([])
+        w.writerow(["后果", "屏障", "FV", "RAW"])
+        for c in _SEV:
+            for r in data["importance"].get(c, []):
+                w.writerow([c, r["barrier"], f"{r['fv']:.4f}", f"{r['raw']:.4f}"])
     w.writerow([])
     w.writerow(["主导事故序列(Top-N)"])
     w.writerow(["序列", "路径", "后果", "频率/yr"])
@@ -155,6 +228,17 @@ def report_csv(data: dict, evidence: dict | None = None) -> bytes:
         w.writerow(["基本事件", "FV"])
         for bsc in f["basics"]:
             w.writerow([bsc["event"], f"{bsc['fv']:.4f}"])
+    if agg:   # 逐树分解(点估计)+ 基准注记 + 免责句(spec A §2.1/§2.2)
+        w.writerow([])
+        w.writerow([f"逐树分解(勾选集聚合,{agg['tree_count']} 树;各行为点估计,分位数不可加)"])
+        w.writerow(["事件树"] + _SEV)
+        for t in agg["per_tree"]:
+            w.writerow([t["name"]] + [f"{t['consequences'].get(c, 0.0):.4e}" for c in _SEV])
+        for t in agg["per_tree"]:
+            if t.get("init_note"):
+                w.writerow([f"※ {t['name']} 初因口径", t["init_note"]])
+        for s in _AGG_DISCLOSURES:
+            w.writerow([f"⚠ {s}"])
     if evidence:
         w.writerow([])
         w.writerow([_evidence_line(evidence)])
@@ -172,13 +256,17 @@ def report_docx(data: dict, scenario_name: str, tree_png: bytes | None,
                 evidence: dict | None = None) -> bytes:
     from docx import Document
     from docx.shared import Inches
+    agg = data.get("aggregate")
+    mark = _agg_scope_label(data)                 # 「勾选集聚合(n 树)」或空(单报告零扰动)
     doc = Document()
-    doc.add_heading("BESS 热失控 QRA 报告", level=0)
+    doc.add_heading("BESS 热失控 QRA 报告" + (f" · {mark}" if mark else ""), level=0)
     doc.add_paragraph(f"场景:{scenario_name}")
+    if agg:   # spec A §2.4:scope 标识不能只靠页脚 —— 标题 + 口径行 + C1–C5 表标题同现
+        doc.add_paragraph(f"口径:{mark} — " + "、".join(s["name"] for s in agg["scenarios"]))
     if not _is_signed(evidence):
         doc.add_paragraph(f"⚠ {_WORKING_MARK}")
 
-    doc.add_heading("后果频率(每站每年)", level=1)
+    doc.add_heading("后果频率(每站每年)" + (f" · {mark}" if mark else ""), level=1)
     t = doc.add_table(rows=1, cols=5); t.style = "Table Grid"
     for i, h in enumerate(["后果", "点估计", "p05", "p50", "p95"]):
         t.rows[0].cells[i].text = h
@@ -196,7 +284,8 @@ def report_docx(data: dict, scenario_name: str, tree_png: bytes | None,
         cells = dt.add_row().cells
         cells[0].text = c; cells[1].text = cdefs.get(c, _C_LABEL[c])
 
-    doc.add_heading("风险矩阵(后果 × 频率)", level=1)
+    # 矩阵落格处 scope 标识同现(§2.4:求和后频率上移频带,聚合行与单场景行落格天然不同)
+    doc.add_heading("风险矩阵(后果 × 频率)" + (f" · {mark}" if mark else ""), level=1)
     placed = {c: _freq_band(data["consequences"].get(c, 0)) for c in _SEV if data["consequences"].get(c, 0) > 0}
     rm = doc.add_table(rows=1, cols=6); rm.style = "Table Grid"
     rm.rows[0].cells[0].text = "频率＼后果"
@@ -211,13 +300,14 @@ def report_docx(data: dict, scenario_name: str, tree_png: bytes | None,
                 cells[i + 1].text = f"{data['consequences'][c]:.1e}"
             _shade(cells[i + 1], _RISK_HEX[lvl])
 
-    doc.add_heading("屏障重要度 FV/RAW(C5 最严重)", level=1)
-    it = doc.add_table(rows=1, cols=3); it.style = "Table Grid"
-    for i, h in enumerate(["屏障", "FV", "RAW"]):
-        it.rows[0].cells[i].text = h
-    for r in data["importance"].get("C5", []):
-        cells = it.add_row().cells
-        cells[0].text = r["barrier"]; cells[1].text = f"{r['fv']:.3f}"; cells[2].text = f"{r['raw']:.2f}"
+    if data.get("importance"):   # 聚合报告无跨树重要度语义 → 整节不出(单报告恒非空,零扰动)
+        doc.add_heading("屏障重要度 FV/RAW(C5 最严重)", level=1)
+        it = doc.add_table(rows=1, cols=3); it.style = "Table Grid"
+        for i, h in enumerate(["屏障", "FV", "RAW"]):
+            it.rows[0].cells[i].text = h
+        for r in data["importance"].get("C5", []):
+            cells = it.add_row().cells
+            cells[0].text = r["barrier"]; cells[1].text = f"{r['fv']:.3f}"; cells[2].text = f"{r['raw']:.2f}"
 
     doc.add_heading("主导事故序列(Top-N)", level=1)
     st = doc.add_table(rows=1, cols=4); st.style = "Table Grid"
@@ -246,6 +336,22 @@ def report_docx(data: dict, scenario_name: str, tree_png: bytes | None,
     if tree_png:
         doc.add_heading("事件树", level=1)
         doc.add_picture(io.BytesIO(tree_png), width=Inches(6.2))
+    if agg:   # 页脚证据块:逐树分解表(点估计)+ 逐树基准注记 + 免责三句(§2.1/§2.2)
+        doc.add_heading(f"逐树分解({mark};各行为点估计,分位数不可加)", level=1)
+        pt = doc.add_table(rows=1, cols=6); pt.style = "Table Grid"
+        pt.rows[0].cells[0].text = "事件树"
+        for i, c in enumerate(_SEV):
+            pt.rows[0].cells[i + 1].text = c
+        for tr in agg["per_tree"]:
+            cells = pt.add_row().cells
+            cells[0].text = tr["name"]
+            for i, c in enumerate(_SEV):
+                cells[i + 1].text = f"{tr['consequences'].get(c, 0.0):.2e}"
+        for tr in agg["per_tree"]:
+            if tr.get("init_note"):
+                doc.add_paragraph(f"※ {tr['name']} 初因口径:{tr['init_note']}")
+        for s in _AGG_DISCLOSURES:
+            doc.add_paragraph("⚠ " + s)
     doc.add_paragraph(); doc.add_paragraph("⚠ " + _DISCLAIMER)
     if evidence:
         doc.add_paragraph(_evidence_line(evidence))
@@ -273,14 +379,20 @@ def report_pdf(data: dict, scenario_name: str, tree_png: bytes | None,
     font = _pdf_font()
     cn = font == "STSong-Light"
     lbl = _C_LABEL if cn else _C_EN
+    agg = data.get("aggregate")
+    mark = (_agg_scope_label(data) if cn else f"checked-set aggregate ({agg['tree_count']} trees)") if agg else ""
     styles = getSampleStyleSheet()
     h0 = ParagraphStyle("h0", parent=styles["Title"], fontName=font)
     h2 = ParagraphStyle("h2", parent=styles["Heading2"], fontName=font)
     nm = ParagraphStyle("nm", parent=styles["Normal"], fontName=font)
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, title="BESS QRA Report")
-    story = [Paragraph("BESS 热失控 QRA 报告" if cn else "BESS Thermal-Runaway QRA Report", h0),
+    story = [Paragraph(("BESS 热失控 QRA 报告" if cn else "BESS Thermal-Runaway QRA Report")
+                       + (f" · {mark}" if mark else ""), h0),
              Paragraph((f"场景:{scenario_name}" if cn else f"Scenario: {scenario_name}"), nm), Spacer(1, 8)]
+    if agg:   # §2.4:scope 标识不能只靠页脚
+        names = "、".join(s["name"] for s in agg["scenarios"]) if cn else ", ".join(s["name"] for s in agg["scenarios"])
+        story += [Paragraph((f"口径:{mark} — {names}" if cn else f"Scope: {mark} — {names}"), nm), Spacer(1, 4)]
     if not _is_signed(evidence):
         story += [Paragraph(f"⚠ {_WORKING_MARK}" if cn else "WORKING COPY — NOT SIGNED OFF", nm),
                   Spacer(1, 8)]
@@ -296,7 +408,8 @@ def report_pdf(data: dict, scenario_name: str, tree_png: bytes | None,
         rows.append([f"{c} {lbl[c]}", f"{data['consequences'].get(c, 0):.2e}",
                      f"{b.get('p05', 0):.2e}", f"{b.get('p50', 0):.2e}", f"{b.get('p95', 0):.2e}"])
     t = Table(rows); t.setStyle(grid_style())
-    story += [Paragraph("后果频率(每站每年)" if cn else "Consequence frequency (/site.yr)", h2), t, Spacer(1, 8)]
+    story += [Paragraph(("后果频率(每站每年)" if cn else "Consequence frequency (/site.yr)")
+                        + (f" · {mark}" if mark else ""), h2), t, Spacer(1, 8)]
 
     cdefs = data.get("consequence_defs", {})
     drows = [["Cx", "内涵" if cn else "definition"]] + [[c, cdefs.get(c, lbl[c])] for c in _SEV]
@@ -314,11 +427,13 @@ def report_pdf(data: dict, scenario_name: str, tree_png: bytes | None,
             cmds.append(("BACKGROUND", (ci + 1, ri + 1), (ci + 1, ri + 1), colors.HexColor("#" + _RISK_HEX[lvl])))
         grid.append(row)
     rm = Table(grid); rm.setStyle(grid_style(cmds))
-    story += [Paragraph("风险矩阵(后果 × 频率)" if cn else "Risk matrix (consequence x frequency)", h2), rm, Spacer(1, 8)]
+    story += [Paragraph(("风险矩阵(后果 × 频率)" if cn else "Risk matrix (consequence x frequency)")
+                        + (f" · {mark}" if mark else ""), h2), rm, Spacer(1, 8)]
 
-    irows = [["barrier", "FV", "RAW"]] + [[r["barrier"], f"{r['fv']:.3f}", f"{r['raw']:.2f}"] for r in data["importance"].get("C5", [])]
-    it = Table(irows); it.setStyle(grid_style())
-    story += [Paragraph("屏障重要度 FV/RAW(C5)" if cn else "Barrier importance FV/RAW (C5)", h2), it, Spacer(1, 8)]
+    if data.get("importance"):   # 聚合报告无跨树重要度语义 → 整节不出(单报告恒非空,零扰动)
+        irows = [["barrier", "FV", "RAW"]] + [[r["barrier"], f"{r['fv']:.3f}", f"{r['raw']:.2f}"] for r in data["importance"].get("C5", [])]
+        it = Table(irows); it.setStyle(grid_style())
+        story += [Paragraph("屏障重要度 FV/RAW(C5)" if cn else "Barrier importance FV/RAW (C5)", h2), it, Spacer(1, 8)]
 
     srows = [["seq", "path", "Cx", "freq/yr"]]
     for s in data.get("sequences", []):
@@ -342,6 +457,20 @@ def report_pdf(data: dict, scenario_name: str, tree_png: bytes | None,
         if img.drawWidth > maxw:
             img.drawHeight = img.drawHeight * maxw / img.drawWidth; img.drawWidth = maxw
         story += [Paragraph("事件树" if cn else "Event tree", h2), img, Spacer(1, 8)]
+    if agg:   # 页脚证据块:逐树分解表 + 逐树基准注记 + 免责三句(§2.1/§2.2)
+        story += [Paragraph((f"逐树分解({mark};各行为点估计,分位数不可加)" if cn
+                             else f"Per-tree breakdown ({mark}; point estimates — quantiles not additive)"), h2)]
+        prow = [["tree"] + _SEV]
+        for tr in agg["per_tree"]:
+            prow.append([tr["name"]] + [f"{tr['consequences'].get(c, 0.0):.2e}" for c in _SEV])
+        ptab = Table(prow, colWidths=[6 * cm] + [2 * cm] * 5); ptab.setStyle(grid_style())
+        story += [ptab, Spacer(1, 4)]
+        for tr in agg["per_tree"]:
+            if tr.get("init_note") and cn:      # 注记为中文文本,无 CJK 字体时略去(避免乱码)
+                story += [Paragraph(f"※ {tr['name']} 初因口径:{tr['init_note']}", nm)]
+        for s in (_AGG_DISCLOSURES if cn else _AGG_DISCLOSURES_EN):
+            story += [Paragraph("⚠ " + s, nm)]
+        story += [Spacer(1, 4)]
     story += [Spacer(1, 8), Paragraph(_DISCLAIMER if cn else
               "Built-in failure/PFD values are public reference magnitudes; calibrate to project data & regulations.", nm)]
     if evidence:

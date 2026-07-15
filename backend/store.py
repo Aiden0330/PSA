@@ -340,12 +340,18 @@ def portfolio() -> list[dict]:
                 if isinstance(cons, dict):
                     settings = json.loads(cr["settings_json"] or "{}")
                     consequences = {k: float(cons.get(k, 0.0)) for k in ("C1", "C2", "C3", "C4", "C5")}
+                    # spec A §2.4:scope 标识全表面。旧案例无 scope 键 → 语义 = single(零迁移);
+                    # checked_set 时 tree_count = 勾选场景数,前端徽章「聚合 n 树」替代场景名。
+                    scope = settings.get("scope", "single")
                     latest_case = {
                         "id": cr["id"], "kind": cr["kind"], "consequences": consequences,
                         "version_hash": cr["content_hash"], "created_at": cr["created_at"],
                         # 域评审 F2:数字口径 = 该案例覆盖的事件树(场景),非项目全部 ETA 之和。
-                        # 场景名透传供前端披露;聚合范围钉扎(按勾选集合并)记 ROADMAP。
+                        # 场景名透传供前端披露;聚合案例(checked_set)以徽章披露口径。
                         "scenario": settings.get("scenario_name"),
+                        "scope": scope,
+                        "tree_count": (len(settings.get("scenarios") or [])
+                                       if scope == "checked_set" else None),
                         "risk": report_export.risk_placement(consequences),
                     }
             out.append({"uuid": uuid, "name": p["name"], "versions": p["versions"],

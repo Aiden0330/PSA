@@ -80,10 +80,33 @@ class EtQuantifyResponse(BaseModel):
     sequences: dict[str, float]
     consequences: dict[str, float]
 
+class TreeSpec(BaseModel):
+    """勾选集聚合(spec A)的单棵事件树载荷:与单树请求同形的每树字段 + 场景身份(key/name)
+    + 可选口径注记(init_note,报告页脚逐树分解用)。labels/consequence_defs 仅报告路径消费。"""
+    key: str
+    name: str
+    init_event: str
+    init_frequency: float
+    functional_events: list[FuncEventIn]
+    fault_trees: dict[str, Any] = {}
+    parameters: dict[str, Any] = {}
+    sequences: list[dict]
+    consequence_bins: dict[str, str]
+    ccf_groups: list[dict[str, Any]] = []
+    house_states: dict[str, bool] = {}
+    boundary_condition_sets: list[dict[str, Any]] = []
+    boundary_condition_set: Optional[str] = None
+    labels: dict[str, str] = {}
+    consequence_defs: dict[str, str] = {}
+    init_note: Optional[str] = None            # 初因频率基准注记(spec B),页脚逐树分解带出
+
 class EtUncertaintyRequest(EtQuantifyRequest):
     samples: int = 1000
     seed: int = 42
     error_factor: float = 3.0
+    # 勾选集聚合(spec A):默认 single 零扰动;checked_set 时按 trees[] 联合抽样聚合。
+    scope: Literal["single", "checked_set"] = "single"
+    trees: list[TreeSpec] = []
 
 class SaveWorkspaceRequest(BaseModel):
     name: str
