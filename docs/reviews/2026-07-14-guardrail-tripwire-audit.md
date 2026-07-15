@@ -46,3 +46,12 @@ CCF 一致性恒等式性质测试 + 组规模>6 拒绝 ✅ · CUDD 对拍 1e-12
   CLAUDE.md「后 Fable 运行规则」中显式标注为过程/ADR 守护。
 - 本审计与 CI 四作业(py/benchmark/CUDD/前端)共同构成低阶模型时代的物理门;
   GitHub 远程建立后 CI 即时生效。
+
+## 附:CI 首跑发现(2026-07-15)
+
+首次 GitHub Actions 运行暴露一类本审计遗漏的绊线盲区:**依赖未追踪数据的测试**。
+`test_real_archive_roundtrip_lossless` 读取 `saved/5d6520ef.json`(gitignored 的
+本机真实存档)——开发机全绿、CI FileNotFoundError。修复:文件存在才跑(skipif +
+原因说明),无损保证在 CI 由同文件的合成富载荷测试覆盖。教训入册:**新测试引用
+仓库文件时,必须确认该文件被 git 追踪**;本机"干净 venv 复现"不等于"干净克隆
+复现"(工作目录里的 gitignored 数据仍可见)。

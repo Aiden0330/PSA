@@ -3,6 +3,8 @@ import copy
 import json
 import os
 
+import pytest
+
 from backend.canonical import to_canonical, to_v2, content_hash
 
 PUUID = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
@@ -67,6 +69,10 @@ def _rich_payload():
     }
 
 
+@pytest.mark.skipif(not os.path.exists(_SAVED), reason=(
+    "真实存档属本机未追踪数据(saved/ 在 .gitignore)——这是迁移期在开发机上的"
+    "额外保真检查,CI/新克隆由 test_rich_payload_roundtrip_lossless 以合成富载荷"
+    "覆盖同一无损保证(CI 首跑发现,2026-07-15)"))
 def test_real_archive_roundtrip_lossless():
     with open(_SAVED, encoding="utf-8") as f:
         payload = json.load(f)["payload"]
