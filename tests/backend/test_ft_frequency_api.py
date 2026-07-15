@@ -83,3 +83,43 @@ def test_ft_source_payload_roundtrips_lossless_with_frequency_params():
     dumped = doc.model_dump(mode="json")
     kinds = {p["ref"]: p["kind"] for t in dumped["event_trees"] for p in t["parameters"]}
     assert kinds.get("F_BMS") == "frequency" and kinds.get("Q_ALARM") == "probability"
+
+
+def _shared_initiator_model():
+    """OR(AND(I,A), AND(I,B)),λ=0.1,qA=0.6,qB=0.7 —— 规格 2026-07-14 锚点 A。"""
+    nodes = [{"id": "I", "basic": True, "param_ref": "I"},
+             {"id": "A", "basic": True, "param_ref": "A"},
+             {"id": "B", "basic": True, "param_ref": "B"},
+             {"id": "G1", "op": "and", "args": ["I", "A"]},
+             {"id": "G2", "op": "and", "args": ["I", "B"]},
+             {"id": "TOP", "op": "or", "args": ["G1", "G2"]}]
+    params = [{"id": "I", "kind": "frequency", "value": 0.1},
+              {"id": "A", "kind": "probability", "value": 0.6},
+              {"id": "B", "kind": "probability", "value": 0.7}]
+    return {"model_data": {"parameters": params},
+            "fault_trees": [{"name": "__init__", "top": "TOP", "nodes": nodes}]}
+
+
+def test_frequency_endpoint_exact_method():
+    """method=exact:头条 0.088(≤ λ=0.1 物理上界),by_initiator 携带 P(E);默认仍 sum。"""
+    m = _shared_initiator_model()
+    r_sum = client.post("/api/ft/frequency", json={"model": m, "fault_tree": "__init__"})
+    r_ex = client.post("/api/ft/frequency",
+                       json={"model": m, "fault_tree": "__init__", "method": "exact"})
+    assert r_sum.status_code == 200 and r_ex.status_code == 200
+    s, e = r_sum.json(), r_ex.json()
+    assert s["method"] == "sum" and abs(s["frequency"] - 0.13) < 1e-12
+    assert s.get("by_initiator") is None                      # sum 不带逐初因块
+    assert e["method"] == "exact" and abs(e["frequency"] - 0.088) < 1e-12
+    assert e["frequency"] <= 0.1 + 1e-15
+    bi = e["by_initiator"]
+    assert len(bi) == 1 and bi[0]["initiator"] == "I"
+    assert abs(bi[0]["enabling_probability"] - 0.88) < 1e-12
+    assert len(e["cutsets"]) == 2                             # 溯源列表两模式同形
+
+
+def test_frequency_endpoint_rejects_unknown_method():
+    r = client.post("/api/ft/frequency",
+                    json={"model": _shared_initiator_model(), "fault_tree": "__init__",
+                          "method": "fuzzy"})
+    assert r.status_code == 422                               # pydantic Literal 校验

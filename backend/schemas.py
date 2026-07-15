@@ -32,6 +32,7 @@ class FtFrequencyRequest(BaseModel):
     model: dict[str, Any]
     fault_tree: str
     cutoff: float = 0.0
+    method: Literal["sum", "exact"] = "sum"   # exact = 逐初因使能析取 BDD(Gap 9,规格 2026-07-14)
     # limit_order 有意不提供:频率通道的头条数字 = Σ 割集,阶截断直接咬掉头条
     # (不同于概率通道的精确 P 不受影响)——静默低估不可接受(engine-review F2)。
 
@@ -41,9 +42,17 @@ class FreqCutSetOut(BaseModel):
     frequency: float
     initiator: str                     # 该割集中唯一的频率事件(每割集一频率规则)
 
+class InitiatorRowOut(BaseModel):
+    initiator: str
+    rate: float                        # λ_i /yr
+    enabling_probability: float        # P(该初因使能析取),BDD 精确
+    frequency: float                   # λ_i × P
+
 class FtFrequencyResponse(BaseModel):
-    frequency: float                   # /yr,Σ 割集频率
+    frequency: float                   # /yr;sum=Σ 割集(post-cutoff),exact=Σ 初因 λ·P(全割集口径;cutoff=0 时 ≤ sum)
+    method: Literal["sum", "exact"] = "sum"
     cutsets: list[FreqCutSetOut]
+    by_initiator: list[InitiatorRowOut] | None = None   # 仅 exact
 
 class FuncEventIn(BaseModel):
     id: str

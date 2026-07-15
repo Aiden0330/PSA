@@ -99,11 +99,12 @@ def api_quantify(req: schemas.QuantifyRequest, _=Depends(require_role(*ANALYST))
 @app.post("/api/ft/frequency", response_model=schemas.FtFrequencyResponse)
 def api_ft_frequency(req: schemas.FtFrequencyRequest, _=Depends(require_role(*ANALYST))):
     """初因事件故障树 → 频率(/yr)。每割集恰好一个频率事件(kind=frequency),
-    其余为使能概率;F = Σ 割集频率。规则违规/量纲错误 → 400(响亮,绝不静默近似)。"""
+    其余为使能概率;method=sum:F = Σ 割集频率;method=exact:逐初因使能析取 BDD,
+    F = Σ λ_i·P_i(≤ Σλ 物理上界;全割集口径,cutoff 只滤展示列表)。规则违规/量纲错误 → 400(响亮,绝不静默近似)。"""
     from psaengine.quantify.frequency import FrequencyRuleError, fault_tree_frequency
     model = load_model_from_dict(req.model)
     try:
-        r = fault_tree_frequency(model, req.fault_tree, cutoff=req.cutoff)
+        r = fault_tree_frequency(model, req.fault_tree, cutoff=req.cutoff, method=req.method)
     except FrequencyRuleError as e:
         raise HTTPException(400, f"频率树规则违规:{e}")
     except KeyError as e:
