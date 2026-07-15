@@ -262,6 +262,26 @@
   账本:IE 行残留仅剩 load-time lint;悬置项仅剩 AI 首跑(API key)与序列级 LFT
   (Fable 规格先行)。附带发现挂链:task_75694c92(导出改写项目名,证据链相邻)。
 
+- **Parity 缺口清零:LFT 序列集成 + Gap 7/8 + 导出改名修复(2026-07-15,用户点题
+  "complete 2,3,4 with fable and/or Opus")**:④ `6e455ee` 钉扎不再改写项目名(rename
+  仅显式保存路径,重复芯片会话零提交退场)。② **序列级 LFT 集成**(Fable 亲做):
+  `ed90116` 实现 rate(s)=Σλ_i·P(E_i∧Path_s) 合并 BDD(锚点 C:两段式给物理不可能
+  序列 1.44e-4、低估失败序列 3.6×;守恒 Σ=F_exact;暴力真值表双锚)→ engine-reviewer
+  round-1 **FAIL**(数学全对但合并无护栏:六类 id 碰撞静默错数,最重 88× 低估@200,
+  两类绕过自声明守卫)→ `8e5f8ec` 碰撞护栏(同 id 仅限同参数基本事件)+ 频率参数
+  逃逸点名 400 + IE 块参数覆盖拒绝 + "逐位"措辞第三次修正 + 共享 helper → round-2
+  **PASS**(原探针复跑全数点名拒绝,合法共享 P7-P11 逐位不扰动);`c44f7f6` 前端
+  lint 翻转(共享=工作场景,集成口径渲染,400 逐字上屏,fe 320)。③ **Gap 7**:
+  Opus 语义卷宗(MEF/SCRAM 源码/XFTA 书/Rausand,全一手)→ `365e7e5` 四精确 Q(t)
+  模型 + exchange 替换 → 评审轻扫 **FAIL**(G1 periodic_test 灾难性消去:x=1e-9
+  56× 高估、772/2000 点**负值**静默入概率通道,常规锚点结构上看不见;G2 exchange
+  REA 双计)→ `faaecbf` 泰勒级数+expm1+Decimal-60 逐点锚+[0,1] 性质锁、事件集去重
+  → round-3 **PASS**(机器精度复验,交界无缝 2.2e-12)→ `817706d` weibull 统一
+  expm1,β=1 逐位退化恢复为锁定不变量;风险监视器有据收窄出 parity。**Gap 8**:
+  Opus UI 批 `5cf3a87`+`6b1c59c`(bc-set 管理器/ETA ⚙ 面板/CCF 分组选择器,真实
+  网络载荷实测,旧档零迁移锁)。`9a291c9` uv.lock 刻意重生成(自 auth B2 起 stale)。
+  **账本 Gaps 表清零**,v2 候选五项记档。基线:py 402 · fe 320 · 基准 24/24 逐位。
+
 ---
 
 ### 0.1 上一基线:2026-06-30(Windows,历史记录)

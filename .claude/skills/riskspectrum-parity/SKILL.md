@@ -28,17 +28,30 @@ ledger is the single place that answers "how far are we?" — keep it current.
 | **Analysis cases** (report + uncertainty + importance auto-pin) | ✅ 2026-07-09 | version hash + engine version + settings + results per run; audit actions; dossier ledgers |
 | **Model compare / diff** | ✅ 2026-07-09 | Identity-keyed structural diff over canonical versions + dossier compare view. tests/backend/test_diff.py |
 | CUDD backend correctness (coherent + non-coherent) | ✅ 2026-07-09 · **Linux CI 阻断门 2026-07-15** | dd.cudd built on macOS arm64 + GitHub Actions Linux 源码编译(--fetch --cudd)首跑即过,continue-on-error 已移除(Gap 6b 收口);complement-mark cofactor fix + NOT/XOR/success-branch locks; 1000-event closed-form; iterative Shannon traversal |
+| **Sequence-level LFT integration**(序列级完整链接故障树) | ✅ **exceeds** 2026-07-15 | rate(s)=Σλ_i·P(E_i∧Path_s) 合并 BDD 精确(IE 使能与屏障共享事件自动正确,成功分支精确否定);守恒 Σ_s=F_exact;锚点 C:两段式把物理不可能的成功序列算出 1.44e-4、失败序列低估 3.6×——集成通道恒零/精确。engine-reviewer 两轮(round-1 FAIL 六类 id 碰撞静默错数 88×@200 → 碰撞护栏+六锁 → round-2 PASS,合法共享逐位不扰动);前端 lint 翻转为路由(fe 320 实测集成口径渲染+400 逐字上屏);spec 2026-07-15-sequence-lft-integration.md |
+| **Exact Q(t) reliability models**(exponential/GLM/Weibull/periodic-test) | ✅ 2026-07-15 | MEF/SCRAM/XFTA 同式四模型为新 kind(旧三线性化 300 例逐位不变);periodic_test 灾难性消去被审查抓获(x=1e-9 曾 56× 高估、772/2000 点负值)→ 泰勒级数+expm1,Decimal-60 逐点锚+q̄∈[0,1] 500 例性质锁;weibull β=1 与 exponential 逐位退化恢复为锁定不变量;两轮评审 FAIL→PASS;spec 2026-07-15-gap7-qt-models-exchange.md |
+| **Exchange events**(MEF 替换三联补齐) | ✅ 2026-07-15 | PostRule kind=exchange(XFTA §7.2:唯一不可布尔编译的替换,恰属 MCS-list 后处理通道,精确 BDD 通道不动);×q_t/q_s 集合语义 + 事件集去重防 REA 双计(评审 G2);regime-A 参数重绑定后门 v1 响亮拒绝;MEF define-substitution XML I/O 记 v2 |
+| **Analysis-settings UI 全套**(bc-set 管理器 + ETA 侧 house/bc + CCF 分组选择器) | ✅ 2026-07-15(Gap 8 收口) | 命名边界条件集 CRUD(模型内持久化,undo 历史内,旧档零迁移往返锁)+ ETA ⚙ 弹出面板(house 覆盖/bc 集经 quantify+importance 真实载荷实测)+ CCF 成员选择器按源树分组;fe 313 |
 | **Initiating-event fault trees**(手动/FTA 双通道初因) | ✅ 2026-07-13 | fault_tree_frequency:每割集恰好一个频率事件,F=Σ 率×Π使能概率(与 RS/SAPHIRE 同法);双向量纲护栏(频率参数进概率通道 raise、非相干门 NOT/XOR 拒绝、limit_order 整体移除);engine-reviewer 两轮(round-1 FAIL 6 项→整改→round-2 PASS);spec 2026-07-13-ie-fault-tree-frequency.md。**2026-07-14 增 method="exact" 逐初因精确模式**(F=Σλ_i·P(使能析取) BDD 精确,恢复物理上界 F≤Σλ;engine-reviewer 两轮 PASS,300 例随机模型 vs 独立求值器 <1e-12;spec 2026-07-14-ie-frequency-exact-mode.md)。残留:load-time 独立性 lint(UI 精确/Σ 切换 ✅ 2026-07-15 `81987e0`) |
 | **Review/sign-off workflow**(状态机级) | ✅ exceeds 2026-07-12(商用工具均为外挂配置管理流程) | reviews 状态机(signed 终态 DB 触发器、每项目单在审部分唯一索引、角色快照入审计)+ 导出门=内容寻址幂等(签发页脚 vs 工作稿自动区分);spec 2026-07-12-phase5-review-signoff-spec.md |
 | **Multi-project portfolio**(跨项目组合总览) | ✅ 2026-07-14(对标产品无对应物) | /api/portfolio 只读已钉扎案例(绝不现算);review 锚最新版 + open_review 防"看不见还能签";矩阵口径与报告同源(前后端 25 格金表互锁);domain-reviewer 落审 6 裁决 + F1/F2 修复 |
 
 ## Gaps (remaining)
 
-| # | Gap | Why it matters | Notes |
-|---|---|---|---|
-| 7 | Exchange events; time-dependent Q(t) beyond core four; risk monitor | Long tail | Defer — not needed for BESS QRA near-term |
-| 8 | Boundary-condition / post-processing / CCF-per-barrier UI(engine+API done) | Analyst ergonomics | API-first shipped 2026-07-09; UI slot: analysis settings panel |
-| 9 | ~~逐初因精确模式~~(✅ 2026-07-14 关闭,见上)→ 收窄为:**序列级完整 LFT 集成**(IE 树与屏障树共享事件 → 合并 BDD 上 λ·P(E∧路径) 的序列频率) | 共享事件场景现被前端独立性 lint 拒绝而非精确处理 | = RS 序列割集法等价物;规格 2026-07-14 §6 |
+**空(2026-07-15)** —— Gap 7/8/9 全部关闭(见上表),风险监视器经语义卷宗裁决
+**收窄出 parity 范围**(RiskWatcher 为在线运营产品;本工具为设计/评估产品,BESS 无
+核电 tech-spec 式在线 AOT 监管需求;其计算原语——点态风险=一次量化、RIF≡RAW、
+RWF≡RRW、停役≡house 强制、ICCDP 平凡后算——本仓库已全部具备)。
+
+### v2 候选(非 parity 缺口,按价值排序)
+
+| 候选 | 出处 |
+|---|---|
+| 集成模式的 MC 不确定性/屏障重要度(初因分组进抽样/扰动语义) | LFT 规格 §6 |
+| periodic-test 10 参 Complete(Markov 迭代)+ Rausand 四项工程分解 + 瞬时 Q(t) 曲线 | Gap 7 规格 §1 |
+| exchange regime-A(house 条件参数重绑定,精确且 BDD 兼容)+ MEF define-substitution XML I/O | Gap 7 卷宗 §1.2 |
+| 「配置风险 Δ」分析案例薄片(baseline 钉扎 + 强制停役 → ΔP+RAW/RRW+ICCDP) | Gap 7 卷宗 §3 |
+| 组合聚合「勾选集」不确定性 UI 触发(通道已实现无调用点) | spec A 实现报告 |
 
 ## Adjacent-tool intel (2026-07-14, TD-001 §9 调研)
 
