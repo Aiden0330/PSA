@@ -2,8 +2,11 @@ import type { EventTreeModel, FuncEvent, ConsLevel } from '../../eventtree'
 import { buildCascade, CONSEQUENCES } from '../../eventtree'
 
 // 预置 ETA 模板(4c2:自前身工具 docs/reference-assets/templates-eta-claude.ts 逐条迁移)。
-// 迁移原则(硬约束 #4):数值/单位/来源/注记逐字保留;分级仅 C/D(内置);频率均为系统级 /yr
-// (初因频率语义,无单位换算——注记里的「×电芯数折算」保留为文字,不在代码里再乘)。
+// 迁移原则(硬约束 #4):数值/单位/来源/注记逐字保留;分级仅 C/D(内置)。
+// 初因频率口径**逐模板不一**(裁决 2026-07-14,docs/superpowers/specs/2026-07-14-ie-freq-basis-adjudication.md):
+// canonical=舱级(/舱·yr);多数模板已舱级,两条 ISC 系(bess-thermal-runaway / bess-ie-isc)为站级语境
+// (注记含电芯数对账算式、勿叠加),McMicken 为案例自有基准(不可迁移)。旧头注「频率均为系统级 /yr」为错标已更正。
+// 无单位换算——注记里的「×电芯数折算」保留为文字,不在代码里再乘。
 // 模板是「可编辑起点」,量化前用户应按项目实测替换取值。
 // 结局→后果级映射沿用前身各模板 consequenceLevel:安全 C1/冒烟 C2/局部起火 C3/蔓延 C4/爆炸 C5;
 // LOPA 模板结局名与级映射为其自有(见 outcomes 覆盖)。
@@ -49,9 +52,9 @@ const B = (id: string, name: string, category: TemplateBarrier['category'], grad
 export const ETA_TEMPLATES: EtaTemplate[] = [
   {
     id: 'bess-thermal-runaway', name: 'BESS 电芯热失控(通用预置)', category: '通用',
-    init: { name: '单电芯热失控', frequency: 0.05, grade: 'C',
+    init: { name: '单电芯热失控', frequency: 0.05, grade: 'D',
       source: 'EPRI Battery Energy Storage Fire Incident Database (2023);行业公开统计',
-      note: '按 1×10⁻⁷/cell·yr × 5×10⁵ 电芯(约 10 MWh 级电站)估算为系统级频率' },
+      note: '按 1×10⁻⁷/cell·yr × 5×10⁵ 电芯(约 10 MWh 级电站)估算为系统级频率。【口径统一(裁决 2026-07-14)】canonical=舱级(/舱·yr):按电芯数对账 0.05/站·yr ÷ (5×10⁵ 站电芯 / 1×10⁴ 舱电芯) = 1e-3/舱·yr = IE_ISC 舱级先验(既解释 50× 尺度差又与库精确自洽);5×10⁵ 对应小圆柱体系假设。引用 IE_ISC 舱级先验请勿叠加;禁止按 MWh 折舱数(能量折算得 0.017–0.025/舱·yr,与库先验差 20 倍,会在工具内制造新不一致)。分级降 D:随库内同源 λ 依 F6 判定(2026-07-08:EPRI 不发布 /cell·yr 口径、原始出处不可定位)降级,派生值不高于最弱输入等级。' },
     barriers: [
       B('warning', '早期预警(AI/气体)并及时处置', 'warning', 'D', 0.1, 'C1', 'BESS 故障预警算法公开文献综述', '示例参考值'),
       B('active', 'BMS 主动保护(过温/过流停机)', 'active', 'D', 0.05, 'C2', 'IEC 61508 SIL 能力类比', 'PFD 10⁻¹–10⁻² 区间取参考值'),
@@ -65,7 +68,7 @@ export const ETA_TEMPLATES: EtaTemplate[] = [
     id: 'bess-lopa-crossdomain', name: 'BESS 热失控(跨领域 LOPA 取值)', category: 'LOPA',
     init: { name: '单舱热失控初始事件', frequency: 1e-2, grade: 'C',
       source: 'DNV GL BESS QRA (2019);跨领域可靠性综述 §7',
-      note: '按 10⁴ 颗电芯 × 1×10⁻⁶/颗·年(一般电芯)自下而上构造,落于 DNV 无防护区间 10⁻¹–10⁻²/年' },
+      note: '按 10⁴ 颗电芯 × 1×10⁻⁶/颗·年(一般电芯)自下而上构造,落于 DNV 无防护区间 10⁻¹–10⁻²/年。【口径(裁决 2026-07-14)】已为舱级(/unit·yr 同口径);对库内 IE_* 条目的差异为全集/演化子集关系,见库内 F9 注记。' },
     barriers: [
       B('detect', '探测与预警(BMS/气体+响应)', 'warning', 'C', 0.1, 'C1', 'CCPS LOPA "报警+操作员响应"通用值', 'PFD₁=0.1'),
       B('suppress', '灭火/抑制(湿式喷淋折算)', 'passive', 'C', 0.1, 'C2', 'NFPA 喷淋统计折算', 'PFD₂≈0.1(综合有效率 88–91%)'),
@@ -77,9 +80,9 @@ export const ETA_TEMPLATES: EtaTemplate[] = [
   },
   {
     id: 'bess-ie-isc', name: '内短路热失控事件树(预置)', category: '初因',
-    init: { name: '电芯内短路致热失控', frequency: 0.05, grade: 'C',
+    init: { name: '电芯内短路致热失控', frequency: 0.05, grade: 'D',
       source: 'EPRI BESS Failure Incident Database;库条目 cell-thermal-runaway',
-      note: '1×10⁻⁷/cell·yr × 5×10⁵ 电芯(约 10 MWh 级)折算系统级频率' },
+      note: '1×10⁻⁷/cell·yr × 5×10⁵ 电芯(约 10 MWh 级)折算系统级频率。【口径统一(裁决 2026-07-14)】canonical=舱级(/舱·yr):按电芯数对账 0.05/站·yr ÷ (5×10⁵ 站电芯 / 1×10⁴ 舱电芯) = 1e-3/舱·yr = IE_ISC 舱级先验(既解释 50× 尺度差又与库精确自洽);5×10⁵ 对应小圆柱体系假设。引用 IE_ISC 舱级先验请勿叠加;禁止按 MWh 折舱数(能量折算得 0.017–0.025/舱·yr,与库先验差 20 倍,会在工具内制造新不一致)。分级降 D:随库内同源 λ 依 F6 判定(2026-07-08:EPRI 不发布 /cell·yr 口径、原始出处不可定位)降级,派生值不高于最弱输入等级。' },
     barriers: [
       B('tr-detect', '热失控多参量检测(气/烟/压)', 'warning', 'C', 0.05, 'C1', 'Frontiers in Physics (2025);Sandia VOC 验证 (2024)', '库条目 warn-tr-multi,PFD 0.05'),
       B('cooling', '液冷全速降温', 'active', 'D', 0.1, 'C2', 'UL 9540A 浸没对照测试 (EticaAG 2023)', '库条目 act-liquid-cooling-max,PFD 0.1'),
@@ -91,7 +94,7 @@ export const ETA_TEMPLATES: EtaTemplate[] = [
   {
     id: 'bess-ie-insulation', name: '绝缘失效事件树(预置)', category: '初因',
     init: { name: '直流侧绝缘失效', frequency: 2e-2, grade: 'D',
-      source: 'IEEE Std 493-2007;GB 51048-2014', note: '库条目 sys-insulation-fault,推断值' },
+      source: 'IEEE Std 493-2007;GB 51048-2014', note: '库条目 sys-insulation-fault,推断值。【口径(裁决 2026-07-14)】已为舱级(/unit·yr 同口径);对库内 IE_* 条目的差异为全集/演化子集关系,见库内 F9 注记。' },
     barriers: [
       B('imd', 'IMD 绝缘监测报警', 'warning', 'D', 0.05, 'C1', 'ABB 白皮书 (2022);GB 51048-2014 第 7 章', '库条目 warn-imd,漏检 5%'),
       B('relay', '断开主继电器/接触器', 'active', 'D', 0.01, 'C1', 'IEC 61511-1:2016 SIL 1', '库条目 act-main-relay,PFD 0.01'),
@@ -102,7 +105,7 @@ export const ETA_TEMPLATES: EtaTemplate[] = [
   {
     id: 'bess-ie-overcharge', name: '电池过充事件树(预置)', category: '初因',
     init: { name: 'BMS 失效致过充', frequency: 1e-2, grade: 'C',
-      source: 'EPRI 2024 白皮书(控制系统占 46% 根因)', note: '库条目 sys-bms-overcharge' },
+      source: 'EPRI 2024 白皮书(控制系统占 46% 根因)', note: '库条目 sys-bms-overcharge。【口径(裁决 2026-07-14)】已为舱级(/unit·yr 同口径);对库内 IE_* 条目的差异为全集/演化子集关系(本值对 IE_OVERCHARGE 的 10× = F9 全集/子集),见库内 F9 注记。' },
     barriers: [
       B('high-temp', '高温预警(温度阈值)', 'warning', 'D', 0.1, 'C1', 'IEC 61511 BPCS 类比;Springer (2022)', '库条目 warn-high-temp,PFD 0.1'),
       B('protect', '过充保护切断(BMS+硬件冗余)', 'active', 'D', 0.01, 'C1', 'IEC 62619:2022 cl.5.4', '库条目 act-overcharge-protect,PFD 0.01'),
@@ -114,7 +117,7 @@ export const ETA_TEMPLATES: EtaTemplate[] = [
   {
     id: 'bess-ie-ext-heat', name: '异常热源事件树(预置)', category: '初因',
     init: { name: '异常外部热源/邻舱火灾', frequency: 1e-3, grade: 'D',
-      source: 'NFPA 855 (2023);EPRI BESS Failure DB', note: '库条目 sys-external-heat,推断值' },
+      source: 'NFPA 855 (2023);EPRI BESS Failure DB', note: '库条目 sys-external-heat,推断值。【口径(裁决 2026-07-14)】已为舱级(/unit·yr 同口径);对库内 IE_* 条目的差异为全集/演化子集关系(本值对 IE_EXT_FIRE 的 2× = F9 子集拆分),见库内 F9 注记。' },
     barriers: [
       B('high-temp', '高温预警(温度阈值)', 'warning', 'D', 0.1, 'C1', 'IEC 61511 BPCS 类比;Springer (2022)', '库条目 warn-high-temp,PFD 0.1'),
       B('cooling', '液冷全速降温', 'active', 'D', 0.1, 'C1', 'UL 9540A 浸没对照测试 (EticaAG 2023)', '库条目 act-liquid-cooling-max,PFD 0.1'),
@@ -127,7 +130,7 @@ export const ETA_TEMPLATES: EtaTemplate[] = [
     id: 'bess-case-mcmicken', name: 'APS McMicken 2019 对标(真实事故复现)', category: '案例对标',
     init: { name: '单电芯内短路致热失控', frequency: 5e-3, grade: 'D',
       source: 'DNV GL《McMicken Battery Energy Storage System Event: Technical Analysis and Recommendations》(2020)',
-      note: 'McMicken ~2 MWh LG NMC;DNV:模组内电芯异常析锂→内短触发 TR。频率按内短率×电芯数估算,仅示意;对标重点是条件结构而非 IE 频率。反循环原则:仅把 DNV 记录的物理配置事实(无电芯间热障、无泄爆/排风)编码为近失败,其余取库通用先验;详见 docs/案例对标-McMicken-2019.md' },
+      note: 'McMicken ~2 MWh LG NMC;DNV:模组内电芯异常析锂→内短触发 TR。频率按内短率×电芯数估算,仅示意;对标重点是条件结构而非 IE 频率。反循环原则:仅把 DNV 记录的物理配置事实(无电芯间热障、无泄爆/排风)编码为近失败,其余取库通用先验;详见 docs/案例对标-McMicken-2019.md。【案例自有基准(裁决 2026-07-14)】2 MWh 单舱事故语境,仅示意,不可迁移(不得作为舱级通用先验引用)。' },
     barriers: [
       B('detect', '早期离气探测+联动停机', 'warning', 'D', 0.1, 'C1', '库条目 warn-offgas-voc;DNV McMicken 报告', '口径=TR 已触发时阻止升级,略低于探测可靠性;McMicken 探测有限、未触发有效干预'),
       B('bms', 'BMS 切断/隔离', 'active', 'D', 0.1, 'C2', '库条目 act-main-relay', '单芯 TR 已自持,BMS 切断仅部分阻断模组级联'),

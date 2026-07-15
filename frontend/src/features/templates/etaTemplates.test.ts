@@ -24,9 +24,9 @@ describe('etaTemplates 迁移', () => {
     expect(m.initFreq).toBe(0.05)
     expect(m.initFreqSource).toBe('manual')
     // defect 2:初因溯源随模型带入(证据链首环不断)
-    expect(m.initGrade).toBe('C')
+    expect(m.initGrade).toBe('D')                              // 裁决 2026-07-14 §2.4:两条 ISC 初因 C→D(随库内同源 λ 依 F6 降级)
     expect(m.initSource).toContain('EPRI BESS Failure Incident Database')
-    expect(m.initEvidence).toContain('折算系统级频率')
+    expect(m.initEvidence).toContain('折算系统级频率')          // 原站级推导文字保留(注记为 APPEND,值不改)
     // defect 4/R1:终态文字随模板带入,且**展示路径**(consText 读 consequences)即刻正确,
     // 建页无需 save/reload normalize —— 断言展示函数,而非仅字段
     expect(consText(m, 'C2')).toBe('冒烟(可控热失控)')
@@ -83,5 +83,58 @@ describe('etaTemplates 迁移', () => {
     expect(info).toHaveLength(7)
     expect(info.map((i) => i.id)).toContain('bess-case-mcmicken')
     expect(info.every((i) => i.category)).toBe(true)
+  })
+})
+
+// 绊线:初因频率口径逐模板裁决台账(spec 2026-07-14 §3)。
+// 把「口径」从自由文本升级为显式映射表——新模板不进表即红,注记退化即红。
+describe('IE 频率口径裁决台账(绊线,spec 2026-07-14)', () => {
+  // 逐模板期望基准硬编码(裁决 §1 对账表)。改此表须有对应规格。
+  const EXPECTED_BASIS: Record<string, '舱级' | '系统级' | '案例自有'> = {
+    'bess-thermal-runaway': '系统级',
+    'bess-ie-isc': '系统级',
+    'bess-case-mcmicken': '案例自有',
+    'bess-lopa-crossdomain': '舱级',
+    'bess-ie-insulation': '舱级',
+    'bess-ie-overcharge': '舱级',
+    'bess-ie-ext-heat': '舱级',
+  }
+
+  it('每个模板 id 都在口径台账内(新模板未登记 → 红)', () => {
+    for (const t of ETA_TEMPLATES) {
+      expect(EXPECTED_BASIS[t.id], `模板 ${t.id} 未登记 IE 口径:请补台账 + 加注记(spec §2/§3)`).toBeDefined()
+    }
+    // 反向:台账不得含幽灵 id
+    for (const id of Object.keys(EXPECTED_BASIS)) {
+      expect(getTemplate(id), `台账登记了不存在的模板 ${id}`).toBeDefined()
+    }
+  })
+
+  it('系统级模板:注记含电芯数换算算式(×/÷ + cells/电芯)+「勿叠加」;分级已降 D + 引 F6', () => {
+    const sysIds = Object.entries(EXPECTED_BASIS).filter(([, b]) => b === '系统级').map(([id]) => id)
+    expect(sysIds).toEqual(['bess-thermal-runaway', 'bess-ie-isc'])   // 只有两条 ISC 系是站级语境
+    for (const id of sysIds) {
+      const t = getTemplate(id)!
+      const note = t.init.note ?? ''
+      expect(note, `${id} 缺电芯数换算算式`).toMatch(/[×÷][^。]*(?:电芯|cells)/)   // 换算算式模式
+      expect(note, `${id} 缺「勿叠加」`).toContain('勿叠加')
+      expect(t.init.grade, `${id} 初因分级须为 D(§2.4 F6 降级)`).toBe('D')
+      expect(note, `${id} 注记须交叉引用 F6`).toContain('F6')
+    }
+  })
+
+  it('案例自有模板(McMicken):注记声明「不可迁移」', () => {
+    const caseIds = Object.entries(EXPECTED_BASIS).filter(([, b]) => b === '案例自有').map(([id]) => id)
+    expect(caseIds).toEqual(['bess-case-mcmicken'])
+    for (const id of caseIds) {
+      expect(getTemplate(id)!.init.note ?? '', `${id} 缺「不可迁移」`).toContain('不可迁移')
+    }
+  })
+
+  it('舱级模板:注记引库内 F9 全集/子集口径(已舱级,值不改)', () => {
+    const cabinIds = Object.entries(EXPECTED_BASIS).filter(([, b]) => b === '舱级').map(([id]) => id)
+    for (const id of cabinIds) {
+      expect(getTemplate(id)!.init.note ?? '', `${id} 缺 F9 引注`).toContain('F9')
+    }
   })
 })
