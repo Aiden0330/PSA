@@ -46,7 +46,7 @@ function prepareCanvasForExport(svg: SVGSVGElement): SVGSVGElement {
  */
 export function EventTreeEditor(
   { model, onChange, linked, fts, ftsApi, pfds, onAttachFt, onDetachFt, onFtEdited, libBarriers, libComponents,
-    etaSummaries = [], aggregateTotals, onSelectEta, onToggleEta, onAddBarrier, onEditInitFt, getReportContext }: {
+    etaSummaries = [], aggregateTotals, onSelectEta, onToggleEta, onAddBarrier, onEditInitFt, getReportContext, etEngineOptions }: {
     model: EventTreeModel; onChange: (m: EventTreeModel) => void; linked?: Linked
     fts?: any; ftsApi?: Api; pfds?: Record<string, number>
     onAttachFt?: (idx: number) => void; onDetachFt?: (idx: number) => void; onFtEdited?: (feId: string) => void
@@ -57,6 +57,9 @@ export function EventTreeEditor(
     onEditInitFt?: () => void
     /** ADR-2 报告钉扎:随导出请求提交项目上下文 → 后端 auto-pin 版本 + 案例 + 证据页脚 */
     getReportContext?: () => { project_uuid: string; project_payload: unknown }
+    /** 4c/Gap8:ETA 分析设置(house 覆盖 / 命名边界条件集)—— 套用到引擎精确量化与重要度;
+     *  空对象即零扰动(不含 post 规则:那是 FTA 专属)。导出/报告路径不消费,保持既有口径。 */
+    etEngineOptions?: { house_states?: Record<string, boolean>; boundary_condition_set?: string; boundary_condition_sets?: unknown[] }
   },
 ) {
   const [sel, setSel] = useState<string[] | null>(null)
@@ -140,14 +143,14 @@ export function EventTreeEditor(
 
   const onEngineQuantify = async () => {
     setQBusy(true); setQErr(null)
-    try { setEngineSeq((await quantifyEventTree(toEngineRequest(model, linked))).sequences) }
+    try { setEngineSeq((await quantifyEventTree({ ...toEngineRequest(model, linked), ...(etEngineOptions ?? {}) })).sequences) }
     catch (e: any) { setQErr(String(e?.message ?? e)) }
     finally { setQBusy(false) }
   }
   const onDeepen = async () => {
     setDeepBusy(true); setQErr(null)
-    // 4a4:携带项目上下文 → 重要度运行自动钉扎为分析案例(证据链)
-    try { const im = await importanceEventTree({ ...toEngineRequest(model, linked), ...(getReportContext?.() ?? {}) }); setImp(im.importance) }
+    // 4a4:携带项目上下文 → 重要度运行自动钉扎为分析案例(证据链);Gap8:同带边界条件设置
+    try { const im = await importanceEventTree({ ...toEngineRequest(model, linked), ...(etEngineOptions ?? {}), ...(getReportContext?.() ?? {}) }); setImp(im.importance) }
     catch (e: any) { setQErr(String(e?.message ?? e)) }
     finally { setDeepBusy(false) }
   }

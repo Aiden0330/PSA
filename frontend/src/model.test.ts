@@ -59,3 +59,24 @@ describe('addFaultTree / deleteFaultTree', () => {
     expect(addFaultTree(emptyM(), '   ').fault_trees[0].name).toBe('新建 FTA')
   })
 })
+
+import { setBcSets } from './model'
+import type { BcSetJson } from './model'
+
+describe('setBcSets(命名边界条件集)', () => {
+  const sets: BcSetJson[] = [{ name: '检修', house_states: { H_MAINT: true } }]
+  it('非空 → 写入 boundary_condition_sets 键', () => {
+    const m = setBcSets(emptyM(), sets)
+    expect(m.boundary_condition_sets).toEqual(sets)
+  })
+  it('空数组 → 删除该键(保持从未用过 bc-set 的模型形状)', () => {
+    const withSets = setBcSets(emptyM(), sets)
+    const cleared = setBcSets(withSets, [])
+    expect('boundary_condition_sets' in cleared).toBe(false)
+  })
+  it('不改原对象', () => {
+    const m0 = emptyM()
+    setBcSets(m0, sets)
+    expect('boundary_condition_sets' in m0).toBe(false)
+  })
+})

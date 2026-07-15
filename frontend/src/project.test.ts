@@ -116,6 +116,28 @@ describe('project FMEA 字段', () => {
   })
 })
 
+describe('project 命名边界条件集(bc-set)随 fts 不透明往返', () => {
+  const ftsWithBc: ModelJson = {
+    model_data: { parameters: [{ id: 'A', kind: 'probability', value: 0.2 }] },
+    fault_trees: [{ name: 'B1', top: 'TOP', nodes: [{ id: 'H_MAINT', house: true, state: false }, { id: 'TOP', op: 'or', args: [] }] }],
+    boundary_condition_sets: [{ name: '检修', house_states: { H_MAINT: true } }],
+  }
+  it('eta.fts 内的 boundary_condition_sets 序列化 → 反序列化逐字段保留', () => {
+    const eta = { ...mkEta('a', 'A'), fts: ftsWithBc }
+    const got = deserializeProject(serializeProject([eta], 'a', { a: true }), 'x')
+    expect(got.etas[0].fts.boundary_condition_sets).toEqual([{ name: '检修', house_states: { H_MAINT: true } }])
+  })
+  it('userFts 内的 boundary_condition_sets 往返保留', () => {
+    const got = deserializeProject(serializeProject([mkEta('a', 'A')], 'a', { a: true }, ftsWithBc), 'x')
+    expect(got.userFts?.boundary_condition_sets).toEqual([{ name: '检修', house_states: { H_MAINT: true } }])
+  })
+  it('旧档 fts 无该键 → 反序列化后仍无该键(缺省兼容,零迁移)', () => {
+    const legacyFts: ModelJson = { model_data: { parameters: [] }, fault_trees: [] }
+    const got = deserializeProject(serializeProject([{ ...mkEta('a', 'A'), fts: legacyFts }], 'a', { a: true }), 'x')
+    expect('boundary_condition_sets' in got.etas[0].fts).toBe(false)
+  })
+})
+
 describe('project ETA 复制', () => {
   it('复制指定 ETA 到原页签后方并深拷贝运行数据', () => {
     const src = mkEta('a', 'ETA A')

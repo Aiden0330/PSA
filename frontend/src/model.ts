@@ -14,11 +14,14 @@ export interface FtNodeJson {
 export interface ParamJson { id: string; kind: string; value: number; [k: string]: any }
 export interface FaultTreeJson { name: string; top: string; nodes: FtNodeJson[] }
 export interface CcfGroupJson { id: string; members: string[]; model: string; factors: Record<string, number>; staggered?: boolean }
+/** 命名边界条件集(4a2):一组 house 事件的强制状态,量化时按名整体套用。随模型 JSON 不透明往返。 */
+export interface BcSetJson { name: string; house_states: Record<string, boolean> }
 export interface ModelJson {
   model_data: { parameters: ParamJson[] }
   fault_trees: FaultTreeJson[]
   event_trees?: any[]
   ccf_groups?: CcfGroupJson[]
+  boundary_condition_sets?: BcSetJson[]
 }
 
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
@@ -113,6 +116,13 @@ export function updateParam(m: ModelJson, id: string, value: number): ModelJson 
 }
 export function setCcf(m: ModelJson, groups: CcfGroupJson[]): ModelJson {
   const nm = clone(m); nm.ccf_groups = groups; return nm
+}
+/** 覆写模型的命名边界条件集。空数组 → 删除该键,保持从未用过 bc-set 的模型形状(旧档往返零扰动)。 */
+export function setBcSets(m: ModelJson, sets: BcSetJson[]): ModelJson {
+  const nm = clone(m)
+  if (sets.length) nm.boundary_condition_sets = sets
+  else delete nm.boundary_condition_sets
+  return nm
 }
 
 /** 为某 ETA 屏障在 fts 中建启动故障树(名=feId, OR 门 + 1 基本事件=当前 PFD)。 */

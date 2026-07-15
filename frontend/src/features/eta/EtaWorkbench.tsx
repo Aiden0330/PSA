@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { quantify, ftFrequency } from '../../api'
 import type { ScenarioItem, LibraryData } from '../../api'
@@ -7,7 +7,10 @@ import type { EtaSummary } from '../../components/EventTreeEditor'
 import { AiDraftPanel } from '../../components/AiDraftPanel'
 import { Icon } from '../../components/icons'
 import { newBlankEta, addFe, branchLeaf, setConsequence, CONSEQUENCES, consLevel } from '../../eventtree'
-import { attachStarterFt, sharedIeBarrierEvents } from '../../model'
+import { attachStarterFt, sharedIeBarrierEvents, setBcSets } from '../../model'
+import { AnalysisSettingsPanel } from '../analysis/AnalysisSettingsPanel'
+import { EMPTY_SETTINGS, settingsActive, listHouseEventsUnion, toEtEngineOptions } from '../analysis/analysisSettings'
+import type { AnalysisSettings } from '../analysis/analysisSettings'
 import { duplicateProjectEta } from '../../project'
 import { buildScenarioTab } from '../persistence/scenarioLoader'
 import { getTemplate, listTemplates, templateToEtaModel } from '../templates/etaTemplates'
@@ -38,6 +41,27 @@ export function EtaWorkbench(
 ) {
   const { etaTabs, activeKey, checkedKeys, etModel, etFtsModel, pfds, writeEtModel, activeEta, P, docUndo, docRedo, docCanUndo, docCanRedo } = useActiveEta()
   const [templateNotice, setTemplateNotice] = useState<string | null>(null)
+
+  // Gap8:ETA 分析设置(house 覆盖 / 命名边界条件集)—— 复用 FTA 的 AnalysisSettingsPanel(隐藏后处理规则)。
+  // house 事件 = 各屏障 linkFt 故障树的 house 节点并集(引擎合并 PDAG 后按 id 全局覆盖);
+  // 命名集定义随 etFtsModel(bcSets),选择/house 覆盖是分析设置(每 ETA 独立,切页重置)。
+  const [settings, setSettings] = useState<AnalysisSettings>(EMPTY_SETTINGS)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsPopRef = useRef<HTMLDivElement>(null)
+  const linkedFtNames = (etModel?.functionalEvents ?? []).map((fe) => fe.linkFt).filter((n): n is string => !!n)
+  const etaHouses = listHouseEventsUnion(etFtsModel, linkedFtNames)
+  const etaBcSets = etFtsModel.boundary_condition_sets ?? []
+  const etEngineOptions = toEtEngineOptions(settings, etaBcSets)
+  // 切换活动 ETA → 重置分析设置(house 事件/命名集按 ETA 而异,不跨页携带)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setSettings(EMPTY_SETTINGS); setSettingsOpen(false) }, [activeKey])
+  // 弹出面板外点击关闭(与 FtaWorkbench/MenuBar 同款既有模式)
+  useEffect(() => {
+    if (!settingsOpen) return
+    const onDoc = (e: MouseEvent) => { if (settingsPopRef.current && !settingsPopRef.current.contains(e.target as Node)) setSettingsOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [settingsOpen])
 
   const selectEta = (key: string) => { if (key !== activeKey && etaTabs.some((t) => t.key === key)) P().setActive(key) }
   const onToggleEta = (key: string) => P().toggleChecked(key)
@@ -149,6 +173,20 @@ export function EtaWorkbench(
         <div style={ribbonDiv} />
         <button onClick={onAddBarrier} disabled={!etModel} className="psa-btn psa-btn--primary"><Icon name="plus" size={14} />添加屏障</button>
         <button onClick={() => ai.setAiOpen(!ai.aiOpen)} disabled={!etModel} className="psa-btn" title="打开 AI 建模助手"><Icon name="bolt" size={14} />AI 建模助手</button>
+        {/* Gap8:分析设置弹出面板(house 覆盖 / 命名边界条件集)—— 套用到「引擎精确量化」与「深化分析」重要度 */}
+        <div ref={settingsPopRef} style={{ position: 'relative' }}>
+          <button type="button" onClick={() => setSettingsOpen((v) => !v)} disabled={!etModel} className="psa-btn"
+            title="边界条件(house 覆盖)与命名边界条件集——套用到引擎精确量化 / 重要度">
+            ⚙ 分析设置{settingsActive(settings) && <span style={settingsDot} />}
+          </button>
+          {settingsOpen && (
+            <div className="exp-popover">
+              <AnalysisSettingsPanel houses={etaHouses} basicEvents={[]} settings={settings} onChange={setSettings}
+                bcSets={etaBcSets} onBcSetsChange={(sets) => P().setEtaFts(activeKey, setBcSets(etFtsModel, sets))}
+                showPostRules={false} />
+            </div>
+          )}
+        </div>
         <AiAppliedPill ai={ai} />
         <button onClick={docUndo} disabled={!docCanUndo} title="撤销" className="psa-btn" style={{ width: 30, padding: 0, justifyContent: 'center' }}><Icon name="undo" size={15} /></button>
         <button onClick={docRedo} disabled={!docCanRedo} title="重做" className="psa-btn" style={{ width: 30, padding: 0, justifyContent: 'center' }}><Icon name="redo" size={15} /></button>
@@ -262,7 +300,7 @@ export function EtaWorkbench(
             libBarriers={lib?.barrier_effectiveness ?? []} libComponents={lib?.component_failure_rates ?? []}
             etaSummaries={summaries} aggregateTotals={aggregateTotals}
             onSelectEta={selectEta} onToggleEta={onToggleEta} onAddBarrier={onAddBarrier}
-            onEditInitFt={onEditInitFt} getReportContext={getReportContext} />
+            onEditInitFt={onEditInitFt} getReportContext={getReportContext} etEngineOptions={etEngineOptions} />
         )}
       </div>
 
@@ -290,6 +328,7 @@ export function EtaWorkbench(
 // R4a:ribbon 背景改纯白(与 mockup .ribbon{background:#fff} 对齐;.psa-btn 本身已是浅色,无需换皮)
 const etaToolbar: CSSProperties = { minHeight: 46, flexShrink: 0, background: 'var(--psa-surface)', borderBottom: '1px solid var(--psa-line-2)', display: 'flex', alignItems: 'center', padding: '8px 14px', columnGap: 10, rowGap: 8, flexWrap: 'wrap' }
 const ribbonSelect: CSSProperties = { height: 30, border: '1px solid var(--psa-line-strong)', borderRadius: 7, padding: '0 8px', fontSize: 12.5, color: 'var(--psa-ink)', background: 'var(--psa-surface)' }
+const settingsDot: CSSProperties = { display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--psa-primary)', marginLeft: 6, verticalAlign: 'middle' }
 const ribbonDiv: CSSProperties = { width: 1, height: 22, background: 'var(--psa-line-2)' }
 const etaTabsRow: CSSProperties = { minHeight: 42, flexShrink: 0, background: 'var(--psa-bg)', borderBottom: '1px solid var(--psa-line-2)', display: 'flex', alignItems: 'flex-end', padding: '0 12px', gap: 3, flexWrap: 'wrap' }
 const etaTabStyle = (active: boolean): CSSProperties => ({ display: 'flex', alignItems: 'center', gap: 7, height: 34, padding: '0 10px 0 14px', borderRadius: '8px 8px 0 0', background: active ? 'var(--psa-surface)' : 'var(--psa-line)', border: `1px solid ${active ? 'var(--psa-line-2)' : 'transparent'}`, borderBottom: active ? '1px solid var(--psa-surface)' : '1px solid transparent', fontSize: 12.5, fontWeight: active ? 600 : 400, color: active ? 'var(--psa-ink)' : 'var(--psa-muted)', cursor: 'pointer', position: 'relative', top: 1, maxWidth: 248 })

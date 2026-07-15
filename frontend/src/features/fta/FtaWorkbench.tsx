@@ -9,7 +9,7 @@ import { ResultsPanel } from '../../components/ResultsPanel'
 import { Palette } from '../../components/Palette'
 import { Inspector } from '../../components/Inspector'
 import type { ModelJson } from '../../model'
-import { addGate, addBasic, connect, deleteNode, updateNode, updateParam, setTop, getFt, activatedNodes, addBasicFromLib, renameNode, addFaultTree, deleteFaultTree } from '../../model'
+import { addGate, addBasic, connect, deleteNode, updateNode, updateParam, setTop, getFt, activatedNodes, addBasicFromLib, renameNode, addFaultTree, deleteFaultTree, setBcSets } from '../../model'
 import { Icon } from '../../components/icons'
 import { formatEtaNumber } from '../../etaNumberFormat'
 import { useViewStore } from '../../stores/viewStore'
@@ -278,7 +278,9 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
               </button>
               {settingsOpen && (
                 <div className="exp-popover">
-                  <AnalysisSettingsPanel houses={houses} basicEvents={cvBasics} settings={settings} onChange={setSettings} />
+                  <AnalysisSettingsPanel houses={houses} basicEvents={cvBasics} settings={settings} onChange={setSettings}
+                    bcSets={cvModel?.boundary_condition_sets ?? []}
+                    onBcSetsChange={(sets) => { if (cvModel) cvSet(setBcSets(cvModel, sets)) }} />
                 </div>
               )}
             </div>
