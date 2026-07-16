@@ -24,11 +24,28 @@ def _merged_barrier_pdag(model: Model, et_name: str,
     et = model.event_trees[et_name]
     big = PDAG()
     fe_top: dict[str, str] = {}
+    origin: dict[str, str] = {}                      # nid → 首次引入它的故障树名(报错定位)
     for fe in et.functional_events:
         ft = model.fault_trees[fe.link_ft]
         for nid, n in ft.pdag.nodes.items():
             if nid not in big.nodes:
                 big.nodes[nid] = n
+                origin[nid] = fe.link_ft
+                continue
+            existing = big.nodes[nid]
+            if existing is n:                        # 同一棵树被多个功能事件链接:合法
+                continue
+            # review EB-04(2026-07-16 三方评审):屏障↔屏障轴施加与 IE↔屏障轴
+            # (ed90116 F1)同一判据——同 id 仅限同参数基本事件;门/异构撞名此前
+            # 静默首见胜,第二棵树的定义被无声丢弃(FF=.1/FS=0,正确 .02/.08)。
+            ok = (existing.is_basic and n.is_basic
+                  and existing.param_ref == n.param_ref)
+            if not ok:
+                raise ValueError(
+                    f"node id '{nid}' means different things in barrier trees "
+                    f"'{origin[nid]}' and '{fe.link_ft}' (event tree '{et_name}'): "
+                    "same id is only allowed for basic events sharing the same "
+                    "parameter; rename the gate/node in one of the trees")
         fe_top[fe.id] = ft.top
     from psaengine.preprocess.boundary import resolve_house_states, apply_house_states
     states = resolve_house_states(model, house_states, boundary_condition_set)

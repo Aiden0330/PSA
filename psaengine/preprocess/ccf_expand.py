@@ -61,6 +61,19 @@ def q_levels(model: str, factors: dict, m: int, q_t: float, staggered: bool = Fa
     raise ValueError(f"unsupported CCF model '{model}' (mgl|alpha|phi; beta via apply_ccf)")
 
 
+def _mint_ccf_event(g: PDAG, lib: ParameterLibrary, cid: str, grp_id: str, q: float) -> None:
+    """生成 CCF 事件并入图/库。生成名撞用户命名空间(节点或参数)即响亮——
+    review EB-04(2026-07-16 三方评审):此前 PDAG.basic 对重名静默沿用用户节点、
+    ParameterLibrary.add 静默覆盖用户参数(用户 CCF_g q=.9 被无声改写为 βQ,
+    顶值 .901 → .018019 且无异常)。"""
+    if cid in g.nodes or cid in lib:
+        raise ValueError(
+            f"CCF group '{grp_id}': generated event id '{cid}' collides with an "
+            "existing node/parameter; rename the user-side node/parameter or the group")
+    lib.add(Parameter(cid, "probability", q))
+    g.basic(cid, param_ref=cid)
+
+
 def _expand_multilevel(g: PDAG, lib: ParameterLibrary, grp, members: list[str]) -> None:
     """mgl/alpha/phi 全子集展开:成员 x → OR(x__I, 含 x 的所有 k≥2 子集事件)。
     同质假设(NUREG):Q_t 取首成员参数。"""
@@ -80,14 +93,12 @@ def _expand_multilevel(g: PDAG, lib: ParameterLibrary, grp, members: list[str]) 
     for k in range(2, m + 1):
         for combo in combinations(ordered, k):
             cid = f"CCF_{grp.id}_" + "_".join(combo)
-            lib.add(Parameter(cid, "probability", qk[k - 1]))
-            g.basic(cid, param_ref=cid)
+            _mint_ccf_event(g, lib, cid, grp.id, qk[k - 1])
             subset_ids[frozenset(combo)] = cid
 
     for mem in members:
         indep_id = f"{mem}__I"
-        lib.add(Parameter(indep_id, "probability", qk[0]))
-        g.basic(indep_id, param_ref=indep_id)
+        _mint_ccf_event(g, lib, indep_id, grp.id, qk[0])
         node = g.nodes[mem]                          # 原位把成员改成 OR 门
         node.is_basic = False
         node.param_ref = None
@@ -125,13 +136,11 @@ def apply_ccf(pdag: PDAG, ccf_groups, params: ParameterLibrary):
                 continue
             q_rep = lib.get(g.nodes[members[0]].param_ref).unavailability()   # 代表 Q(首成员)
             ccf_id = f"CCF_{grp.id}"
-            lib.add(Parameter(ccf_id, "probability", beta * q_rep))
-            g.basic(ccf_id, param_ref=ccf_id)
+            _mint_ccf_event(g, lib, ccf_id, grp.id, beta * q_rep)
             for m in members:
                 qm = lib.get(g.nodes[m].param_ref).unavailability()
                 indep_id = f"{m}__I"
-                lib.add(Parameter(indep_id, "probability", (1.0 - beta) * qm))
-                g.basic(indep_id, param_ref=indep_id)
+                _mint_ccf_event(g, lib, indep_id, grp.id, (1.0 - beta) * qm)
                 node = g.nodes[m]                    # 原位把 m 改成 OR 门
                 node.is_basic = False
                 node.param_ref = None
