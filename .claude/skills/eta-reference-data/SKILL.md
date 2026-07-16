@@ -9,7 +9,7 @@ description: 参考失效率/屏障有效性数据库的维护技能。向内置
 
 ## 一、当前机制(2026-07)
 
-- **内置基线**:`bess/reference_data.json`(去重后 41 器件 + 51 屏障 + 初因频率),`bess/library.py` 加载,`GET /api/bess/library` 供前端。**保持单条目单行的紧凑 JSON 格式**(diff 友好,历史惯例)。
+- **内置基线**:`bess/reference_data.json`(2026-07-15 检索批后 52 器件 + 53 屏障 + 7 初因 = 112 条;其中 2 条 IE 为 `category:"benchmark"` 基准参照——**勿作事件树 IE**,note 有硬警示),`bess/library.py` 加载,`GET /api/bess/library` 供前端。**保持单条目单行的紧凑 JSON 格式**(diff 友好,历史惯例)。新增条目后必须:后端运行时 `node frontend/scripts/capture-data.mjs` 重捕获 `embeddedData.ts` + `make bundle`(2026-07-15 发现该副本自基线起 stale 一周,已建规矩)。
 - **用户覆盖层**:前端 `libraryStore.ts`(localStorage 叠加内置,增删改/导出导入/恢复内置;`applyOverlay` 后全站生效;随项目文件迁移)。内置层改动走本仓库,用户层数据永不写回 builtin。
 - **条目字段**:`source.citation` **必填**(测试强制)+ `grade` + 可选 `url`/`note`(换算方法、口径、误报率写这里);屏障带 `category`(warning/active/passive)与 `detection{difficulty(1–5), silent, precursor}`;器件带 `rate`+`unit`;初因带 `freq_prior`。
 - **入库流程(TDD)**:改 `reference_data.json` → `tests/test_library.py` 守护(计数与关键 id:`B_OFFGAS/B_BMS/B_THERMAL/B_DEFLAG/B_SPACING/B_RESPONSE` 等)→ `make test-py` → **`make bundle`**(离线包内嵌库,必须重新生成 embeddedData.ts)。
