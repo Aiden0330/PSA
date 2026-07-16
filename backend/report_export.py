@@ -68,16 +68,37 @@ def risk_placement(consequences: dict) -> dict:
     return {"cells": cells, "worst": worst}
 
 
-def build_report_data(model, et_name: str = "TR", *, consequence_defs: dict | None = None,
+def build_report_data(model, et_name: str = "TR", *, ie_ft_name: str | None = None,
+                      house_states: dict | None = None, boundary_condition_set: str | None = None,
+                      consequence_defs: dict | None = None,
                       labels: dict | None = None, linked_fe_ids: list | None = None,
                       samples: int = 1000, seed: int = 42, error_factor: float = 3.0,
                       top_n: int = TOP_N) -> dict:
-    all_seqs = event_tree_sequences(model, et_name)   # 一次构树: 既出主导序列, 也据此聚合后果频率(免重复建 BDD)
-    unc = event_tree_uncertainty(model, et_name, samples=samples, seed=seed, error_factor=error_factor)
-    imp = barrier_importance_exact(model, et_name)
+    # F3 阶段 1(EB-01):点序列经单一分派点(集成 LFT vs 普通 ETA),并透传 house/bc——
+    # 此前固定走普通 event_tree_sequences 且不接 house,报告对集成模型发布错误频率、
+    # 忽略边界设置。集成模式无 MC 变体:不确定性带退化为点值(不伪造 spread)+ 注记。
+    from backend.execution import point_sequences
+    integrated = ie_ft_name is not None
+    all_seqs = point_sequences(model, et_name, ie_ft_name, house_states, boundary_condition_set)
     cons: dict[str, float] = {}
     for s in all_seqs:
         cons[s["consequence"]] = cons.get(s["consequence"], 0.0) + s["frequency"]
+    if integrated:
+        # 集成模式:MC 不确定性/屏障重要度为 v2 候选(引擎无 integrated 变体)——
+        # 带退化为点值(p05=p50=p95=点估计,非零伪 spread),报告注记说明。
+        bands = {c: {"p05": float(cons.get(c, 0.0)), "p50": float(cons.get(c, 0.0)),
+                     "p95": float(cons.get(c, 0.0))} for c in _SEV}
+        imp = {}
+        integrated_note = ("集成模式(序列级 LFT):点估计频率精确;MC 不确定性带与屏障重要度"
+                           "为 v2 候选,本报告分位列显示点值(非抽样区间)。")
+    else:
+        unc = event_tree_uncertainty(model, et_name, samples=samples, seed=seed,
+                                     error_factor=error_factor, house_states=house_states,
+                                     boundary_condition_set=boundary_condition_set)
+        imp = barrier_importance_exact(model, et_name, house_states=house_states,
+                                       boundary_condition_set=boundary_condition_set)
+        bands = unc["bands"]
+        integrated_note = None
 
     cdefs = consequence_defs or {}
     # 空串自定义内涵视同未填 → 回退内置标签(避免报告出现空白后果说明)
@@ -102,8 +123,11 @@ def build_report_data(model, et_name: str = "TR", *, consequence_defs: dict | No
                        sorted(fv.items(), key=lambda kv: kv[1], reverse=True)[:top_n]],
         }
 
-    return {"consequences": {c: float(cons.get(c, 0.0)) for c in _SEV}, "bands": unc["bands"],
-            "importance": imp, "consequence_defs": consequence_out, "sequences": sequences, "fta": fta}
+    out = {"consequences": {c: float(cons.get(c, 0.0)) for c in _SEV}, "bands": bands,
+           "importance": imp, "consequence_defs": consequence_out, "sequences": sequences, "fta": fta}
+    if integrated_note:
+        out["integrated_note"] = integrated_note
+    return out
 
 
 # ── 勾选集聚合报告(spec A §2.1/§2.2/§2.4)────────────────────────────────────

@@ -124,6 +124,8 @@ class MefImportRequest(BaseModel):
     xml: str
 
 class ReportRequest(EtUncertaintyRequest):
+    # ie_fault_tree 经 EtQuantifyRequest 继承已在;此处显式列出以彰显报告支持集成 LFT
+    # (F3 阶段 1/EB-01:报告接集成通道)。
     scenario_name: str = "ETA"
     tree_png: Optional[str] = None    # 'data:image/png;base64,...'
     consequence_defs: dict[str, str] = {}   # C1..C5 自定义内涵(空则回退内置)

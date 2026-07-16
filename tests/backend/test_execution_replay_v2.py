@@ -50,12 +50,13 @@ def _anchor_c_report_req(fmt="csv"):
                       {"path": {"FE_B": "success"}, "end_state": "S_OK"}],
         "consequence_bins": {"S_FAIL": "C3", "S_OK": "C1"},
         "ie_fault_tree": {
-            "name": "__init__",
-            "parameters": [{"id": "I", "kind": "frequency", "value": 1e-3}],
+            "name": "__init__", "top": "IE_TOP",
+            # 共享事件 S 在 IE 树内也须声明为 basic(两树各自校验,合并按 id 统一)
             "nodes": [
                 {"id": "I", "basic": True, "param_ref": "I"},
+                {"id": "S", "basic": True, "param_ref": "S"},
                 {"id": "IE_TOP", "op": "and", "args": ["I", "S"]}],
-            "top": "IE_TOP"},
+            "parameters": [{"id": "I", "kind": "frequency", "value": 1e-3}]},
         "scenario_name": "anchorC", "samples": 200, "seed": 1,
     }
 
