@@ -45,13 +45,13 @@ RWF≡RRW、停役≡house 强制、ICCDP 平凡后算——本仓库已全部�
 
 ### v2 候选(非 parity 缺口,按价值排序)
 
-| 候选 | 出处 |
-|---|---|
-| 集成模式的 MC 不确定性/屏障重要度(初因分组进抽样/扰动语义) | LFT 规格 §6 |
-| periodic-test 10 参 Complete(Markov 迭代)+ Rausand 四项工程分解 + 瞬时 Q(t) 曲线 | Gap 7 规格 §1 |
-| exchange regime-A(house 条件参数重绑定,精确且 BDD 兼容)+ MEF define-substitution XML I/O | Gap 7 卷宗 §1.2 |
-| 「配置风险 Δ」分析案例薄片(baseline 钉扎 + 强制停役 → ΔP+RAW/RRW+ICCDP) | Gap 7 卷宗 §3 |
-| 组合聚合「勾选集」不确定性 UI 触发(通道已实现无调用点) | spec A 实现报告 |
+| 候选 | 出处 | 状态 |
+|---|---|---|
+| 集成模式的 MC 不确定性/屏障重要度(初因分组进抽样/扰动语义) | LFT 规格 §6 | 未启动(禁独改,需 Fable 规格) |
+| periodic-test 10 参 Complete(Markov 迭代)+ 瞬时 Q(t) 曲线 + IEC/PDS 显示分解 | Gap 7 规格 §1 | **已 BANKED 2026-07-15**:规格 `2026-07-15-periodic-test-complete-banked.md` + 26 锚点 `tests/banked/`(探针自动激活)——SCRAM 逐行转录 × Decimal-60 × 独立 MC 三角验证;λ≈μ 朴素形负概率缺陷预捕获入 §3 强制条款。后 Fable 可机械实现 |
+| exchange regime-A(house 条件参数重绑定,精确且 BDD 兼容)+ MEF define-substitution XML I/O | Gap 7 卷宗 §1.2 | **已 BANKED 2026-07-15**:规格 `2026-07-15-regime-a-rebind-mef-substitution-banked.md` + 23 锚点(双探针分组激活)——单一咽喉有效库视图设计(unavailability() 10+ 调用点普查),映射表对照 SCRAM substitution.cc + input.rng L435-468 |
+| 「配置风险 Δ」分析案例薄片(baseline 钉扎 + 强制停役 → ΔP+RAW/RRW+ICCDP) | Gap 7 卷宗 §3 | 未启动(可放行级,任意模型可做) |
+| 组合聚合「勾选集」不确定性 UI 触发(通道已实现无调用点) | spec A 实现报告 | 未启动(半天级前端) |
 
 ## Adjacent-tool intel (2026-07-14, TD-001 §9 调研)
 

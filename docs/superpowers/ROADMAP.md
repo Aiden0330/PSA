@@ -282,9 +282,30 @@
   网络载荷实测,旧档零迁移锁)。`9a291c9` uv.lock 刻意重生成(自 auth B2 起 stale)。
   **账本 Gaps 表清零**,v2 候选五项记档。基线:py 402 · fe 320 · 基准 24/24 逐位。
 
----
-
-### 0.1 上一基线:2026-06-30(Windows,历史记录)
+- **规格银行 + 参考库扩容(2026-07-15,用户点题 "complete 2 and 8 (search as many
+  as possible) first")**:后 Fable 窗口期的两件时效工作。**#2 规格银行**(Fable 亲做):
+  两份 BANKED 规格 + `tests/banked/` 56 项先红锚点(探针自动激活,实现落地即转绿)——
+  ① periodic-test Complete(SCRAM 11 参三态 Markov):语义逐行转录 + **三角验证**
+  (float 转录 ↔ Decimal-60 全点 rel≤5.5e-15 ↔ 叙事语义独立 MC 2M×2 四探针 |z|<1),
+  预捕获 λ≈μ 朴素两级式**负概率**缺陷(q 级 7.5e-5)入 §3 强制稳定形,x=F 检验起点
+  q≡1 恒等式与稳态周期性成免费锚;② regime-A 重绑定 + MEF define-substitution I/O:
+  单一咽喉有效库视图设计(unavailability() 14 调用点普查,逐点接线否决),映射表
+  对照 substitution.cc/input.rng 逐行。engine-reviewer 审计(独立重写实现+Decimal
+  双路复算全锚逐位命中)round-1 **PASS(有条件)**:四条"错误实现仍全绿"窄通道
+  (D1 t=θ 边界 ≤/< 无锚可 50× 且全绿、D3 探针 TypeError 分支藏半成品、D7 拒收
+  夹具 7 缺 3、S1 夹具顺序逃逸)+ 三处证据链数字失真(D4 Simpson 跨跳变假收敛
+  0.0434979→0.0435037、D5 脚本未打印 5 组引用数、D6 规格残留旧模型数 0.118→0.3826
+  ——转录类罪案 +3,累计 10 例)→ 12 项全落修 → round-2 **PASS(无保留)**。
+  **#8 参考库**:14 轮检索 12 条新证据条目(库 100→112:IEEE 493 电气×2、SINTEF
+  PDS λ_D/λ_DU×2、SPAR-H 名义 HEP×2、中电联 2024 机队统计×2、NFPA 喷淋、NIST/Hughes
+  点式探测、两条 benchmark 基准 IE 5e-4/1.5e-2 硬防误用);domain-reviewer 三轮
+  (round-1 **FAIL**:M1 喷淋 93% 住宅口径误拼致 0.07 低估 1.6×→0.11/89%、M2
+  「链路自洽校验」被库自身场景树定量证伪(C3+ 2.3e-5 vs 后验 4.5e-4 差 19×)→
+  如实改写、S1-S6;round-2 **FAIL** R1 互引保守性方向**写反**(压低先验标成保守,
+  罪案第 7 例)→ **PASS** 文件内核实)。顺手修复:embeddedData.ts 自 07-07 基线
+  stale 一周(离线包带着出处评审修正前数据发布)→ 重捕获 + 再生规矩入技能。
+  提交:`a63bfab`(库)+ 本批(bank);基线:py 426 · banked 56 skip · fe 320 ·
+  基准 24/24 · bundle 2.81MB。账本 v2 候选表两项标 BANKED。
 
 - **目录与环境**:`D:\PSA_BESS` 是唯一有效工作区;`D:\PSA_Opus_Chatgpt` 已做目录联接指向 `D:\PSA_BESS`。Python 运行依赖和测试依赖已写入 `pyproject.toml`;`.venv` 已按 editable install 指向本项目。
 - **项目文件一致性**:项目 payload v2 已覆盖 ETA 页签、活动页、勾选集合、用户自建 FTA、FMEA 行数据和 FMEA 映射配置。保存、另存、导出、打开和导入均走统一 payload 构造/恢复流程。
