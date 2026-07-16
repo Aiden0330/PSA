@@ -19,8 +19,9 @@ verbatim, skips named.
 | Reference data / anything embedded in the offline bundle | `make test-py` + `make bundle` (coordinator runs it; subagents never do) |
 | Full pre-commit sweep | `make check` |
 
-Baselines (2026-07-14): py **366 collected**(含 24 benchmark 逐位)· vitest
-**281** pass · benchmark 24/24. A *dropped* test count is a finding even when
+Baselines (2026-07-15): py **426 passed + 56 banked skips**(banked = tests/banked/
+先红锚点,实现落地自动激活——skip 数下降而非转绿也是 finding)· benchmark 24/24
+逐位 · vitest **320** pass. A *dropped* test count is a finding even when
 everything passes.
 
 ## Beyond suites — exercise the territory
