@@ -1,11 +1,21 @@
 from __future__ import annotations
-from math import log
+from math import isfinite, log
 import numpy as np
 from psaengine.model.model import Model
 from psaengine.quantify.probability import exact_probability
 from psaengine.eta.sequence import _build_event_tree, quantify_event_tree
 
 _CLASSES = ["C1", "C2", "C3", "C4", "C5"]
+
+
+def _validate_mc_params(samples: int, error_factor: float) -> None:
+    """EB-05/O1:蒙特卡洛入口数值域 —— samples ≥ 1、error_factor 有限且 ≥ 1。
+    消除 samples=0 的 500(空数组分位)与 EF<1 静默退化为确定性结果(带参数名响亮拒绝)。
+    EF=1 合法边界:sigma=0 是显式的"无认知不确定"确定性带,非静默退化。"""
+    if not isinstance(samples, int) or isinstance(samples, bool) or samples < 1:
+        raise ValueError(f"samples must be an integer >= 1, got {samples!r}")
+    if not isfinite(error_factor) or error_factor < 1:
+        raise ValueError(f"error_factor must be finite and >= 1, got {error_factor!r}")
 
 
 def event_tree_uncertainty(model: Model, et_name: str, samples: int = 1000,
@@ -15,6 +25,7 @@ def event_tree_uncertainty(model: Model, et_name: str, samples: int = 1000,
     """对各底事件做对数正态(median=nominal, EF)采样, 建一次 BDD 只重算概率,
     给每个后果 C1–C5 出 p05/p50/p95 + 点估计。共享底事件一次采样 → 自动相关。
     init_frequency 视为定值。边界条件同 quantify_event_tree(4a2)。"""
+    _validate_mc_params(samples, error_factor)
     b = _build_event_tree(model, et_name, house_states, boundary_condition_set)
     et, big, m, all_basics, fe_bdd = b.et, b.big, b.m, b.all_basics, b.fe_bdd
     seq_exprs = []  # (consequence_class, expr)
@@ -63,6 +74,7 @@ def aggregate_event_tree_uncertainty(specs: list, samples: int = 1000,
     刻意不做的两种错误实现:①同 seed 逐树各跑再相加(RNG 流套在各树底事件枚举序上 → 字典序
     伪耦合);②各树独立抽样再相加(共享数据源被当独立 → 上分位静默压窄,非保守)。此处用
     单一 rng + 按 ref 名的联合向量,二者皆非。返回 {"point","bands","per_tree"}。"""
+    _validate_mc_params(samples, error_factor)
     if not specs:
         raise ValueError("aggregate_event_tree_uncertainty: 需要至少一棵事件树")
     trees = []

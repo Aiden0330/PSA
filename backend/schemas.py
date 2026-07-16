@@ -5,7 +5,8 @@ from pydantic import BaseModel
 class QuantifyRequest(BaseModel):
     model: dict[str, Any]
     fault_tree: Optional[str] = None
-    method: str = "exact"
+    # EB-05/O1:严格枚举(与引擎 Analysis.probability 双锁);拼写错误 → 422 而非静默落 REA。
+    method: Literal["exact", "mcub", "rea"] = "exact"
     cutoff: float = 0.0
     limit_order: Optional[int] = None
     # 4a2 边界条件:house 事件状态覆盖 / 模型内命名边界条件集(boundary_condition_sets)

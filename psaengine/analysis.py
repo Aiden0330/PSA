@@ -34,6 +34,9 @@ class Analysis:
     def probability(self, method: str = "exact") -> float:
         if method == "exact":
             return exact_probability(self.m, self.root, self.q)
+        # EB-05/O1:未知 method 不再静默落 REA —— 响亮拒绝(exact|mcub|rea)。
+        if method not in ("mcub", "rea"):
+            raise ValueError(f"unknown method '{method}' (exact|mcub|rea)")
         cs = self.cutsets()
         probs = [c.probability for c in cs]
         return mcub(probs) if method == "mcub" else rea(probs)

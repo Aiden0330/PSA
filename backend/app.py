@@ -1,10 +1,13 @@
 from __future__ import annotations
 import os
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend import examples, schemas
 from psaengine.model.json_io import load_model_from_dict
@@ -36,6 +39,27 @@ from backend.auth.routes import router as _auth_router, SESSION_COOKIE as _SESSI
 from backend.auth.guards import require_role, require_authenticated, ANALYST, REVIEWER, ANY_ROLE, ADMIN
 
 app.include_router(_auth_router)
+
+
+# EB-05/O1 + EB-12:统一异常 → JSON 且 application/json; charset=utf-8(中文客户端可读),
+# 并把 domain ValueError 映射为 400(响亮拒绝,消除 samples=0 等静默 500)。三处覆盖:
+#   - HTTPException:保持既有 status/detail/headers,仅补 charset(body 形状与默认一致);
+#   - RequestValidationError:pydantic 422(method 严格枚举等),body 形状与默认一致;
+#   - ValueError:装载/量化边界域校验错误 → 400(branch/init_frequency/samples/EF 等)。
+@app.exception_handler(StarletteHTTPException)
+async def _http_exception_handler(request, exc: StarletteHTTPException):
+    return UTF8JSONResponse(status_code=exc.status_code, content={"detail": exc.detail},
+                            headers=getattr(exc, "headers", None))
+
+
+@app.exception_handler(RequestValidationError)
+async def _request_validation_handler(request, exc: RequestValidationError):
+    return UTF8JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
+
+
+@app.exception_handler(ValueError)
+async def _value_error_handler(request, exc: ValueError):
+    return UTF8JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.middleware("http")
