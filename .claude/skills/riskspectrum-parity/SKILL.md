@@ -14,7 +14,7 @@ ledger is the single place that answers "how far are we?" — keep it current.
 |---|---|---|
 | Exact BDD top-event probability | ✅ exceeds (RS default is MCS+MCUB) | benchmark corpus, closed-form anchors ≤1e-16 |
 | **Exact success-branch negation in sequences** | ✅ **exceeds** (RS approximates via delete-term) | guard test: shared-event LL=0.109 ≠ product 0.0361 — sales point, protect it |
-| MCS: ZBDD + MOCUS + truncation w/ ΔP_k error estimate | ✅ | tests + benchmark |
+| MCS: BDD-path enumeration → ZBDD absorption-minimization + MOCUS cross-check + truncation w/ ΔP_k | ✅ | tests + benchmark. **Capability boundary (EB-11)**: ZBDD minimizes the *already-enumerated* candidate family (a Python list from BDD path-walk) — **not** a full symbolic ZBDD built from the formula; scale bottleneck stays at BDD path enumeration |
 | Modularization (Dutuit-Rauzy), prime implicants (non-coherent) | ✅ (RS has no PI) | tests |
 | Importance B/FV/RAW/RRW/DIM | ✅ | tests |
 | MC uncertainty (lognormal-EF/normal/uniform/beta) + tornado | ✅ | tests |
@@ -27,7 +27,7 @@ ledger is the single place that answers "how far are we?" — keep it current.
 | **Cut-set post-processing** (mutually-exclusive / delete / recovery) | ✅ 2026-07-09 | MCS-list-only by design — exact BDD channel untouched (guarded test); REA/MCUB over processed list. tests/unit/test_postprocess.py |
 | **Analysis cases** (report + uncertainty + importance auto-pin) | ✅ 2026-07-09 | version hash + engine version + settings + results per run; audit actions; dossier ledgers |
 | **Model compare / diff** | ✅ 2026-07-09 | Identity-keyed structural diff over canonical versions + dossier compare view. tests/backend/test_diff.py |
-| CUDD backend correctness (coherent + non-coherent) | ✅ 2026-07-09 · **Linux CI 阻断门 2026-07-15** | dd.cudd built on macOS arm64 + GitHub Actions Linux 源码编译(--fetch --cudd)首跑即过,continue-on-error 已移除(Gap 6b 收口);complement-mark cofactor fix + NOT/XOR/success-branch locks; 1000-event closed-form; iterative Shannon traversal |
+| CUDD backend **correctness** (coherent + non-coherent) | ✅ 2026-07-09 · **Linux CI 阻断门 2026-07-15** | dd.cudd built on macOS arm64 + GitHub Actions Linux 源码编译(--fetch --cudd)首跑即过,continue-on-error 已移除(Gap 6b 收口);complement-mark cofactor fix + NOT/XOR/success-branch locks; 1000-event closed-form; iterative Shannon traversal. CI 加 `import dd.cudd` 前置断言防 importorskip 静默跳过变绿(EB-12/O5)。**Capability boundary (EB-11)**: CUDD 是 **CI 正确性验证门(与 Python 内核逐位对拍),非生产规模路径**——生产量化入口(Analysis/序列/频率)仍直接构造 Python 内核;万级 CUDD 生产选择 / MCS 抽象 / 规模压测待激活 |
 | **Sequence-level LFT integration**(序列级完整链接故障树) | ✅ **exceeds** 2026-07-15 | rate(s)=Σλ_i·P(E_i∧Path_s) 合并 BDD 精确(IE 使能与屏障共享事件自动正确,成功分支精确否定);守恒 Σ_s=F_exact;锚点 C:两段式把物理不可能的成功序列算出 1.44e-4、失败序列低估 3.6×——集成通道恒零/精确。engine-reviewer 两轮(round-1 FAIL 六类 id 碰撞静默错数 88×@200 → 碰撞护栏+六锁 → round-2 PASS,合法共享逐位不扰动);前端 lint 翻转为路由(fe 320 实测集成口径渲染+400 逐字上屏);spec 2026-07-15-sequence-lft-integration.md |
 | **Exact Q(t) reliability models**(exponential/GLM/Weibull/periodic-test) | ✅ 2026-07-15 | MEF/SCRAM/XFTA 同式四模型为新 kind(旧三线性化 300 例逐位不变);periodic_test 灾难性消去被审查抓获(x=1e-9 曾 56× 高估、772/2000 点负值)→ 泰勒级数+expm1,Decimal-60 逐点锚+q̄∈[0,1] 500 例性质锁;weibull β=1 与 exponential 逐位退化恢复为锁定不变量;两轮评审 FAIL→PASS;spec 2026-07-15-gap7-qt-models-exchange.md |
 | **Exchange events**(MEF 替换三联补齐) | ✅ 2026-07-15 | PostRule kind=exchange(XFTA §7.2:唯一不可布尔编译的替换,恰属 MCS-list 后处理通道,精确 BDD 通道不动);×q_t/q_s 集合语义 + 事件集去重防 REA 双计(评审 G2);regime-A 参数重绑定后门 v1 响亮拒绝;MEF define-substitution XML I/O 记 v2 |
@@ -52,6 +52,7 @@ RWF≡RRW、停役≡house 强制、ICCDP 平凡后算——本仓库已全部�
 | exchange regime-A(house 条件参数重绑定,精确且 BDD 兼容)+ MEF define-substitution XML I/O | Gap 7 卷宗 §1.2 | **已 BANKED 2026-07-15**:规格 `2026-07-15-regime-a-rebind-mef-substitution-banked.md` + 23 锚点(双探针分组激活)——单一咽喉有效库视图设计(unavailability() 10+ 调用点普查),映射表对照 SCRAM substitution.cc + input.rng L435-468 |
 | 「配置风险 Δ」分析案例薄片(baseline 钉扎 + 强制停役 → ΔP+RAW/RRW+ICCDP) | Gap 7 卷宗 §3 | 未启动(可放行级,任意模型可做) |
 | 组合聚合「勾选集」不确定性 UI 触发(通道已实现无调用点) | spec A 实现报告 | 未启动(半天级前端) |
+| wheel 打包含 backend(`pyproject.toml` packages.find 仅 `psaengine*`/`bess*` → build wheel 不含 `backend`;editable 安装掩盖)+ 干净环境 smoke-import `backend.app` | EB-12/O5 | 未启动(**低优先**:§5 部署为源码路径 `uv sync`,非 wheel;修时须动 pyproject/CI 打包面,避免与 CI 作业交互——独立小包处理) |
 
 ## Adjacent-tool intel (2026-07-14, TD-001 §9 调研)
 

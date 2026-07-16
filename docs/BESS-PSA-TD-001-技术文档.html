@@ -511,14 +511,20 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
 
   <p><strong>变量序</strong>采用 DFLM(depth-first left-most)启发式:按故障树深度优先遍历首次出现的顺序
   排定基本事件——对手工构建的工程树,这一顺序天然把结构相关的事件排相邻,实测在基准语料上无一例爆炸。
-  BDD 变量序为 NP 困难问题,内核不做动态重排;规模换挡的答案是后端切换:
+  BDD 变量序为 NP 困难问题,内核不做动态重排;规模换挡的设计出口是后端切换:
   <code>make_manager(order, backend)</code> 工厂在纯 Python(数百事件舒适区)、<code>dd.autoref</code>
-  (验证用)与 <code>dd.cudd</code>(CUDD,万级事件,macOS arm64 编译实证)间共享同一遍历协议
-  (<code>is_terminal/top_var_index/cofactor/var_name</code>),量化代码后端无关。</p>
+  与 <code>dd.cudd</code>(CUDD)间共享同一遍历协议
+  (<code>is_terminal/top_var_index/cofactor/var_name</code>),量化代码后端无关。
+  <b>能力声明的诚实边界(EB-11)</b>:生产量化入口(Analysis / 序列 / 频率)当前一律直接构造
+  纯 Python 内核;CUDD 后端目前是 <b>CI 正确性验证门</b>——在 Linux 阻断作业里与 Python 内核逐位
+  对拍(含非相干补边缺陷锁),<b>而非已接入的生产规模路径</b>。万级事件的 CUDD 生产选择、MCS 抽象与
+  规模压测是待激活的路线项(§11),不先于正确性闭环。</p>
 
   <h4>最小割集、截断与工程近似</h4>
-  <p>割集提取走 <strong>BDD→ZBDD</strong> 路线:枚举 BDD 中使函数为真的正文字路径得到候选集族,
-  转入零压缩决策图(ZBDD)做吸收律最小化(<span class="inm">minimize</span>),得到全部最小割集;
+  <p>割集提取走 <strong>BDD→ZBDD</strong> 路线:枚举 BDD 中使函数为真的正文字路径得到候选集族
+  (Python 列表),转入零压缩决策图(ZBDD)做吸收律最小化(<span class="inm">minimize</span>),得到全部最小割集;
+  <b>能力边界(EB-11)</b>:此处 ZBDD 施于「已由 BDD 路径枚举出的候选集族」的 Python 列表最小化,
+  <b>非从公式直接符号化构造完整 ZBDD</b>——规模瓶颈仍在 BDD 路径枚举步;
   同时提供教科书 <strong>MOCUS</strong>(自顶向下门展开)作为交叉验证器——性质测试断言两法在随机树上
   集族相等。非相干结构(含 NOT/XOR/成功逻辑)下"最小割集"不再良定义,内核提供<strong>素蕴涵项</strong>
   (prime implicants)替代(见本节末)。</p>
@@ -1149,8 +1155,13 @@ python -m pytest -q tests/test_dd_parity.py   # 三后端对拍应全绿</code><
 
   <h3 id="s5-5"><span class="no">5.5</span>启动、验证与离线单文件</h3>
   <pre><code>make run        # 前后端一起:后端 127.0.0.1:8000,前端 127.0.0.1:5173(/api 代理)
-make check      # 提交前全门:diff + 前端测试/构建 + 后端测试
+make check      # 提交前全门:diff + 前端测试/构建 + 后端测试(不含 benchmark)
+make benchmark  # 引擎基准对标(SCRAM/OpenFTA):引擎改动的独立强制门,不在 make check 内
 make bundle     # 产出 bess-eta-standalone.html——双击即用的离线单文件</code></pre>
+  <p><b>门禁分工(勿误解)</b>:<code>make check</code> 是提交前全门但<b>刻意不含 benchmark</b>
+  (CLAUDE.md 口径);<code>make benchmark</code>(17 基准 SCRAM/OpenFTA 逐位对标)是<b>引擎/数值改动的
+  独立强制门</b>,单元全绿不构成收口——psaengine/bess 任何数值改动须另跑并 24/24 全绿。CI 以四个独立
+  作业(Python 测试 / 引擎基准 / CUDD Linux 对拍 / 前端)把二者都设为物理阻断门。</p>
   <p>最简演示部署:<code>make bundle</code> 的单文件无需任何服务(后端不可达时自动回退到嵌入数据)。
   完整功能(版本库/评审/组合总览/AI)只需 <code>make backend</code> 一个进程——FastAPI 自伺服前端构建产物
   (<code>frontend/dist</code>),单端口 8000 即全部。当前测试基线:py 426(另 56 项 banked 先红锚点按设计
@@ -1577,8 +1588,9 @@ make bundle     # 产出 bess-eta-standalone.html——双击即用的离线单�
   <ul>
     <li><strong>数据成熟度</strong>:内置库全为 C/D 级(设计如此)——正式 QRA 交付前须项目实测/贝叶斯升级;
       模板 IE 频率与场景库存在口径差(10 MWh 系统级 vs 通用舱级先验),文档已注明,须按项目统一;</li>
-    <li><strong>规模</strong>:纯 Python 内核舒适区数百事件;万级事件走 CUDD 后端(macOS 已实证编译,
-      Linux CI 待 GitHub 远程激活);无动态变量重排;</li>
+    <li><strong>规模</strong>:纯 Python 内核舒适区数百事件;CUDD 后端目前是 <b>CI 正确性验证门</b>
+      (Linux 阻断作业 2026-07-15 首跑即过,与 Python 内核逐位对拍),<b>尚未接入生产量化入口</b>——
+      万级事件的 CUDD 生产选择、MCS 抽象与规模压测记为路线项,不先于正确性闭环;无动态变量重排;</li>
     <li><strong>范围</strong>:静态 FTA/ETA——不做动态故障树(SPARE/SEQ 门)、不做 Level-2 物理后果耦合
       (C1–C5 为频率分级接口);初因频率通道为"每割集一初因"约定,逐初因分组的精确模式列账本 Gap #9;</li>
     <li><strong>协同</strong>:评审签发 + 本地三角色认证已落地(§3.11),实时协同(CRDT)经评估后

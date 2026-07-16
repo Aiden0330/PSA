@@ -30,8 +30,8 @@ make setup     # = uv venv(Python 3.12)+ pip install -e ".[test]" + npm ci
 
 ```bash
 make test        # 前后端全部测试(不含 benchmark)
-make benchmark   # 引擎基准对标(SCRAM/OpenFTA 参考值,已入 CI)
-make check       # 提交前完整口径:git diff --check + 测试 + 构建
+make benchmark   # 引擎基准对标(SCRAM/OpenFTA):引擎/数值改动的独立强制门,不在 make check 内
+make check       # 提交前完整口径:git diff --check + 测试 + 构建(刻意不含 benchmark)
 make backend     # FastAPI :8000(托管 frontend/dist)
 make frontend    # Vite dev :5173
 make run         # 构建前端并在 :8000 一体运行

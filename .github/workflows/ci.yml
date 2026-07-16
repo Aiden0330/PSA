@@ -53,6 +53,10 @@ jobs:
           tar xzf dd-*.tar.gz
           cd dd-*/
           python setup.py install --fetch --cudd
+      - name: Assert CUDD backend actually loaded (no silent skip)
+        # EB-12/O5: parity 用例经 pytest.importorskip("dd.cudd") —— CUDD 未编译成功即静默
+        # SKIP,作业仍绿。此前置断言让「CUDD 没装上」直接红,守住 blocking gate 的真实性。
+        run: python -c "import dd.cudd; print('dd.cudd loaded:', dd.cudd.__file__)"
       - name: Run parity tests
         run: python -m pytest -q tests/test_dd_parity.py
 
