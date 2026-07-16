@@ -58,6 +58,32 @@ def event_tree_uncertainty(model: Model, et_name: str, samples: int = 1000,
     return {"point": {c: float(point.get(c, 0.0)) for c in _CLASSES}, "bands": bands}
 
 
+def _param_law_signature(p) -> tuple:
+    """参数的认识论法则指纹(spec A 同一性判据):量纲 kind / 点值 value / 时间参数 /
+    Q(t) 系数 / 分布。provenance(source/version)刻意不入指纹——那是溯源元数据,非数值法则。"""
+    d = getattr(p, "distribution", None)
+    dist = (d.family, tuple(sorted(d.params.items()))) if d is not None else None
+    return (p.kind, p.value, p.mttr, p.test_interval, p.mission_time,
+            p.gamma, p.alpha, p.beta, p.t0, dist)
+
+
+def _assert_shared_ref_consistent(ref: str, p, tidx: int, law_by_ref: dict) -> None:
+    """EB-09/O3:spec A(2026-07-14)前提 —— 同 ref 名 = 同认识论参数(项目全局命名空间)。
+    同名跨树参数法则不一致 → 点名拒绝。修前 aggregate 静默取首个中值(下方 median_by_ref),
+    canonical 允许同 ref 异值 → 点估计走首值、联合分位带亦走首值,二者掩盖了「本是两个不同模型」
+    的矛盾(评审算例:.1/.9 同 ref,点 C2=.001 但 p05/p50/p95 均 .0002)。此处只加 load 边界校验,
+    不改任何抽样数学:同 ref 同值 sig 相等 → 逐位不扰动。"""
+    sig = _param_law_signature(p)
+    prev = law_by_ref.get(ref)
+    if prev is None:
+        law_by_ref[ref] = (sig, tidx)
+        return
+    if prev[0] != sig:
+        raise ValueError(
+            f"共享参数 ref '{ref}' 在树 #{prev[1]} 与树 #{tidx} 定义不一致 "
+            f"(spec A:同 ref 名=同认识论参数,须逐字段一致): {prev[0]} vs {sig}")
+
+
 def aggregate_event_tree_uncertainty(specs: list, samples: int = 1000,
                                      seed: int = 42, error_factor: float = 3.0,
                                      house_states: dict | None = None,
@@ -79,7 +105,8 @@ def aggregate_event_tree_uncertainty(specs: list, samples: int = 1000,
         raise ValueError("aggregate_event_tree_uncertainty: 需要至少一棵事件树")
     trees = []
     median_by_ref: dict[str, float] = {}
-    for model, et_name in specs:
+    law_by_ref: dict[str, tuple] = {}     # EB-09/O3:同 ref 名参数法则一致性(spec A load 边界)
+    for tidx, (model, et_name) in enumerate(specs):
         b = _build_event_tree(model, et_name, house_states, boundary_condition_set)
         et, big, m, all_basics, fe_bdd = b.et, b.big, b.m, b.all_basics, b.fe_bdd
         seq_exprs = []  # (consequence_class, expr)
@@ -91,8 +118,10 @@ def aggregate_event_tree_uncertainty(specs: list, samples: int = 1000,
             seq_exprs.append((et.consequence_of(seq["end_state"]), expr))
         ref_of = {bb: big.nodes[bb].param_ref for bb in all_basics}   # 底事件 → 参数 ref 名
         for ref in ref_of.values():                                  # 同 ref 名跨树共用同一 median
+            p = b.params.get(ref)
+            _assert_shared_ref_consistent(ref, p, tidx, law_by_ref)  # spec A:异值同名点名拒绝
             if ref not in median_by_ref:
-                median_by_ref[ref] = b.params.get(ref).unavailability()
+                median_by_ref[ref] = p.unavailability()
         trees.append({"m": m, "seq_exprs": seq_exprs, "ref_of": ref_of,
                       "init_frequency": et.init_frequency})
 

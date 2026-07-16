@@ -41,15 +41,21 @@ def _single_fields():
 
 
 def _tree(key, name, freq, pfd, note=None):
-    """锚 1 形状的单屏障树载荷(TreeSpec):C1 = f·(1−pfd),C2 = f·pfd。"""
+    """锚 1 形状的单屏障树载荷(TreeSpec):C1 = f·(1−pfd),C2 = f·pfd。
+
+    EB-09/O3:屏障 ref 用逐树唯一 id(f"FE1_{key}")。这两棵是**不同屏障**(电芯内短路 vs
+    BMS 过充,pfd 0.1≠0.2),spec A「同 ref 名=同认识论参数」下必须异名;此前 helper 硬编码
+    "FE1" 使二者跨树撞名,聚合分位带被静默压到首树值(点估计仍逐树精确,故旧断言未察觉)——
+    正是评审 .1/.9 复现的同族。逐树唯一 id 是独立屏障的 spec-A-clean 表示,点估计逐位不变。"""
+    fid = f"FE1_{key}"
     t = {"key": key, "name": name,
          "init_event": f"IE_{key}", "init_frequency": freq,
-         "functional_events": [{"id": "FE1", "pfd": pfd}],
+         "functional_events": [{"id": fid, "pfd": pfd}],
          "fault_trees": {}, "parameters": {},
-         "sequences": [{"path": {"FE1": "success"}, "end_state": "L0"},
-                       {"path": {"FE1": "failure"}, "end_state": "L1"}],
+         "sequences": [{"path": {fid: "success"}, "end_state": "L0"},
+                       {"path": {fid: "failure"}, "end_state": "L1"}],
          "consequence_bins": {"L0": "C1", "L1": "C2"},
-         "labels": {"FE1": "屏障一"}}
+         "labels": {fid: "屏障一"}}
     if note:
         t["init_note"] = note
     return t
