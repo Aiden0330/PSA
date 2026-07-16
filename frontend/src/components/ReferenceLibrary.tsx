@@ -163,7 +163,7 @@ export function ReferenceLibrary({ onLibraryChange }: { onLibraryChange?: () => 
           ? allRows.filter((r) => { const g = String(r.grade ?? ''); return !GRADES.includes(g) || gradeFilter.has(g) })
           : allRows
         return (
-          <div key={spec.section} className="psa-panel">
+          <div key={spec.section} className="psa-panel" style={{ flex: 'none' }}>
             <div className="psa-ch">
               <span className="t">{spec.title}</span>
               <span className="meta">{rows.length === allRows.length ? rows.length : rows.length + ' / ' + allRows.length} 条</span>
