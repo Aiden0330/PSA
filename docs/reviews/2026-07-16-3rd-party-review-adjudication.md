@@ -1,7 +1,25 @@
 # 第三方评审(GPT-5.6)裁定与修复 backlog
 
 *2026-07-16 · 源:`review_3rd_party/2026-07-16-engine-backend-code-review.md`(只读评审,
-引擎+后端,12 发现)· 裁定人:Fable 5(逐条对代码核实,非照单全收)· 状态:已裁定,待执行*
+引擎+后端,12 发现)· 裁定人:Fable 5(逐条对代码核实,非照单全收)· 状态:**大部落地**(见下)*
+
+## 落地台账(2026-07-16 当日)
+
+| 包 | 覆盖 | commit | 审查 |
+|---|---|---|---|
+| F1 | EB-04 屏障合并碰撞 + CCF 命名空间 | `e65cfd4` | engine-reviewer PASS(+F-1/S-1/S-7 补强 `5972447`) |
+| F2 | EB-03+07 状态机原子 + CAS 事务化 + 文件原子写 | `4d4afae` → 冷读 FAIL R1-R4 → `5972447` | 冷读对抗审查 |
+| O1 | EB-05 输入严格拒绝(method/branch/finite/samples/EF) | `b46f313`(Opus) | 30 测试 |
+| O2 | EB-06 local 读守卫 + 删除角色 | `00385b0`(Opus) | 7 测试 |
+| O3 | EB-09 共享 ref load 边界(执行 spec A) | `8b99271`(Opus) | 5 测试 |
+| O4 | EB-10 非相干拒 MCS/REA/MCUB | `ba51e68`(Opus) | 8 测试,benchmark 24/24 |
+| O5 | EB-11+12 CUDD 前置断言 + charset + 能力声明核对 | `7c6cf0d`(Opus) | — |
+| F3 规格 | EB-01/02/08「分析执行与证据重放 v2」+ 9 黄金锚点 | `c79c2ac` | 规格 + 先红门控锚点 |
+| F3 阶段 1 | EB-01 报告接集成 LFT + house/bc + 集成拒绝(**报告解冻**) | `46c8a38` | G1-G3/G9 活;live 实测 C3 2e-4 |
+
+**残留**:F3 阶段 2(EB-02 钉扎请求哈希完整性)、阶段 3(EB-08 canonical v2 + 引擎指纹 +
+反构重放)——见规格 `docs/superpowers/specs/2026-07-16-analysis-execution-evidence-replay-v2.md`
+§4 分阶段,阶段实现为锚点执行级,可交 Opus。EB-01 止血后报告冻结已解除。CI 四门全绿。
 
 ## 0 · 总裁定
 
