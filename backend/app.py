@@ -277,10 +277,28 @@ def api_saved_list():
 @app.post("/api/saved")
 def api_saved_create(req: schemas.SaveWorkspaceRequest, _=Depends(require_role(*ANALYST))):
     from backend import storage, store
-    # D-P5-4 乐观并发:base 非空且与服务器最新版本不一致 → 409(不覆盖),前端选路
-    # (查看双方 diff / 另存副本 / 确认覆盖)。版本库内容寻址已保底双方版本俱在,409 只是让
-    # 冲突可见,不是防丢。base 为空(单用户/首存/客户端未传)→ 不检查(现行为,约束 #0)。
-    if req.base_version_hash and req.id:
+    # D-P5-4 乐观并发 + review F2/EB-07(2026-07-16)重排:
+    # v2 载荷 → CAS 检查与版本创建同一 SQLite 事务(store.save_workspace_version_cas,
+    #   BEGIN IMMEDIATE 串行化——两个同 base 的过期保存不再都 200);canonical 失败
+    #   不再静默吞:规范化错误 → 422。证据库为权威真源,legacy 文件其后原子落盘。
+    # 非 v2 载荷 → 显式分型放行并打标(canonical_skipped),沿旧只读 base 检查
+    #   (非 v2 无 canonical 版本,该检查天然空转,保留仅为形状兼容)。
+    sid = req.id or storage.mint_sid()
+    is_v2 = isinstance(req.payload, dict) and req.payload.get("v") == 2 \
+        and isinstance(req.payload.get("etas"), list)
+    version = None
+    if is_v2:
+        try:
+            version = store.save_workspace_version_cas(
+                sid, req.name, req.payload,
+                base_version_hash=req.base_version_hash if req.id else None)
+        except store.VersionConflictError as e:
+            raise HTTPException(409, {"message": "版本冲突:他人已保存了更新的版本",
+                                      "server_hash": e.server_hash,
+                                      "base_hash": req.base_version_hash})
+        except ValueError as e:
+            raise HTTPException(422, f"v2 payload 无法规范化: {e}")
+    elif req.base_version_hash and req.id:
         puuid = store.legacy_project_uuid(req.id)
         versions = store.list_versions(puuid)
         if versions:
@@ -288,13 +306,11 @@ def api_saved_create(req: schemas.SaveWorkspaceRequest, _=Depends(require_role(*
             if latest != req.base_version_hash:
                 raise HTTPException(409, {"message": "版本冲突:他人已保存了更新的版本",
                                           "server_hash": latest, "base_hash": req.base_version_hash})
-    rec = storage.save_workspace(req.name, req.payload, sid=req.id)
-    # ADR-2 绞杀者双写:v2 载荷 → canonical 版本(幂等);失败不影响旧行为(非 v2 载荷等)。
-    try:
-        from backend import store
-        rec["version"] = store.save_workspace_version(rec["id"], req.name, req.payload)
-    except Exception:
-        pass
+    rec = storage.save_workspace(req.name, req.payload, sid=sid)
+    if version is not None:
+        rec["version"] = version
+    else:
+        rec["canonical_skipped"] = "non_v2_payload"
     return rec
 
 @app.get("/api/saved/{sid}")

@@ -117,6 +117,9 @@ def _conn() -> sqlite3.Connection:
     cx.row_factory = sqlite3.Row
     cx.execute("PRAGMA journal_mode=WAL")
     cx.execute("PRAGMA foreign_keys=ON")
+    # review F2/EB-03(2026-07-16):写者互斥时等待而非立刻 SQLITE_BUSY——
+    # 并发转换的仲裁交给条件 UPDATE 的 rowcount,不靠碰运气的锁失败。
+    cx.execute("PRAGMA busy_timeout=5000")
     cx.executescript(_DDL)
     return cx
 
@@ -178,23 +181,28 @@ def record_audit(cx: sqlite3.Connection, action: str, *, project_uuid: str | Non
                 json.dumps(d, ensure_ascii=False)))
 
 
+def _ensure_project_in(cx: sqlite3.Connection, puuid: str, name: str, *,
+                       rename: bool = False) -> bool:
+    row = cx.execute("SELECT name FROM projects WHERE uuid=?", (puuid,)).fetchone()
+    if row is None:
+        cx.execute("INSERT INTO projects(uuid,name,created_at,modified_at) VALUES(?,?,?,?)",
+                   (puuid, name, _now(), _now()))
+        record_audit(cx, "project.create", project_uuid=puuid, details={"name": name})
+        return True
+    if rename and row["name"] != name:
+        cx.execute("UPDATE projects SET name=?, modified_at=? WHERE uuid=?", (name, _now(), puuid))
+        record_audit(cx, "project.rename", project_uuid=puuid,
+                     details={"from": row["name"], "to": name})
+    return False
+
+
 def ensure_project(puuid: str, name: str, *, rename: bool = False) -> bool:
     """Create the project if missing. 既有项目**默认不改名**(task_75694c92:_pin_case 曾以
     scenario_name 作 hint 调本函数,导致每次报告导出把存档项目改名成场景名——名字是用户
     资产,分析动作不得改写)。显式保存路径(用户给名)传 rename=True;改名进审计。
     Returns True if created."""
     with _conn() as cx:
-        row = cx.execute("SELECT name FROM projects WHERE uuid=?", (puuid,)).fetchone()
-        if row is None:
-            cx.execute("INSERT INTO projects(uuid,name,created_at,modified_at) VALUES(?,?,?,?)",
-                       (puuid, name, _now(), _now()))
-            record_audit(cx, "project.create", project_uuid=puuid, details={"name": name})
-            return True
-        if rename and row["name"] != name:
-            cx.execute("UPDATE projects SET name=?, modified_at=? WHERE uuid=?", (name, _now(), puuid))
-            record_audit(cx, "project.rename", project_uuid=puuid,
-                         details={"from": row["name"], "to": name})
-        return False
+        return _ensure_project_in(cx, puuid, name, rename=rename)
 
 
 def create_version(puuid: str, doc: ProjectDocument, sidecar: dict | None = None, *,
@@ -208,29 +216,37 @@ def create_version(puuid: str, doc: ProjectDocument, sidecar: dict | None = None
     identical saves must be safe, not just sequential ones."""
     h = content_hash(doc)
     with _conn() as cx:
+        return _create_version_in(cx, puuid, doc, sidecar, origin=origin,
+                                  message=message, h=h)
+
+
+def _create_version_in(cx: sqlite3.Connection, puuid: str, doc: ProjectDocument,
+                       sidecar: dict | None = None, *, origin: str = "save",
+                       message: str | None = None, h: str | None = None) -> dict:
+    h = h or content_hash(doc)
+    row = cx.execute("SELECT id FROM versions WHERE project_uuid=? AND content_hash=?",
+                     (puuid, h)).fetchone()
+    if row is not None:
+        return {"id": row["id"], "content_hash": h, "created": False}
+    parent = cx.execute("SELECT id FROM versions WHERE project_uuid=? ORDER BY id DESC LIMIT 1",
+                        (puuid,)).fetchone()
+    try:
+        cur = cx.execute(
+            "INSERT INTO versions(project_uuid,content_hash,parent_version_id,canonical_json,"
+            "sidecar_json,created_at,actor,origin,message) VALUES(?,?,?,?,?,?,?,?,?)",
+            (puuid, h, parent["id"] if parent else None, canonical_json(doc),
+             json.dumps(sidecar, ensure_ascii=False) if sidecar is not None else None,
+             _now(), actor(), origin, message))
+    except sqlite3.IntegrityError:
         row = cx.execute("SELECT id FROM versions WHERE project_uuid=? AND content_hash=?",
                          (puuid, h)).fetchone()
-        if row is not None:
-            return {"id": row["id"], "content_hash": h, "created": False}
-        parent = cx.execute("SELECT id FROM versions WHERE project_uuid=? ORDER BY id DESC LIMIT 1",
-                            (puuid,)).fetchone()
-        try:
-            cur = cx.execute(
-                "INSERT INTO versions(project_uuid,content_hash,parent_version_id,canonical_json,"
-                "sidecar_json,created_at,actor,origin,message) VALUES(?,?,?,?,?,?,?,?,?)",
-                (puuid, h, parent["id"] if parent else None, canonical_json(doc),
-                 json.dumps(sidecar, ensure_ascii=False) if sidecar is not None else None,
-                 _now(), actor(), origin, message))
-        except sqlite3.IntegrityError:
-            row = cx.execute("SELECT id FROM versions WHERE project_uuid=? AND content_hash=?",
-                             (puuid, h)).fetchone()
-            return {"id": row["id"], "content_hash": h, "created": False}
-        vid = cur.lastrowid
-        cx.execute("UPDATE projects SET modified_at=? WHERE uuid=?", (_now(), puuid))
-        record_audit(cx, "version.auto_pin" if origin == "auto_pin" else "version.create",
-                     project_uuid=puuid, version_id=vid,
-                     details={"content_hash": h, "origin": origin, "message": message})
-        return {"id": vid, "content_hash": h, "created": True}
+        return {"id": row["id"], "content_hash": h, "created": False}
+    vid = cur.lastrowid
+    cx.execute("UPDATE projects SET modified_at=? WHERE uuid=?", (_now(), puuid))
+    record_audit(cx, "version.auto_pin" if origin == "auto_pin" else "version.create",
+                 project_uuid=puuid, version_id=vid,
+                 details={"content_hash": h, "origin": origin, "message": message})
+    return {"id": vid, "content_hash": h, "created": True}
 
 
 def create_case(puuid: str, version_id: int, kind: str, *, settings: dict | None = None,
@@ -264,6 +280,62 @@ def save_workspace_version(sid: str, name: str, payload: dict) -> dict:
     ensure_project(puuid, name, rename=True)   # 用户显式给名的保存路径,改名合法且入审计
     ver = create_version(puuid, doc, sidecar, origin="save", message=f"saved:{sid}")
     return {"project_uuid": puuid, **ver}
+
+
+class VersionConflictError(ValueError):
+    """乐观并发:base_version_hash 已过期(review F2/EB-07)。"""
+    def __init__(self, server_hash: str):
+        super().__init__(f"base version is stale; server latest = {server_hash}")
+        self.server_hash = server_hash
+
+
+def save_workspace_version_cas(sid: str, name: str, payload: dict,
+                               base_version_hash: str | None = None) -> dict:
+    """CAS 检查与版本创建同一事务(review F2/EB-07):此前 base 检查(只读)、
+    legacy 文件写、canonical 写三段分离——两个携带同一 base 的过期保存可同时通过
+    检查并都返回 200。BEGIN IMMEDIATE 串行化写者:后到者在事务内重读最新哈希,
+    不一致即 VersionConflictError(携带 server_hash 供 409 响应)。
+
+    规范化(to_canonical)在事务外完成——纯计算,失败不留半事务;
+    非 v2 载荷在此抛 ValueError,由调用方显式分型(不再静默吞)。"""
+    puuid = legacy_project_uuid(sid)
+    try:
+        doc, sidecar = to_canonical(payload, puuid, project_name=name)
+    except ValueError:
+        raise
+    except Exception as e:
+        # v2 形载荷的深层规范化失败(如 KeyError 'model')同属校验错误——
+        # 统一为 ValueError 供端点映射 422(convert.py 类型化报错记 F3/canonical v2)
+        raise ValueError(f"canonicalization failed: {type(e).__name__}: {e}") from e
+    os.makedirs(os.path.dirname(os.path.abspath(_DB_PATH)), exist_ok=True)
+    cx = sqlite3.connect(_DB_PATH)
+    cx.row_factory = sqlite3.Row
+    cx.isolation_level = None                      # 显式事务控制
+    try:
+        cx.execute("PRAGMA journal_mode=WAL")
+        cx.execute("PRAGMA foreign_keys=ON")
+        cx.execute("PRAGMA busy_timeout=5000")
+        cx.executescript(_DDL)
+        cx.execute("BEGIN IMMEDIATE")
+        if base_version_hash:
+            row = cx.execute(
+                "SELECT content_hash FROM versions WHERE project_uuid=?"
+                " ORDER BY id DESC LIMIT 1", (puuid,)).fetchone()
+            if row is not None and row["content_hash"] != base_version_hash:
+                raise VersionConflictError(row["content_hash"])
+        _ensure_project_in(cx, puuid, name, rename=True)
+        ver = _create_version_in(cx, puuid, doc, sidecar,
+                                 origin="save", message=f"saved:{sid}")
+        cx.execute("COMMIT")
+        return {"project_uuid": puuid, **ver}
+    except BaseException:
+        try:
+            cx.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        raise
+    finally:
+        cx.close()
 
 
 # ---- read surface -----------------------------------------------------------
@@ -606,8 +678,14 @@ def sign_review(puuid: str, version_id: int, note: str | None = None,
         row = _review_row(cx, puuid, version_id)
         if row is None or row["state"] != "in_review":
             raise ReviewStateError("only an in-review version can be signed")
-        cx.execute("UPDATE reviews SET state='signed', decided_by=?, decided_at=?, note=?"
-                   " WHERE id=?", (actor(), _now(), note, row["id"]))
+        # review F2/EB-03(2026-07-16):条件 UPDATE + rowcount 仲裁——上面的 SELECT
+        # 只提供友好报错;并发下(退回先提交)持旧读的签发曾无条件 UPDATE 成功,
+        # 产生 review.return → review.sign 的非法审计序。
+        cur = cx.execute("UPDATE reviews SET state='signed', decided_by=?, decided_at=?, note=?"
+                         " WHERE id=? AND state='in_review'",
+                         (actor(), _now(), note, row["id"]))
+        if cur.rowcount != 1:
+            raise ReviewStateError("only an in-review version can be signed")
         record_audit(cx, "review.sign", project_uuid=puuid, version_id=version_id,
                      details={"content_hash": h, "note": note, "role": actor_role})
         return _review_joined(cx, puuid, version_id)  # type: ignore[return-value]
@@ -623,8 +701,11 @@ def return_review(puuid: str, version_id: int, note: str,
         row = _review_row(cx, puuid, version_id)
         if row is None or row["state"] != "in_review":
             raise ReviewStateError("only an in-review version can be returned")
-        cx.execute("UPDATE reviews SET state='returned', decided_by=?, decided_at=?, note=?"
-                   " WHERE id=?", (actor(), _now(), note, row["id"]))
+        cur = cx.execute("UPDATE reviews SET state='returned', decided_by=?, decided_at=?, note=?"
+                         " WHERE id=? AND state='in_review'",   # F2/EB-03 同 sign:条件仲裁
+                         (actor(), _now(), note, row["id"]))
+        if cur.rowcount != 1:
+            raise ReviewStateError("only an in-review version can be returned")
         record_audit(cx, "review.return", project_uuid=puuid, version_id=version_id,
                      details={"content_hash": h, "note": note, "role": actor_role})
         return _review_joined(cx, puuid, version_id)  # type: ignore[return-value]
