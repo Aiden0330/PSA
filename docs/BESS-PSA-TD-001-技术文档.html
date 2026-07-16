@@ -1102,6 +1102,15 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
 uv sync                      # 创建 .venv 并按 uv.lock 精确还原 Python 依赖
 npm --prefix frontend ci     # 按 package-lock 精确还原前端依赖(需先有 Node 20)</code></pre>
 
+  <div class="note"><b>威胁模型与信任边界(部署决策)。</b><code>PSA_AUTH</code> 部署开关唯一决定信任边界,
+  两态共享同一存储——认证是叠加层而非代码分叉(约束 #0)。
+  <b>off(默认)= 离线单机零信任边界</b>:单用户即全权,无登录墙,私有读接口透明放行,
+  CORS 维持 <code>"*"</code>(离线单文件无 cookie、无凭据,反射任意 Origin 无害);适用离线评估与单机演示。
+  <b>local/server = 认证边界</b>:私有项目 / 存档 / 组合总览 / AI 草案等读接口要求已登录,
+  删除等破坏性操作要求 <code>analyst</code> 及以上角色,CORS 收紧至受信任前端 Origin 白名单
+  (<code>PSA_CORS_ORIGINS</code>);适用多用户 / 联网部署。选择哪一态是一次显式、有意的部署动作
+  (EB-06/O2)。</div>
+
   <h3 id="s5-2"><span class="no">5.2</span>macOS</h3>
   <p>无需 Homebrew:uv 用官方安装脚本,Node 用 nvm(按其官方 README 一行脚本安装)。
   注意非交互 shell(脚本/自动化)须先 <code>source ~/.nvm/nvm.sh</code> 才能见到 node/npm。</p>

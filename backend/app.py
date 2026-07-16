@@ -294,7 +294,8 @@ def api_import_mef(req: schemas.MefImportRequest, _=Depends(require_role(*ANALYS
             "fault_tree": fts[0]["name"]}
 
 @app.get("/api/saved")
-def api_saved_list():
+def api_saved_list(_=Depends(require_authenticated)):
+    # EB-06/O2:私有存档列表 —— local 模式要求已登录(off 模式 require_authenticated 放行)。
     from backend import storage
     return storage.list_workspaces()
 
@@ -344,7 +345,7 @@ def api_saved_create(req: schemas.SaveWorkspaceRequest, _=Depends(require_role(*
     return rec
 
 @app.get("/api/saved/{sid}")
-def api_saved_get(sid: str):
+def api_saved_get(sid: str, _=Depends(require_authenticated)):
     from backend import storage, store
     try:
         rec = storage.load_workspace(sid)
@@ -361,7 +362,8 @@ def api_saved_get(sid: str):
     return rec
 
 @app.delete("/api/saved/{sid}")
-def api_saved_delete(sid: str):
+def api_saved_delete(sid: str, _=Depends(require_role(*ANALYST))):
+    # EB-06/O2:删除是破坏性写 —— local 模式要求 analyst+(off 模式放行)。
     from backend import storage
     try:
         storage.delete_workspace(sid)
@@ -483,20 +485,22 @@ def api_bess_event_tree(scenario: str | None = None):
     }
 
 # ---- ADR-2 只读面:项目 / 版本 / 审计 / 分析案例(证据链查询) ----
+# EB-06/O2:私有项目/证据链读接口 —— local 模式要求已登录(off 模式 require_authenticated
+# 放行,约束 #0 逐位不变)。本机恶意页此前可未认证读全部项目/组合总览,此处闭合。
 @app.get("/api/projects")
-def api_projects_list():
+def api_projects_list(_=Depends(require_authenticated)):
     from backend import store
     return store.list_projects()
 
 @app.get("/api/portfolio")
-def api_portfolio():
+def api_portfolio(_=Depends(require_authenticated)):
     """R5 组合总览:每项目一行,数字取自已钉扎案例(证据链正确性)。只读聚合面,
-    与 /api/projects 同属无角色门的查询面。"""
+    local 模式要求已登录(私有跨项目口径,与监管报告聚合同信任边界)。"""
     from backend import store
     return store.portfolio()
 
 @app.get("/api/projects/{puuid}")
-def api_project_get(puuid: str):
+def api_project_get(puuid: str, _=Depends(require_authenticated)):
     from backend import store
     p = store.get_project(puuid)
     if p is None:
@@ -504,12 +508,13 @@ def api_project_get(puuid: str):
     return p
 
 @app.get("/api/projects/{puuid}/versions")
-def api_project_versions(puuid: str):
+def api_project_versions(puuid: str, _=Depends(require_authenticated)):
     from backend import store
     return store.list_versions(puuid)
 
 @app.get("/api/projects/{puuid}/versions/{vid}")
-def api_project_version(puuid: str, vid: int, include_doc: bool = False):
+def api_project_version(puuid: str, vid: int, include_doc: bool = False,
+                        _=Depends(require_authenticated)):
     from backend import store
     v = store.get_version(puuid, vid, include_doc=include_doc)
     if v is None:
@@ -517,7 +522,8 @@ def api_project_version(puuid: str, vid: int, include_doc: bool = False):
     return v
 
 @app.get("/api/projects/{puuid}/diff")
-def api_project_diff(puuid: str, frm: int = Query(alias="from"), to: int = Query()):
+def api_project_diff(puuid: str, frm: int = Query(alias="from"), to: int = Query(),
+                     _=Depends(require_authenticated)):
     """4a5 模型版本对比(parity #5):canonical 文档结构化 diff,列表按身份键对齐。"""
     from backend import store
     from backend.diff import diff_documents
@@ -535,12 +541,12 @@ def api_project_diff(puuid: str, frm: int = Query(alias="from"), to: int = Query
     }
 
 @app.get("/api/projects/{puuid}/audit")
-def api_project_audit(puuid: str, limit: int = 200):
+def api_project_audit(puuid: str, limit: int = 200, _=Depends(require_authenticated)):
     from backend import store
     return store.list_audit(puuid, limit=limit)
 
 @app.get("/api/projects/{puuid}/cases")
-def api_project_cases(puuid: str):
+def api_project_cases(puuid: str, _=Depends(require_authenticated)):
     from backend import store
     return store.list_cases(puuid)
 
@@ -559,7 +565,7 @@ class ReviewCommentBody(BaseModel):
     body: str
 
 @app.get("/api/projects/{puuid}/reviews")
-def api_reviews_list(puuid: str):
+def api_reviews_list(puuid: str, _=Depends(require_authenticated)):
     from backend import store
     return store.list_reviews(puuid)
 
@@ -607,7 +613,7 @@ def api_review_return(puuid: str, vid: int, body: ReviewDecideBody,
         raise HTTPException(422, "退回必须填写理由(证据链要求)")
 
 @app.get("/api/projects/{puuid}/versions/{vid}/comments")
-def api_version_comments(puuid: str, vid: int):
+def api_version_comments(puuid: str, vid: int, _=Depends(require_authenticated)):
     from backend import store
     return store.list_review_comments(puuid, vid)
 
@@ -697,7 +703,9 @@ def api_ai_draft_applied(rid: int, body: schemas.AiDraftAppliedRequest, _=Depend
 
 
 @app.get("/api/ai/drafts")
-def api_ai_drafts(project_uuid: str | None = None, limit: int = 50):
+def api_ai_drafts(project_uuid: str | None = None, limit: int = 50,
+                  _=Depends(require_authenticated)):
+    # EB-06/O2:AI 草案溯源列表属私有面 —— local 模式要求已登录(off 模式放行)。
     from backend import store
     return store.list_ai_drafts(project_uuid, limit=limit)
 
