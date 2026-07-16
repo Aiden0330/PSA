@@ -38,8 +38,12 @@ def _merged_barrier_pdag(model: Model, et_name: str,
             # review EB-04(2026-07-16 三方评审):屏障↔屏障轴施加与 IE↔屏障轴
             # (ed90116 F1)同一判据——同 id 仅限同参数基本事件;门/异构撞名此前
             # 静默首见胜,第二棵树的定义被无声丢弃(FF=.1/FS=0,正确 .02/.08)。
-            ok = (existing.is_basic and n.is_basic
-                  and existing.param_ref == n.param_ref)
+            # 合法共享(评审 S-1):同参数基本事件,或同 state 的 house(常量可互换、
+            # 边界条件集本就按 id 全局覆盖——跨屏障共享 house id 是合理建模习语)。
+            ok = ((existing.is_basic and n.is_basic
+                   and existing.param_ref == n.param_ref)
+                  or (existing.is_house and n.is_house
+                      and existing.state == n.state))
             if not ok:
                 raise ValueError(
                     f"node id '{nid}' means different things in barrier trees "

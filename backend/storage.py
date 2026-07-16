@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, os, re, uuid
+import json, os, re, tempfile, uuid
 from datetime import datetime, timezone
 
 _DIR = os.path.join(os.path.dirname(__file__), "..", "saved")
@@ -9,6 +9,10 @@ _ID_RE = re.compile(r"^[0-9a-f]+$")
 def _dir() -> str:
     os.makedirs(_DIR, exist_ok=True)
     return _DIR
+
+
+def is_valid_sid(sid: str) -> bool:
+    return bool(_ID_RE.match(sid))
 
 
 def _path(sid: str) -> str:
@@ -28,14 +32,18 @@ def save_workspace(name: str, payload: dict, sid: str | None = None) -> dict:
     sid = sid or mint_sid()
     rec = {"id": sid, "name": name,
            "saved_at": datetime.now(timezone.utc).isoformat(), "payload": payload}
-    tmp = _path(sid) + ".tmp"
+    # review F2-R1(2026-07-16 冷读):此前共享 `{sid}.tmp`——并发同 sid 保存互相
+    # 消耗对方 tmp(小载荷 FileNotFoundError、大载荷发布可解析的混编 JSON),且异常
+    # 清理误删对方在途 tmp。改用同目录唯一临时名(mkstemp)+ os.replace 原子换入。
+    d = _dir()
+    fd, tmp = tempfile.mkstemp(prefix=f".{sid}-", suffix=".tmp", dir=d)
     try:
-        with open(tmp, "w", encoding="utf-8") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(rec, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, _path(sid))
+        os.replace(tmp, _path(sid))                  # 同目录 rename:原子;最后写者胜
     except BaseException:
         if os.path.exists(tmp):
-            os.remove(tmp)
+            os.remove(tmp)                           # 只删本调用自己的唯一 tmp
         raise
     return {"id": sid, "name": name, "saved_at": rec["saved_at"]}
 

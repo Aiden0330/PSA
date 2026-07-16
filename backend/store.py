@@ -660,9 +660,15 @@ def submit_review(puuid: str, version_id: int, note: str | None = None) -> dict:
                        "submitted_at,note) VALUES(?,?,'in_review',?,?,?)",
                        (puuid, version_id, actor(), _now(), note))
         else:                                                  # returned → 回转
-            cx.execute("UPDATE reviews SET state='in_review', submitted_by=?, submitted_at=?,"
-                       " decided_by=NULL, decided_at=NULL, note=? WHERE id=?",
-                       (actor(), _now(), note, row["id"]))
+            # review F2-R2(2026-07-16 冷读):条件谓词 + rowcount 仲裁,同 sign/return——
+            # 此前无条件 UPDATE,并发下迟到的 submit 会覆写他人刚建立的 in_review 行
+            # (审计尾出现非法的 review.submit → review.submit 双条)。
+            cur = cx.execute(
+                "UPDATE reviews SET state='in_review', submitted_by=?, submitted_at=?,"
+                " decided_by=NULL, decided_at=NULL, note=? WHERE id=? AND state='returned'",
+                (actor(), _now(), note, row["id"]))
+            if cur.rowcount != 1:
+                raise ReviewStateError("only a returned version can be resubmitted")
         record_audit(cx, "review.submit", project_uuid=puuid, version_id=version_id,
                      details={"content_hash": h, "note": note})
         return _review_joined(cx, puuid, version_id)  # type: ignore[return-value]

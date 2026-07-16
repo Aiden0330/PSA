@@ -143,6 +143,35 @@ def test_ccf_indep_id_colliding_user_node_raises():
         quantify_event_tree(m, "TR")
 
 
+def test_house_house_same_state_allowed_diff_state_rejected():
+    # 评审 S-7:house↔house 轴锚点。同 state 合法(常量可互换、bc 集本就全局按 id 覆盖);
+    # 异 state 撞名此前静默错数(S_FF=.02,正确 .1,5× 低估)→ 必拒。
+    def mk(state2):
+        return _model(
+            [Parameter("A", "probability", 0.1), Parameter("B", "probability", 0.1)],
+            {"FE_1": lambda g: (g.basic("A"), g.house("H", state=True),
+                                g.gate("T1", Op.AND, ["A", "H"])),
+             "FE_2": lambda g: (g.basic("B"), g.house("H", state=state2),
+                                g.gate("T2", Op.AND, ["B", "H"]))})
+    quantify_event_tree(mk(True), "TR")            # 同 state:放行
+    with pytest.raises(ValueError, match="'H'"):
+        quantify_event_tree(mk(False), "TR")       # 异 state:拒绝
+
+
+def test_single_tree_duplicate_id_rejected_at_load():
+    # 评审 F-1:单树内同 id 既 basic 又 gate,装载期静默重定义(EB-04 早一层)→ 拒绝
+    from psaengine.model.json_io import load_model_from_dict
+    d = {"model_data": {"parameters": [
+             {"id": "X", "kind": "probability", "value": 0.4},
+             {"id": "A", "kind": "probability", "value": 0.1}]},
+         "fault_trees": [{"name": "FT", "top": "X", "nodes": [
+             {"id": "A", "basic": True},
+             {"id": "X", "basic": True},
+             {"id": "X", "op": "or", "args": ["A"]}]}]}
+    with pytest.raises(ValueError, match="duplicate node id 'X'"):
+        load_model_from_dict(d)
+
+
 def test_ccf_clean_namespace_expansion_unchanged():
     # 无撞名时 beta 展开数值不受护栏影响:P(M1∧M2) = βQ + (1−βQ)((1−β)Q)²
     m = _model(

@@ -305,9 +305,15 @@ def api_saved_create(req: schemas.SaveWorkspaceRequest, _=Depends(require_role(*
     # v2 载荷 → CAS 检查与版本创建同一 SQLite 事务(store.save_workspace_version_cas,
     #   BEGIN IMMEDIATE 串行化——两个同 base 的过期保存不再都 200);canonical 失败
     #   不再静默吞:规范化错误 → 422。证据库为权威真源,legacy 文件其后原子落盘。
-    # 非 v2 载荷 → 显式分型放行并打标(canonical_skipped),沿旧只读 base 检查
-    #   (非 v2 无 canonical 版本,该检查天然空转,保留仅为形状兼容)。
+    # 非 v2 载荷 → 显式分型放行并打标(canonical_skipped);沿旧只读 base 检查——
+    #   注(review F2-S2):该 sid 曾有 v2 版本时,非 v2 + 过期 base 仍会 409(非空转);
+    #   保留为真实并发保护,勿当死代码删。
     sid = req.id or storage.mint_sid()
+    # review F2-R3(2026-07-16 冷读):sid 形状校验前置到任何库写之前——此前 CAS
+    # 先行,非法 sid 会把 project+version+audit 全部提交后才撞 storage._path 的
+    # hex 校验(500),在证据库/组合总览留下不可打开、无删除面的永久孤儿项目。
+    if not storage.is_valid_sid(sid):
+        raise HTTPException(422, f"非法存档 id '{sid}'(仅允许十六进制)")
     is_v2 = isinstance(req.payload, dict) and req.payload.get("v") == 2 \
         and isinstance(req.payload.get("etas"), list)
     version = None

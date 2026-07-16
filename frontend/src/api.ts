@@ -208,6 +208,17 @@ export class SaveConflictError extends Error {
 // 401/403 意味着后端活着但拒绝了你 —— 此时静默写 localStorage 会让用户以为存到了服务器。
 // 规则:AuthRequiredError 从 /api/saved 家族直接上抛(UI 弹登录);只有网络层异常
 // (fetch reject)与其余 HTTP 错误(后端不可达/降级语义)才走 localStorage 回退。
+// review F2-R4:保存的 4xx 客户端缺陷(422 规范化失败 / 非法 id)—— 不是离线信号,
+// 抛出让 UI 可见披露,绝不静默回退 localStorage。
+export class SaveClientError extends Error {
+  status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'SaveClientError'
+    this.status = status
+  }
+}
+
 export class AuthRequiredError extends Error {
   status: number
   constructor(status: number) {
@@ -258,12 +269,21 @@ export async function saveWorkspace(name: string, payload: any, id?: string, bas
       try { detail = (await r.json())?.detail ?? {} } catch { /* body 不是预期形状时仍抛冲突 */ }
       throw new SaveConflictError(detail.server_hash ?? '', detail.base_hash ?? baseVersionHash ?? '')
     }
+    // review F2-R4(2026-07-16 冷读):4xx 客户端缺陷(422 规范化失败/非法 id)不得
+    // 静默回退 localStorage —— 那正是 EB-07 要消除的"服务器静默吞"换成"前端静默吞",
+    // 用户仍以为已存到服务器。抛可见错误,由调用方披露(非离线信号)。
+    if (r.status >= 400 && r.status < 500) {
+      let msg = `save → ${r.status}`
+      try { msg = (await r.json())?.detail ?? msg } catch { /* 保留状态码信息 */ }
+      throw new SaveClientError(r.status, typeof msg === 'string' ? msg : `save → ${r.status}`)
+    }
     if (!r.ok) throw new Error(`save → ${r.status}`)
     const data = (await r.json()) as SavedItem
     _savedOffline = false
     return data
   } catch (e) {
-    if (e instanceof AuthRequiredError || e instanceof SaveConflictError) throw e
+    if (e instanceof AuthRequiredError || e instanceof SaveConflictError
+        || e instanceof SaveClientError) throw e
     _savedOffline = true
     return lsSave(name, payload, id)
   }

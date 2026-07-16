@@ -19,6 +19,16 @@ def _param(d: dict) -> Parameter:
 
 def _pdag(ft: dict, lib: ParameterLibrary) -> PDAG:
     g = PDAG()
+    # review engine-reviewer F-1(2026-07-16,EB-04 同类早一层):单树内重复 id 装载期
+    # 静默重定义——两遍建图,第二遍 g.gate() 无条件覆盖第一遍的 basic/house 同 id 节点
+    # (同 id 既是 basic 又是 gate 时,basic 定义被无声丢弃 → 与 EB-04 同向静默低估)。
+    # 源头拒绝:一棵树内 id 必须唯一。
+    seen: set[str] = set()
+    for nd in ft["nodes"]:
+        if nd["id"] in seen:
+            raise ValueError(f"duplicate node id '{nd['id']}' within fault tree "
+                             f"(top='{ft.get('top')}'): ids must be unique per tree")
+        seen.add(nd["id"])
     for nd in ft["nodes"]:
         if nd.get("basic"):
             ref = nd.get("param_ref", nd["id"])
