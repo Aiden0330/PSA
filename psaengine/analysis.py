@@ -1,11 +1,31 @@
 from __future__ import annotations
 from psaengine.model.model import Model
+from psaengine.model.pdag import Op
 from psaengine.preprocess.normalize import normalize
 from psaengine.ordering.heuristics import dflm
 from psaengine.bdd.kernel import BddManager, build_from_pdag
 from psaengine.quantify.probability import exact_probability, rea, mcub
 from psaengine.quantify.cutsets import minimal_cutsets
 from psaengine.importance.measures import importance as _imp
+
+
+def _first_non_coherent_gate(pdag):
+    """EB-10/O4:自 top 可达子图中的首个 NOT/XOR 门(非相干判据),否则 None。
+    与 frequency._reject_non_coherent 同判据(NOT/XOR),但服务于 cutsets 通道的独立提示语。"""
+    seen: set = set()
+    stack = [pdag.top]
+    while stack:
+        nid = stack.pop()
+        if nid is None or nid in seen:
+            continue
+        seen.add(nid)
+        n = pdag.nodes.get(nid)
+        if n is None:
+            continue
+        if getattr(n, "op", None) in (Op.NOT, Op.XOR):
+            return (nid, n.op)
+        stack.extend(getattr(n, "args", []) or [])
+    return None
 
 class Analysis:
     def __init__(self, model: Model, fault_tree: str | None = None,
@@ -42,6 +62,17 @@ class Analysis:
         return mcub(probs) if method == "mcub" else rea(probs)
 
     def cutsets(self, cutoff: float = 0.0, limit_order: int | None = None):
+        # EB-10/O4:非相干模型(含 NOT/XOR)无相干最小割集 —— cutsets 枚举只取正文字路径,
+        # 会静默丢弃负文字(A∧¬B:精确 .1 却给割集 [A]/REA .2)。点名拒绝并指向 prime_implicants;
+        # exact 概率通道走 BDD 精确否定,相干/非相干均正确,不受本守卫影响。
+        bad = _first_non_coherent_gate(self.pdag)
+        if bad is not None:
+            nid, op = bad
+            raise ValueError(
+                f"minimal cut sets are undefined for non-coherent model "
+                f"(gate {op.value.upper()} at '{nid}'); cut-set enumeration silently drops negative "
+                f"literals — use prime_implicants for MCS/REA/MCUB (Analysis.prime_implicants); "
+                f"exact probability is unaffected")
         return minimal_cutsets(self.m, self.root, q=self.q,
                                cutoff=cutoff, limit_order=limit_order)
 

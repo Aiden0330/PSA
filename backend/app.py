@@ -101,7 +101,10 @@ def api_quantify(req: schemas.QuantifyRequest, _=Depends(require_role(*ANALYST))
                       boundary_condition_set=req.boundary_condition_set)
     except ValueError as e:                          # 未知 house/边界集等建模错误 → 400 而非 500
         raise HTTPException(400, str(e))
-    cs = an.cutsets(cutoff=req.cutoff, limit_order=req.limit_order)
+    try:
+        cs = an.cutsets(cutoff=req.cutoff, limit_order=req.limit_order)
+    except ValueError as e:                          # EB-10/O4:非相干模型无最小割集 → 400(提示 prime_implicants)
+        raise HTTPException(400, str(e))
     post = None
     if req.post_rules:                               # 4a3:后处理只动 MCS 列表;精确概率通道不变
         from psaengine.quantify.postprocess import PostRule, apply_post_rules
