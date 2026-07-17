@@ -498,3 +498,14 @@ station.md;脚本+数据:docs/reference-assets/pilot-200mwh/。
 - 库内项目治理入 **UI backlog(低优先)**:项目改名 / 归档 / 合并 / 清理孤儿行。
 - 诱因:save 流与钉扎流 uuid 不一致时产生成对项目行,崩溃重跑产生重复行,当前无清理 / 合并入口。
 - 源:试点 P-5(`docs/reviews/2026-07-16-pilot-200mwh-station.md`)。
+
+## 2026-07-17 · 集成 MC/重要度落地(banked 激活)+ MC 向量化 130×(P-6/P-7 收口)
+
+`4993ff6`:集成通道 MC(按 ref 联合抽样 + λ 入带 + 量纲分流:频率不封顶/概率封 [0,1])
++ 扰动重要度(共享事件 RAW=1 精确),banked A1-A10 激活转绿,端点/报告解冻,G3 由拒绝锁
+翻转为通道活锁(数值回退判别)。`d582e76`:exact_probability_batch 节点级样本向量化,
+三 MC 通道共用——N=1000 57s→0.44s(130×)、N=50k 47min→12.9s,逐位等价三证(A7 冻结值
+不动/单树≡聚合逐位/批量-标量逐列交叉锁)。engine-reviewer PASS(独立推导+金标准探针),
+收口修复:A10 闭式补 λ 入带项(0.117 非 0.09,区间重定 [0.095,0.14])、集成钉扎
+resolved_settings 的 ie_ft_name 残留 None 改实值。checked_set × 集成树的预存缺口由独立
+会话任务处理中(chip)。基线:py 572+56 · benchmark 24/24。

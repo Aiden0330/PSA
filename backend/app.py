@@ -524,7 +524,7 @@ def api_event_tree_uncertainty(req: schemas.EtUncertaintyRequest, _=Depends(requ
                            settings={"samples": req.samples, "seed": req.seed, "error_factor": req.error_factor},
                            results=res, audit_action="analysis.uncertainty",
                            computed_request_hash=request_hash(dumped),
-                           resolved_settings=_single_resolved(req, dumped, None,
+                           resolved_settings=_single_resolved(req, dumped, ie_ft,
                                                               samples=req.samples, seed=req.seed,
                                                               error_factor=req.error_factor))
         res = {**res, "case": pinned}
@@ -555,7 +555,7 @@ def api_event_tree_importance(req: schemas.EtQuantifyRequest, _=Depends(require_
                                 settings={"method": "perturbation-exact"},
                                 results={"importance": imp}, audit_action="analysis.importance",
                                 computed_request_hash=request_hash(dumped),
-                                resolved_settings=_single_resolved(req, dumped, None))
+                                resolved_settings=_single_resolved(req, dumped, ie_ft))
     return out
 
 @app.get("/api/bess/library")
