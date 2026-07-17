@@ -1,3 +1,4 @@
+import { buildAnalysisRequest } from '../analysis/buildRequest'
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { addVersionComment, diffProjectVersions, exportReport, listProjectCases, listProjectReviews, listProjectVersions, listVersionComments, returnReview, signReview, submitReview } from '../../api'
@@ -65,8 +66,10 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
     if (!etModel) return
     setBusy(true); setErr(null)
     try {
-      const linked = { fault_trees: etFtsModel.fault_trees ?? [], parameters: etFtsModel.model_data.parameters ?? [] }
-      const req = toEngineRequest(etModel, linked)
+      // FE-01(F-α):单树导出与屏幕量化同一构造(集成块随行);此前还漏带 ccf_groups
+      const linked = { fault_trees: etFtsModel.fault_trees ?? [], parameters: etFtsModel.model_data.parameters ?? [],
+                       ccf_groups: etFtsModel.ccf_groups ?? [] }
+      const req = buildAnalysisRequest(etModel, linked)
       const useAgg = aggScope && checkedTabs.length >= 1
       await exportReport(fmt, {
         ...req, samples: 1000,

@@ -14,7 +14,8 @@ import { Icon } from '../../components/icons'
 import { formatEtaNumber } from '../../etaNumberFormat'
 import { useViewStore } from '../../stores/viewStore'
 import { useActiveEta, etaDisplayName } from '../../stores/useActiveEta'
-import { composeModel, INIT_FREQ_KEY } from '../../stores/derived'
+import { composeModel } from '../../stores/derived'
+import { deriveLinkedValue } from './linkedDerive'
 import { EMPTY_FTS } from '../../stores/projectStore'
 import { AiAppliedPill } from '../ai-draft/AiAppliedPill'
 import type { AiDraftState } from '../ai-draft/useAiDraft'
@@ -104,20 +105,24 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
     if (!ftEtaName) return
     const target = P().present.etas.find((e) => e.key === ftEtaKey)
     if (!target) return
+    // FE-03(F-α):初因树只准频率端点(此前调概率端点 + 空 catch——r2 typed 直传后
+    // 频率参数被引擎响亮拒,400 被吞成静默保留旧初频)。分派收敛到 deriveLinkedValue
+    // (与 EtaWorkbench 正确先例同口径:共享事件 → 序列级集成情形,不做两段式);错误可见。
     try {
-      if (ftEtaName === '__init__') {
-        if (target.model.initFreqSource === 'ft') {
-          const top = (await quantify(m, '__init__')).probability
-          P().setEtaPfd(ftEtaKey, INIT_FREQ_KEY, top)          // 派生量入缓存,不进内容历史
-        }
-      } else {
+      if (ftEtaName !== '__init__') {
         // C1 守护:若该屏障已 detach(linkFt 已清空),不覆盖用户手动填写的 PFD
         const fe = target.model.functionalEvents.find((f) => f.id === ftEtaName)
         if (!fe?.linkFt) return
-        const prob = (await quantify(m, ftEtaName)).probability
-        P().setEtaPfd(ftEtaKey, ftEtaName, prob)               // 派生量入缓存,不进内容历史
       }
-    } catch {}
+      const d = await deriveLinkedValue(m, ftEtaName, target.model.initFreqSource)
+      if (d.kind === 'value') P().setEtaPfd(ftEtaKey, d.key, d.value)   // 派生量入缓存,不进内容历史
+      else if (d.kind === 'integrated') {
+        setError(`初因树与屏障共享基本事件(${d.shared.join(', ')})→ 序列级精确集成情形:`
+          + '初因频率头条不由两段式更新,请在 ETA 页用「引擎精确量化」。')
+      }
+    } catch (e: any) {
+      setError(`挂树派生值更新失败(旧值已过期,请修正后重试):${String(e?.message ?? e)}`)
+    }
   }
   const cvSet     = ftIsStandalone ? (m: ModelJson) => P().setUserFts(m) : ftIsEta ? etaSet : set
   const cvUndo    = (ftIsStandalone || ftIsEta) ? docUndo : undo

@@ -1,7 +1,8 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { EventTreeModel } from '../eventtree'
+import { buildAnalysisRequest } from '../features/analysis/buildRequest'
 import {
-  addFe, layout, toEngineRequest, withIeFaultTree, CONSEQUENCES,
+  addFe, layout, CONSEQUENCES,
   consequenceTotals, consLevel, consDef, reorderFe, isCascade, gradeLabel,
 } from '../eventtree'
 import type { PointerEvent as ReactPointerEvent } from 'react'
@@ -58,7 +59,7 @@ export function EventTreeEditor(
     /** ADR-2 报告钉扎:随导出请求提交项目上下文 → 后端 auto-pin 版本 + 案例 + 证据页脚 */
     getReportContext?: () => { project_uuid: string; project_payload: unknown }
     /** 4c/Gap8:ETA 分析设置(house 覆盖 / 命名边界条件集)—— 套用到引擎精确量化与重要度;
-     *  空对象即零扰动(不含 post 规则:那是 FTA 专属)。导出/报告路径不消费,保持既有口径。 */
+     *  空对象即零扰动(不含 post 规则:那是 FTA 专属)。F-α 起导出/报告与量化同源消费(FE-01)。 */
     etEngineOptions?: { house_states?: Record<string, boolean>; boundary_condition_set?: string; boundary_condition_sets?: unknown[] }
   },
 ) {
@@ -148,7 +149,7 @@ export function EventTreeEditor(
     setQBusy(true); setQErr(null)
     // 初因源=故障树 ⇒ 经 withIeFaultTree 并入 ie_fault_tree 块走 integrated 通道(共享事件精确)。
     try {
-      const res = await quantifyEventTree({ ...withIeFaultTree(toEngineRequest(model, linked), model, linked), ...(etEngineOptions ?? {}) })
+      const res = await quantifyEventTree(buildAnalysisRequest(model, linked, etEngineOptions))
       setEngineSeq(res.sequences)
       setEngineMeta(res.method === 'integrated' ? { method: res.method, ieFrequency: res.ie_frequency ?? null } : null)
     }
@@ -159,14 +160,16 @@ export function EventTreeEditor(
     setDeepBusy(true); setQErr(null)
     // 4a4:携带项目上下文 → 重要度运行自动钉扎为分析案例(证据链);Gap8:同带边界条件设置
     // 初因源=故障树时同带 ie_fault_tree 块(重要度通道 v1 点估计;块使模型合并一致)。
-    try { const im = await importanceEventTree({ ...withIeFaultTree(toEngineRequest(model, linked), model, linked), ...(etEngineOptions ?? {}), ...(getReportContext?.() ?? {}) }); setImp(im.importance) }
+    try { const im = await importanceEventTree({ ...buildAnalysisRequest(model, linked, etEngineOptions), ...(getReportContext?.() ?? {}) }); setImp(im.importance) }
     catch (e: any) { setQErr(String(e?.message ?? e)) }
     finally { setDeepBusy(false) }
   }
   const onExport = async (fmt: 'docx' | 'pdf' | 'csv') => {
     setExpBusy(true); setQErr(null)
     try {
-      const req = toEngineRequest(model, linked)
+      // FE-01(F-α):报告与屏幕量化同一构造——此前裸 toEngineRequest 丢集成块/CCF/
+      // 边界设置,屏幕集成数、报告标量数,钉扎还按标量模型核验通过(错数带核验章)。
+      const req = buildAnalysisRequest(model, linked, etEngineOptions)
       let png: string | undefined
       if (fmt !== 'csv' && svgRef.current) png = await svgToPng(prepareCanvasForExport(svgRef.current))
       await exportReport(fmt, {
@@ -222,7 +225,10 @@ export function EventTreeEditor(
   const worstC = worstSev >= 0 ? CONSEQUENCES[worstSev] : '—'
   const worstFreq = worstSev >= 0 ? seqRows.filter((r) => sevIdx(r.c) === worstSev).reduce((a, r) => a + r.freq, 0) : 0
   const kpis = [
-    { label: '初因事件频率（总）', value: formatEtaNumber(model.initFreq), unit: '/yr' },
+    // FE-01(F-α):集成量化后 KPI 用响应的 Σλ·P(标「集成」),不再固定显示标量残值
+    engineMeta?.method === 'integrated' && engineMeta.ieFrequency != null
+      ? { label: '初因事件频率（总·集成）', value: formatEtaNumber(engineMeta.ieFrequency), unit: '/yr' }
+      : { label: '初因事件频率（总）', value: formatEtaNumber(model.initFreq), unit: '/yr' },
     { label: '严重后果（≥III）累计', value: formatEtaNumber(totalSevere), unit: '/yr' },
     { label: `最严重后果（${gradeLabel(worstC)}）`, value: worstSev >= 0 ? formatEtaNumber(worstFreq) : '—', unit: '/yr' },
     { label: '后果序列 / 屏障', value: `${leafCount} / ${model.functionalEvents.length}`, unit: '条·个' },
