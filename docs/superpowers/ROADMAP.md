@@ -472,3 +472,13 @@ run.ps1   .claude/launch.json(预览)
   先红后绿)。基线:py 546+56skip · fe 323 · benchmark 24/24 · bundle 2.81MB。
 - 评审裁定书状态:12 属实项 + F3 三阶段全落地;残留 = checked_set 聚合"仅记录"通道与
   集成 MC 422(均显式标注,规格 §5 v2 候选)。
+
+## 2026-07-16(深夜)· 试点:200 MWh 参考场站大规模测试(A/B/C/D 全程)
+
+96 舱 × 2080 cells LFP 参考站,5 场景程序化建模(product 维度初频链 / BMS 2oo3+CCF /
+过充走集成 LFT 共享 VSENSE / 「年度检修」bc 集),全通道分析钉扎 + 组合总览;引擎压测
+(14 屏障 16k 序列 1.7s 无墙;**MC 57s/千样本 = 主瓶颈 P-7**;alpha CCF 组上限 6 = P-8);
+证据链监管演练五问全过(签发行入页脚、通道同源逐位重放);对标:C3+ = 1.60× 机队统计、
+剔过充假设 0.38×(统计值被夹中,首要数据缺口 = 过充需求率 P-3)。新发现:P-1 quantify/
+报告双通道求和序 ULP 分歧(重放须通道同源)。报告:docs/reviews/2026-07-16-pilot-200mwh-
+station.md;脚本+数据:docs/reference-assets/pilot-200mwh/。

@@ -1,0 +1,5 @@
+{"label": "MC N=200 (n=10, 1024 seqs)", "s": 11.39, "ok": true, "note": "p95(C5)=9.649e-05"}
+{"label": "MC N=1000 (n=10, 1024 seqs)", "s": 56.97, "ok": true, "note": "p95(C5)=9.614e-05"}
+{"label": "MC 外推(线性于 N×序列数)", "s": null, "ok": true, "note": "~57.0s/千样本 → N=10k≈9.5min、N=50k≈47min(n=10 档)"}
+{"label": "importance n=12 (24 requantify)", "s": 4.67, "ok": true, "note": "rows=12"}
+{"label": "chain n=8 (256 seqs)", "s": 0.018, "ok": true, "note": "C5=8.284e-06"}
