@@ -87,17 +87,30 @@ def test_concurrent_submit_vs_return_no_illegal_audit_order():
             except BaseException as e:      # noqa: BLE001
                 out[name] = e
 
-        # submit(returned→in_review)对 return(要求 in_review):从 returned 态,
-        # return 必败(非 in_review),submit 必成——恰一成功
+        # submit(returned→in_review)对 return(要求 in_review):线性化包络有两条合法路径
+        # (试点 CI 抓获的探针规格错,fe1e4f9 后修正——初版断言唯一赢家 {submit},漏了
+        #  合法串行化「submit 先提交 → return 见到 in_review 也合法成功」):
+        #   ① return 先跑(state=returned)→ 失败;submit 成 → 赢家 {submit},终态 in_review
+        #   ② submit 先提交 → return 串行其后合法成功 → 赢家 {submit,return},终态 returned,
+        #      审计序必须 submit 在 return 之前(条件 UPDATE 保证不存在第三种交错)
         ts = [threading.Thread(target=_run, args=("submit", store.submit_review)),
               threading.Thread(target=_run, args=("return", store.return_review))]
         for t in ts:
             t.start()
         for t in ts:
             t.join()
-        winners = [k for k, e in out.items() if e is None]
-        assert winners == ["submit"], f"round {i}: {out}"
-        assert store.review_for_version(puuid, vid)["state"] == "in_review"
+        winners = {k for k, e in out.items() if e is None}
+        state = store.review_for_version(puuid, vid)["state"]
+        if winners == {"submit"}:
+            assert state == "in_review", f"round {i}: 赢家 {{submit}} 但终态 {state}"
+        elif winners == {"submit", "return"}:
+            assert state == "returned", f"round {i}: 双成必为 submit→return 串行,终态应 returned,得 {state}"
+            acts = [a["action"] for a in store.list_audit(puuid) if a["action"].startswith("review.")]
+            # 只增日志按时间倒序/正序均可——取本轮末两条(设置期已有 submit,return 各一)
+            tail = acts[:2] if acts and acts[0] == "review.return" else acts[-2:]
+            assert set(tail) == {"review.submit", "review.return"}, f"round {i}: 审计尾 {acts[:4]}"
+        else:
+            raise AssertionError(f"round {i}: 非法赢家集 {out}(return 不得从 returned 态直接成功)")
 
 
 # ── R3:非法 sid 在任何库写之前拒绝 ───────────────────────────────────────────
