@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { quantify, ftFrequency } from '../../api'
 import type { ScenarioItem, LibraryData } from '../../api'
@@ -16,6 +16,7 @@ import { buildScenarioTab } from '../persistence/scenarioLoader'
 import { getTemplate, listTemplates, templateToEtaModel } from '../templates/etaTemplates'
 import { useActiveEta, etaDisplayName } from '../../stores/useActiveEta'
 import { INIT_FREQ_KEY } from '../../stores/derived'
+import { makeKeyedStaleGuard } from '../analysis/staleGuard'
 import { EMPTY_FTS } from '../../stores/projectStore'
 import { AiAppliedPill } from '../ai-draft/AiAppliedPill'
 import type { AiDraftState } from '../ai-draft/useAiDraft'
@@ -53,11 +54,22 @@ export function EtaWorkbench(
   const settingsPopRef = useRef<HTMLDivElement>(null)
   const linkedFtNames = (etModel?.functionalEvents ?? []).map((fe) => fe.linkFt).filter((n): n is string => !!n)
   const etaHouses = listHouseEventsUnion(etFtsModel, linkedFtNames)
-  const etaBcSets = etFtsModel.boundary_condition_sets ?? []
-  const etEngineOptions = toEtEngineOptions(settings, etaBcSets)
-  // 切换活动 ETA → 重置分析设置(house 事件/命名集按 ETA 而异,不跨页携带)+ 清共享提示(按 ETA 而异)
+  // F-β R-1:linked/etEngineOptions 引用稳定化——EventTreeEditor 结果失效依赖它们,
+  // 内联字面量每渲染新引用即失效风暴(规格 2026-07-17-fe-async-ownership-runkey)。
+  const etEngineOptions = useMemo(
+    () => toEtEngineOptions(settings, etFtsModel.boundary_condition_sets ?? []),
+    [settings, etFtsModel])
+  const linked = useMemo(
+    () => ({ fault_trees: etFtsModel.fault_trees ?? [], parameters: etFtsModel.model_data.parameters ?? [],
+             ccf_groups: etFtsModel.ccf_groups ?? [] }),
+    [etFtsModel])
+  const etaBcSets = useMemo(() => etFtsModel.boundary_condition_sets ?? [], [etFtsModel])
+  const deriveGuard = useRef(makeKeyedStaleGuard()).current
+  // F-β R-2:重置键 = workspaceId + activeKey——不同项目常共享同一场景 key,
+  // 只按 activeKey 会把 A 的 house 覆盖带进 B(FE-05)。
+  const wsId = P().workspaceId
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setSettings(EMPTY_SETTINGS); setSettingsOpen(false); setSharedNotice(null) }, [activeKey])
+  useEffect(() => { setSettings(EMPTY_SETTINGS); setSettingsOpen(false); setSharedNotice(null) }, [wsId, activeKey])
   // 弹出面板外点击关闭(与 FtaWorkbench/MenuBar 同款既有模式)
   useEffect(() => {
     if (!settingsOpen) return
@@ -115,7 +127,9 @@ export function EtaWorkbench(
     if (etaTabs.some((t) => t.key === val)) { selectEta(val); return }
     try {
       const sid = val.slice(3)
+      const wid = P().workspaceId                              // F-β W1:发起槽先捕获
       const t = await buildScenarioTab(sid, scenarios.find((s) => s.id === sid)?.name ?? '场景')
+      if (P().workspaceId !== wid) return                      // W3:切槽后丢弃文档变更,绝不写别的项目
       if (P().present.etas.some((x) => x.key === t.key)) { selectEta(t.key); return }
       P().addTab(t)
     } catch (e: any) { onError(String(e?.message ?? e)) }
@@ -145,8 +159,11 @@ export function EtaWorkbench(
     setSharedNotice(null)
     try {
       // 频率通道(每割集恰好一个频率事件,F = Σ 率×Π使能概率)—— 不是概率端点
+      const wid = P().workspaceId                              // F-β W1/W4:发起槽 + 代序
+      const tok = deriveGuard.begin(`${wid}:${active.key}:${INIT_FREQ_KEY}`)
       const { frequency } = await ftFrequency(active.fts, '__init__')
-      P().setEtaPfd(active.key, INIT_FREQ_KEY, frequency)      // 派生量入缓存,不进内容历史
+      if (!deriveGuard.isCurrent(`${wid}:${active.key}:${INIT_FREQ_KEY}`, tok)) return
+      P().setEtaPfdFor(wid, active.key, INIT_FREQ_KEY, frequency)   // W2:槽定向派生写
     } catch (e: any) {
       onError(String(e?.message ?? e))                          // 规则违规等 400:响亮,不静默
     }
@@ -165,8 +182,11 @@ export function EtaWorkbench(
         : null)
     }
     try {
+      const wid = P().workspaceId                              // F-β W1/W4
+      const tok = deriveGuard.begin(`${wid}:${active.key}:${feId}`)
       const prob = (await quantify(active.fts, feId)).probability
-      P().setEtaPfd(active.key, feId, prob)                    // 派生量入缓存,不进内容历史
+      if (!deriveGuard.isCurrent(`${wid}:${active.key}:${feId}`, tok)) return
+      P().setEtaPfdFor(wid, active.key, feId, prob)            // W2:槽定向派生写
     } catch (e: any) {
       onError(String(e?.message ?? e))                          // review F3:不再静默吞错
     }
@@ -312,7 +332,7 @@ export function EtaWorkbench(
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: 12, display: 'flex' }}>
         {!etModel ? <p style={{ padding: 12 }}>加载中…</p> : (
           <EventTreeEditor model={etModel} onChange={writeEtModel}
-            linked={{ fault_trees: etFtsModel.fault_trees ?? [], parameters: etFtsModel.model_data.parameters ?? [], ccf_groups: etFtsModel.ccf_groups ?? [] }}
+            linked={linked}
             fts={etFtsModel} ftsApi={{ set: (m) => P().setEtaFts(activeKey, m), undo: docUndo, redo: docRedo, canUndo: docCanUndo, canRedo: docCanRedo }}
             pfds={pfds} onAttachFt={onAttachFt} onDetachFt={onDetachFt} onFtEdited={onFtEdited}
             libBarriers={lib?.barrier_effectiveness ?? []} libComponents={lib?.component_failure_rates ?? []}

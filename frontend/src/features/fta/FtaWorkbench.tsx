@@ -16,6 +16,7 @@ import { useViewStore } from '../../stores/viewStore'
 import { useActiveEta, etaDisplayName } from '../../stores/useActiveEta'
 import { composeModel } from '../../stores/derived'
 import { deriveLinkedValue } from './linkedDerive'
+import { makeKeyedStaleGuard } from '../analysis/staleGuard'
 import { EMPTY_FTS } from '../../stores/projectStore'
 import { AiAppliedPill } from '../ai-draft/AiAppliedPill'
 import type { AiDraftState } from '../ai-draft/useAiDraft'
@@ -53,6 +54,7 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
   const [highlight, setHighlight] = useState<Set<string>>(new Set())
   const [ftPos, setFtPos] = useState<Record<string, Record<string, { x: number; y: number }>>>({})
   const [settings, setSettings] = useState<AnalysisSettings>(EMPTY_SETTINGS)
+  const deriveGuard = useRef(makeKeyedStaleGuard()).current
   // R4b:「⚙ 分析设置」ribbon 弹出面板的展开态——纯展示态,不影响 settings 本身的读写路径
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsPopRef = useRef<HTMLDivElement>(null)
@@ -61,9 +63,11 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setSelected(null); setResult(null); setError(null) }, [current])
   useEffect(() => { setHighlight(new Set()) }, [model])
-  // 切换目标树 → 重置分析设置(house 覆盖/后处理规则按树而异,不跨树携带)
+  // F-β R-2:重置键 = workspaceId + 目标全身份(src/etaKey/树名/示例 current)——
+  // 只按 src/current 会让 A 的设置带到 B 或另一棵同名树(FE-05)。
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setSettings(EMPTY_SETTINGS) }, [ftEditTarget.src, current])
+  useEffect(() => { setSettings(EMPTY_SETTINGS) },
+    [P().workspaceId, ftEditTarget.src, (ftEditTarget as any).etaKey, (ftEditTarget as any).name, current])
   // 弹出面板外点击关闭(与 MenuBar 下拉菜单相同的既有模式)
   useEffect(() => {
     if (!settingsOpen) return
@@ -114,8 +118,11 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
         const fe = target.model.functionalEvents.find((f) => f.id === ftEtaName)
         if (!fe?.linkFt) return
       }
+      const wid = P().workspaceId                            // F-β W1/W4:发起槽 + 代序
+      const tok = deriveGuard.begin(`${wid}:${ftEtaKey}:${ftEtaName}`)
       const d = await deriveLinkedValue(m, ftEtaName, target.model.initFreqSource)
-      if (d.kind === 'value') P().setEtaPfd(ftEtaKey, d.key, d.value)   // 派生量入缓存,不进内容历史
+      if (!deriveGuard.isCurrent(`${wid}:${ftEtaKey}:${ftEtaName}`, tok)) return
+      if (d.kind === 'value') P().setEtaPfdFor(wid, ftEtaKey, d.key, d.value)   // W2:槽定向派生写
       else if (d.kind === 'integrated') {
         setError(`初因树与屏障共享基本事件(${d.shared.join(', ')})→ 序列级精确集成情形:`
           + '初因频率头条不由两段式更新,请在 ETA 页用「引擎精确量化」。')

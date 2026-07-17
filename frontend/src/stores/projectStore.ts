@@ -104,6 +104,11 @@ export interface ProjectStore {
   detachFt: (key: string, feIndex: number) => void
   /** 派生量缓存写入(PFD):不产生历史条目。 */
   setEtaPfd: (key: string, feId: string, prob: number) => void
+  /** F-β(FE-02,规格 2026-07-17-fe-async-ownership-runkey W2):槽定向派生写——
+   *  异步量化返回时用户可能已切换/关闭项目,写回必须落在**发起槽**:
+   *  活动 → 顶层 pfds;停放 → 该槽 pfds(派生缓存在撤销历史之外,写停放槽无害);
+   *  已关闭 → 丢弃。与 setIdentityFor(R2-审 F1)同三路语义。 */
+  setEtaPfdFor: (wid: string, key: string, feId: string, prob: number) => void
 
   undo: () => void
   redo: () => void
@@ -314,6 +319,15 @@ export const useProjectStore = create<ProjectStore>()((set) => {
     // 派生量只写历史之外的缓存:undo/redo 对其透明
     setEtaPfd: (key, feId, prob) =>
       set((s) => ({ pfds: { ...s.pfds, [key]: { ...(s.pfds[key] ?? {}), [feId]: prob } } })),
+    setEtaPfdFor: (wid, key, feId, prob) =>
+      set((s) => {
+        if (wid === s.workspaceId)
+          return { pfds: { ...s.pfds, [key]: { ...(s.pfds[key] ?? {}), [feId]: prob } } }
+        const slot = s.parked[wid]
+        if (!slot) return s   // 槽已关闭:派生写丢弃(写进别的项目 = FE-02 跨项目污染)
+        return { parked: { ...s.parked, [wid]: {
+          ...slot, pfds: { ...slot.pfds, [key]: { ...(slot.pfds[key] ?? {}), [feId]: prob } } } } }
+      }),
 
     undo: () =>
       set((s) => {

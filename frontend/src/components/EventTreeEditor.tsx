@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { EventTreeModel } from '../eventtree'
 import { buildAnalysisRequest } from '../features/analysis/buildRequest'
+import { makeStaleGuard } from '../features/analysis/staleGuard'
 import {
   addFe, layout, CONSEQUENCES,
   consequenceTotals, consLevel, consDef, reorderFe, isCascade, gradeLabel,
@@ -76,8 +77,12 @@ export function EventTreeEditor(
   const [imp, setImp] = useState<Record<string, { barrier: string; fv: number; raw: number }[]> | null>(null)
   const [impC, setImpC] = useState('C5')
   const [deepBusy, setDeepBusy] = useState(false)
+  const quantGuard = useRef(makeStaleGuard()).current
+  const impGuard = useRef(makeStaleGuard()).current
 
-  useEffect(() => { setEngineSeq(null); setEngineMeta(null); setQErr(null); setImp(null) }, [model])
+  // F-β R-1(FE-05):结果随完整分析上下文失效——挂树/CCF/边界设置任一变化即清空
+  // (linked/etEngineOptions 由父组件 useMemo 稳定化,契约见 props 注释)。
+  useEffect(() => { setEngineSeq(null); setEngineMeta(null); setQErr(null); setImp(null) }, [model, linked, etEngineOptions])
 
   // 竖向分隔条:拖拽改变事件树画布高度,底部坞(事故序列/风险矩阵等)相应变矮;双击复位为自适应
   const treeRef = useRef<HTMLElement>(null)
@@ -149,7 +154,9 @@ export function EventTreeEditor(
     setQBusy(true); setQErr(null)
     // 初因源=故障树 ⇒ 经 withIeFaultTree 并入 ie_fault_tree 块走 integrated 通道(共享事件精确)。
     try {
+      const tok = quantGuard.begin()                            // F-β W4:晚响应不覆盖新结果
       const res = await quantifyEventTree(buildAnalysisRequest(model, linked, etEngineOptions))
+      if (!quantGuard.isCurrent(tok)) return
       setEngineSeq(res.sequences)
       setEngineMeta(res.method === 'integrated' ? { method: res.method, ieFrequency: res.ie_frequency ?? null } : null)
     }
@@ -160,7 +167,12 @@ export function EventTreeEditor(
     setDeepBusy(true); setQErr(null)
     // 4a4:携带项目上下文 → 重要度运行自动钉扎为分析案例(证据链);Gap8:同带边界条件设置
     // 初因源=故障树时同带 ie_fault_tree 块(重要度通道 v1 点估计;块使模型合并一致)。
-    try { const im = await importanceEventTree({ ...buildAnalysisRequest(model, linked, etEngineOptions), ...(getReportContext?.() ?? {}) }); setImp(im.importance) }
+    try {
+      const tok = impGuard.begin()                              // F-β W4
+      const im = await importanceEventTree({ ...buildAnalysisRequest(model, linked, etEngineOptions), ...(getReportContext?.() ?? {}) })
+      if (!impGuard.isCurrent(tok)) return
+      setImp(im.importance)
+    }
     catch (e: any) { setQErr(String(e?.message ?? e)) }
     finally { setDeepBusy(false) }
   }
