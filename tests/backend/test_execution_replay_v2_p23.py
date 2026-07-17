@@ -295,6 +295,11 @@ def test_G8_fingerprint_git_degrades_without_crash(monkeypatch):
     ("exponential", {"mission_time": 8760.0}),
     ("glm", {"mttr": 24.0}),
     ("periodic_test", {"test_interval": 100.0}),
+    # banked Complete(PTC 评审 F2):同病同拒,防 _QT_KINDS 重构掉行
+    ("periodic_test_complete", {"lambda_test": 3e-4, "mttr": 8.0, "test_interval": 730.0,
+                                "theta": 200.0, "gamma": 0.005, "test_duration": 2.0,
+                                "available_at_test": False, "sigma": 0.95, "omega": 0.01,
+                                "mission_time": 8760.0}),
 ])
 def test_mef_export_rejects_qt_kinds(tmp_path, kind, extra):
     from psaengine.model.json_io import load_model_from_dict

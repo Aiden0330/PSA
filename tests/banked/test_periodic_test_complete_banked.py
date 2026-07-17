@@ -279,3 +279,25 @@ def test_curve_helper_matches_pointwise():
     ys = periodic_test_complete_curve(p, ts)
     for tt, y in zip(ts, ys):
         assert y == _q(t=tt)                       # 逐位:同一实现取样
+
+
+# ── 收口补锁(实现批评审 F1/F2)────────────────────────────────────────────────
+
+def test_F1_available_at_test_strict_bool():
+    # 字符串 "false" 经 bool() 强转按 True 记账 → 窗内 q 由 1.0 滑到 0.079(12.6× 低估)
+    with pytest.raises(ValueError, match="strict bool"):
+        _q(x="false", t=200.0 + 3 * 730.0 + 1.0)
+    with pytest.raises(ValueError, match="strict bool"):
+        _q(x=1, t=8760.0)                       # int 1 同拒(bool 是 int 子类,isinstance 放行 True/False)
+
+
+def test_F2_json_roundtrip_ten_params_bitwise():
+    from psaengine.model.json_io import parameters_to_json, load_model_from_dict
+    p = _param()
+    lib_json = [{"id": "PTC", **{k: v for k, v in vars(p).items()
+                                 if k not in ("id", "distribution") and v is not None}}]
+    m = load_model_from_dict({"model_data": {"parameters": lib_json},
+                              "fault_trees": [], "event_trees": [], "ccf_groups": []})
+    p2 = m.parameters.get("PTC")
+    assert p2.unavailability() == p.unavailability()          # 逐位
+    assert parameters_to_json(m.parameters)[0] == lib_json[0]  # save 侧对称(False 存活于 v is not None)

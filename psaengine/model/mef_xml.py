@@ -12,7 +12,8 @@ _OP_REV = {v: k for k, v in _OP.items()}
 # EB-08:MEF <float> 只承载一个概率标量。时变 Q(t) 模型(exponential/glm/weibull/
 # periodic_test)经 unavailability() 会被**静默固化**成当前 t 的一个数——重导入即失真且
 # 不可辨。导出侧对这四类响亮拒绝并点名参数(probability/rate 的既有扁平化行为零扰动)。
-_QT_KINDS = frozenset(("exponential", "glm", "weibull", "periodic_test"))
+_QT_KINDS = frozenset(("exponential", "glm", "weibull", "periodic_test",
+                       "periodic_test_complete"))   # banked Complete 同病同拒(11 参 XML 记 v2)
 
 
 def _mef_unavailability(param, pid: str) -> float:

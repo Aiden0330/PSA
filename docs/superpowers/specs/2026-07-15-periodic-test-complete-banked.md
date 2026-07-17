@@ -170,3 +170,15 @@ P2(σ=1,γ=0,ω=0,x=T,**λ\*=λ**——评审 D4:λ\* 不归一则非经典域,�
 先红后绿(去 skip 即红)→ 实现 → 全绿;`make benchmark` 24/24(参数层新增,应零差异,
 结构性:概率通道只经 unavailability() 取标量);engine-reviewer 两轮(隔离/数值语义类);
 uv 环境无新依赖(Decimal 标准库)。
+
+## 9 · 实现批评审记录(2026-07-17,commit 5d2872e)
+
+- **round-2(实现转录保真,engine-reviewer):PASS**——状态机顺序赋值别名语义逐行同构
+  (含求和项序);§3 四条全落;A5/A9 代数路径独立重推吻合;json_io `v is not None`
+  过滤经探针确认 `False` 存活。两缺口即修:**F1** available_at_test 仅查 None,字符串
+  "false" 经 bool() 强转按 True 记账(窗内 1.0→0.079,12.6× 静默低估)→ isinstance
+  严判 + 锚点;**F2** MEF 拒绝 parametrize 未含新 kind、十参往返无锁 → 两锁补齐。
+- **偏离记录(从严,评审裁定可接受)**:γ/σ/ω 实现为**必填**(§4 表未标)——规范源为
+  SCRAM/MEF 11 位置参数签名无可省位,且 γ 默认 0 会静默压低 q(安全方向:拒算)。
+- 继承注记:MC 通道"有 distribution 即以分布采样遮蔽 Q(t) 模型"对新 kind 同病,
+  已在 §1 记 v1 非目标 → v2(与集成 MC 规格 S4 的"谱施于 unavailability"合流裁决)。

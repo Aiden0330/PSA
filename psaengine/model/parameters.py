@@ -17,10 +17,21 @@ class Parameter:
     test_interval: Optional[float] = None
     mission_time: Optional[float] = None
     # Gap 7 精确 Q(t) 模型字段(规格 2026-07-15-gap7;MEF/SCRAM/XFTA 同一公式集):
-    gamma: Optional[float] = None       # glm 需求失效概率 γ(缺省 0)
+    gamma: Optional[float] = None       # glm 需求失效概率 γ(缺省 0)/ Complete 检验致害 γ
     alpha: Optional[float] = None       # weibull 尺度 α>0
     beta: Optional[float] = None        # weibull 形状 β>0
     t0: Optional[float] = None          # weibull 时移 t0≥0(缺省 0)
+    # periodic_test_complete(banked 规格 2026-07-15;SCRAM 11 参 Complete 同语义):
+    # value=λ 运行期率 · lambda_test=λ* 检验期率 · mttr→μ=1/mttr · test_interval=τ ·
+    # theta=θ 首检时刻 · test_duration=π 检验时长 · available_at_test=x(必填,不设默认
+    # ——方向依场景而异,静默默认即口径事故)· sigma=σ 检出覆盖 · omega=ω 修后坏重启 ·
+    # mission_time=t 求值时刻。既有 kind 零扰动(全部 Optional 缺省 None)。
+    lambda_test: Optional[float] = None
+    theta: Optional[float] = None
+    test_duration: Optional[float] = None
+    available_at_test: Optional[bool] = None
+    sigma: Optional[float] = None
+    omega: Optional[float] = None
     distribution: Optional[Distribution] = None
     source: Optional[str] = None
     version: Optional[str] = None
@@ -115,6 +126,8 @@ class Parameter:
                 return x / 2.0 - x * x / 6.0 + x ** 3 / 24.0
             from math import expm1
             return 1.0 + expm1(-x) / x
+        if self.kind == "periodic_test_complete":
+            return _ptc_q(self, self.mission_time, require_t=True)
         if self.kind == "frequency":
             # 量纲护栏(规格 2026-07-13 §2.1):频率(/yr)不是概率,误入概率通道必须响亮——
             # 频率量化走 psaengine.quantify.frequency.fault_tree_frequency(每割集一频率规则)。
@@ -136,3 +149,107 @@ class ParameterLibrary:
         return pid in self._params
     def ids(self) -> list[str]:
         return list(self._params)
+
+
+# ── periodic_test_complete:三态 Markov {可用 A, 潜伏失效 L, 在修 R} 分相闭式 ──────
+# 规范语义源:SCRAM PeriodicTest::Complete 逐行(banked 规格 §2,评审 round-1 PASS);
+# 三角验证:float ↔ Decimal-60 ↔ 独立离散事件 MC(2M×2 seeds |z|<1)。
+# 数值卫生(§3,违者锚点即红):p_exp 一律 −expm1;p_exp2 禁朴素形
+# (λp_μ−μp_λ)/(λ−μ)——λ≈μ 时相对误差 1.8e0 且得负概率,必须用稳定形。
+
+def _ptc_validate(p: Parameter) -> None:
+    pid = p.id
+    if p.value is None or p.value < 0:
+        raise ValueError(f"periodic_test_complete {pid}: lambda {p.value!r} must be >= 0")
+    if p.lambda_test is None or p.lambda_test < 0:
+        raise ValueError(f"periodic_test_complete {pid}: needs lambda_test >= 0")
+    if p.mttr is None or p.mttr <= 0:
+        raise ValueError(f"periodic_test_complete {pid}: needs mttr > 0")
+    if p.test_interval is None or p.test_interval <= 0:
+        raise ValueError(f"periodic_test_complete {pid}: needs test_interval > 0")
+    if p.theta is None or p.theta < 0:
+        raise ValueError(f"periodic_test_complete {pid}: needs theta >= 0")
+    if p.test_duration is None or not 0.0 < p.test_duration < p.test_interval:
+        raise ValueError(f"periodic_test_complete {pid}: needs 0 < test_duration < test_interval "
+                         f"(got pi={p.test_duration!r}, tau={p.test_interval!r};严格,较 SCRAM 更紧)")
+    if not isinstance(p.available_at_test, bool):
+        # 评审 F1:仅查 None 会让字符串 "false" 经 bool() 强转按 True 记账——窗内 q 由
+        # 1.0 滑到 0.079(12.6× 静默低估)。类型严判,拒绝一切非 bool。
+        raise ValueError(f"periodic_test_complete {pid}: needs available_at_test (strict bool, "
+                         "不设默认——检验期间可用性方向依场景而异,静默默认/强转即口径事故)")
+    if p.gamma is None or not 0.0 <= p.gamma <= 1.0:
+        raise ValueError(f"periodic_test_complete {pid}: needs gamma in [0,1]")
+    if p.sigma is None or not 0.0 <= p.sigma <= 1.0:
+        raise ValueError(f"periodic_test_complete {pid}: needs sigma in [0,1]")
+    if p.omega is None or not 0.0 <= p.omega <= 1.0:
+        raise ValueError(f"periodic_test_complete {pid}: needs omega in [0,1]")
+
+
+def _ptc_q(p: Parameter, t: Optional[float], *, require_t: bool) -> float:
+    from math import exp, expm1
+    _ptc_validate(p)
+    if t is None or t < 0:
+        if require_t or t is not None:
+            raise ValueError(f"periodic_test_complete {p.id}: needs mission_time >= 0")
+    lam, lam_t, mu = p.value, p.lambda_test, 1.0 / p.mttr
+    tau, theta, g0 = p.test_interval, p.theta, p.gamma
+    pi_, x, sig, om = p.test_duration, bool(p.available_at_test), p.sigma, p.omega
+
+    def p_exp(r: float, tt: float) -> float:
+        return -expm1(-r * tt)
+
+    def p_exp2(tt: float) -> float:
+        # 稳定形 1 − e^{−λt}(1 + λg), g = expm1(δt)/δ, δ = λ−μ(δ=0 → g=t)。
+        # 朴素形 (λp_μ−μp_λ)/(λ−μ) 在 λ≈μ 灾难性消去(锚点 A9 以 δ/λ≈1e-12 强制)。
+        dlt = lam - mu
+        g = tt if dlt == 0.0 else expm1(dlt * tt) / dlt
+        return 1.0 - exp(-lam * tt) * (1.0 + lam * g)
+
+    if t <= theta:                                   # ≤:t=θ 走纯老化(评审 D1,锚点 A1b)
+        return p_exp(lam, t)
+
+    p_fail = p_exp(lam, theta)
+    p_repair = 0.0
+    p_avail = 1.0 - p_fail
+
+    def p_ml(p_mu: float, tt: float) -> float:
+        # 修完:ω 坏重启→潜伏;否则回可用后再以 λ 老化(修后用 λ 非 λ*,即使身处检验窗)
+        return p_mu * om + (1.0 - om) * p_exp2(tt)
+
+    def p_test(w: float, available: bool) -> None:
+        nonlocal p_fail, p_repair, p_avail
+        p_lt, p_mu = p_exp(lam_t, w), p_exp(mu, w)
+        tr = p_fail + p_avail * (g0 + (1.0 - g0) * p_lt)      # 潜伏池:窗前 + γ 冲击 + 检中 λ*
+        nf = p_repair * p_ml(p_mu, w) + (1.0 - sig) * tr      # 修出再失效者跳过当窗检出
+        nr = (1.0 - p_mu) * p_repair + sig * tr               # σ 检出 → 窗末起修
+        na = 1.0 - nf - nr - (0.0 if available
+                              else p_avail * (1.0 - g0) * (1.0 - p_lt))
+        p_fail, p_repair, p_avail = nf, nr, na
+
+    def p_period(dd: float) -> None:
+        nonlocal p_fail, p_repair, p_avail
+        p_lam, p_mu = p_exp(lam, dd), p_exp(mu, dd)
+        p_fail = p_avail * p_lam + p_fail + p_repair * p_ml(p_mu, dd)
+        p_repair = p_repair * (1.0 - p_mu)
+        p_avail = 1.0 - p_fail - p_repair
+
+    delta = t - theta
+    n = int(delta / tau)                             # C 截断语义(整周期数;误差 O(n·ε),A8 锁)
+    for _ in range(n):
+        p_test(pi_, True)
+        p_period(tau - pi_)
+    rem = delta - n * tau
+    if rem <= pi_:
+        p_test(rem, x)                               # 部分窗同样施加 σ 检出;x 仅在此记账
+    else:
+        p_test(pi_, True)
+        p_period(rem - pi_)
+    q = 1.0 - p_avail
+    if q < -1e-9 or q > 1.0 + 1e-9:                  # 结构性违界响亮;舍入毛刺夹持(§3)
+        raise ValueError(f"periodic_test_complete {p.id}: q={q!r} structurally out of [0,1]")
+    return min(max(q, 0.0), 1.0)
+
+
+def periodic_test_complete_curve(p: Parameter, ts: list[float]) -> list[float]:
+    """UI 曲线助手(banked 规格 §1):逐点采样 q(t),纯采样无新数学。"""
+    return [_ptc_q(p, float(tt), require_t=True) for tt in ts]
