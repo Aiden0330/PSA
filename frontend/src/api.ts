@@ -46,6 +46,20 @@ function embedFallback(path: string): unknown {
   return undefined
 }
 
+// FE-07(HTTP 失败 vs 静态降级不得混同):jget 走内置降级时,响应必须"可见来源",
+// 而非静默替换。命中 embedded 时在响应对象上挂非枚举 __provenance(不污染 JSON/渲染),
+// 并 console.warn。consumer 可用 provenanceOf() 反查这份数据是否来自内置预置。
+export interface JgetProvenance { source: 'server' | 'embedded'; reason?: string }
+export function provenanceOf(x: unknown): JgetProvenance | undefined {
+  return x && typeof x === 'object' ? (x as { __provenance?: JgetProvenance }).__provenance : undefined
+}
+function markProvenance<T>(data: T, prov: JgetProvenance): T {
+  if (data && typeof data === 'object') {
+    try { Object.defineProperty(data, '__provenance', { value: prov, enumerable: false, configurable: true, writable: true }) } catch { /* 冻结对象:忽略,来源仍由 console.warn 披露 */ }
+  }
+  return data
+}
+
 async function jget<T>(path: string): Promise<T> {
   try {
     const r = await fetch(`${BASE}${path}`)
@@ -53,7 +67,11 @@ async function jget<T>(path: string): Promise<T> {
     return r.json()
   } catch (e) {
     const fb = embedFallback(path)
-    if (fb !== undefined) return fb as T
+    if (fb !== undefined) {
+      const reason = e instanceof Error ? e.message : String(e)
+      console.warn(`[api] ${path} 后端不可达,回退内置预置数据(source=embedded;reason=${reason})`)
+      return markProvenance(fb as T, { source: 'embedded', reason })
+    }
     throw e
   }
 }
@@ -119,15 +137,20 @@ export async function draftAiModel(req: AiDraftRequest): Promise<AiDraftResponse
   return r.json()
 }
 
-/** 4b2 应用回执:记录逐元素接受清单(fire-and-forget,回执失败不阻断应用)。 */
+// FE-11:应用回执不再 fire-and-forget 吞错 —— 检查 response.ok,失败(401/500/…)即抛,
+// 网络 reject 原样上抛。可靠性(本地留存/重试)由 features/ai-draft/aiOutbox 承担,
+// 本函数只负责一次网络提交并如实报告成败。
 export async function reportAiDraftApplied(rid: number, accepted: Record<string, unknown>,
                                            projectUuid?: string, status: 'applied' | 'rejected' = 'applied'): Promise<void> {
-  try {
-    await fetch(`${BASE}/ai/drafts/${rid}/applied`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, accepted, project_uuid: projectUuid }),
-    })
-  } catch { /* 回执尽力而为 */ }
+  const r = await fetch(`${BASE}/ai/drafts/${rid}/applied`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, accepted, project_uuid: projectUuid }),
+  })
+  if (!r.ok) {
+    let detail = ''
+    try { const d = await r.json(); detail = typeof d?.detail === 'string' ? d.detail : '' } catch {}
+    throw new StatusError(r.status, detail || `ai draft applied → ${r.status}`)
+  }
 }
 
 export async function quantifyEventTree(req: any): Promise<EtQuantifyResult> {
@@ -318,8 +341,11 @@ export interface PortfolioCase { id: number; kind: string; consequences: Record<
  *  review_state 锚定最新版本(当前模型是否签发),两者语义不同,都要。 */
 export interface PortfolioRow { uuid: string; name: string; versions: number; latest_hash: string | null; review_state: ReviewState | null; open_review: { version_id: number; version_hash: string; is_latest: boolean } | null; latest_case: PortfolioCase | null; saved_id: string | null }
 export const getPortfolio = () => jget<PortfolioRow[]>('/portfolio')
-export const listProjectVersions = (uuid: string) => jget<VersionInfo[]>(`/projects/${uuid}/versions`)
-export const listProjectCases = (uuid: string) => jget<CaseInfo[]>(`/projects/${uuid}/cases`)
+// FE-06:证据链读端走 jgetStatus(带 status 的 StatusError)—— 组件据此区分 401(重认证)/
+// 403(无权限)/其它(错误条),绝不把读失败渲染成"暂无数据"。/projects/* 无内置降级,
+// 语义与既有 jget 一致(都在非 2xx 上抛),只是错误从裸 Error 升级为可判定 status 的 StatusError。
+export const listProjectVersions = (uuid: string) => jgetStatus<VersionInfo[]>(`/projects/${uuid}/versions`)
+export const listProjectCases = (uuid: string) => jgetStatus<CaseInfo[]>(`/projects/${uuid}/cases`)
 export interface DiffChange { op: 'added' | 'removed' | 'changed'; path: string; from?: unknown; to?: unknown }
 export interface VersionDiff {
   from: { id: number; content_hash: string }
@@ -328,7 +354,7 @@ export interface VersionDiff {
   summary: { added: number; removed: number; changed: number }
 }
 export const diffProjectVersions = (uuid: string, from: number, to: number) =>
-  jget<VersionDiff>(`/projects/${uuid}/diff?from=${from}&to=${to}`)
+  jgetStatus<VersionDiff>(`/projects/${uuid}/diff?from=${from}&to=${to}`)
 
 // ── Phase 5 评审/签发(D-P5-5 方向 A)──
 // 评审动作离线无意义:失败显式抛错(detail-aware),绝不进 /api/saved 的 localStorage 回退家族。
@@ -345,17 +371,19 @@ export interface ReviewInfo {
 }
 export interface ReviewComment { id: number; author: string; created_at: string; body: string }
 
+// FE-06:评审/评论写端也升级为 StatusError(带 status),让 401 会话过期统一进重认证通道
+// (原为裸 Error,组件无法区分 401)。所有既有 consumer 只读 .message,语义零回退。
 async function jpostReview<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!r.ok) {
     let detail = ''
     try { const d = await r.json(); detail = typeof d?.detail === 'string' ? d.detail : '' } catch {}
-    throw new Error(detail || `${path} → ${r.status}`)
+    throw new StatusError(r.status, detail || `${path} → ${r.status}`)
   }
   return r.json()
 }
 
-export const listProjectReviews = (uuid: string) => jget<ReviewInfo[]>(`/projects/${uuid}/reviews`)
+export const listProjectReviews = (uuid: string) => jgetStatus<ReviewInfo[]>(`/projects/${uuid}/reviews`)
 export const submitReview = (uuid: string, versionId: number, note?: string) =>
   jpostReview<ReviewInfo>(`/projects/${uuid}/reviews`, { version_id: versionId, note })
 export const signReview = (uuid: string, versionId: number, note?: string, password?: string) =>
@@ -363,7 +391,7 @@ export const signReview = (uuid: string, versionId: number, note?: string, passw
 export const returnReview = (uuid: string, versionId: number, note: string) =>
   jpostReview<ReviewInfo>(`/projects/${uuid}/reviews/${versionId}/return`, { note })
 export const listVersionComments = (uuid: string, versionId: number) =>
-  jget<ReviewComment[]>(`/projects/${uuid}/versions/${versionId}/comments`)
+  jgetStatus<ReviewComment[]>(`/projects/${uuid}/versions/${versionId}/comments`)
 export const addVersionComment = (uuid: string, versionId: number, body: string) =>
   jpostReview<ReviewComment>(`/projects/${uuid}/versions/${versionId}/comments`, { body })
 

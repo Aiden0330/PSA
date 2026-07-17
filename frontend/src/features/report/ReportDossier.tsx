@@ -1,7 +1,7 @@
 import { buildAnalysisRequest } from '../analysis/buildRequest'
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { addVersionComment, diffProjectVersions, exportReport, listProjectCases, listProjectReviews, listProjectVersions, listVersionComments, returnReview, signReview, submitReview } from '../../api'
+import { StatusError, addVersionComment, diffProjectVersions, exportReport, listProjectCases, listProjectReviews, listProjectVersions, listVersionComments, returnReview, signReview, submitReview } from '../../api'
 import type { AggregateTreePayload, CaseInfo, ReviewComment, ReviewInfo, VersionDiff, VersionInfo } from '../../api'
 import { Icon } from '../../components/icons'
 import { CONSEQUENCES, consDef, toEngineRequest } from '../../eventtree'
@@ -9,6 +9,7 @@ import type { ProjectEta } from '../../project'
 import { composeModel } from '../../stores/derived'
 import { useActiveEta, etaDisplayName } from '../../stores/useActiveEta'
 import { useAuthStore } from '../../stores/authStore'
+import { useEvidenceGuard } from './evidenceGuard'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
 
 const mono = 'var(--psa-font-mono)'
@@ -43,24 +44,64 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
   const [reviews, setReviews] = useState<ReviewInfo[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // FE-06:台账读取的 loading / 读失败态 —— 读失败绝不呈现为"暂无数据"(见 handleReadError)。
+  const [loading, setLoading] = useState(false)
+  const [loadErr, setLoadErr] = useState<string | null>(null)
+  // ── 签发态(声明上移:切项目重置效果需在其上方引用 setter)──
+  const [signTarget, setSignTarget] = useState<VersionInfo | null>(null)
+  const [signNote, setSignNote] = useState('')
+  const [signPassword, setSignPassword] = useState('')
   // spec A:「按勾选集聚合」默认 OFF(单场景导出零扰动);ON 时 trees[] = 全部勾选页签。
   const [aggScope, setAggScope] = useState(false)
   const checkedTabs = etaTabs.filter((t) => checkedKeys[t.key])
   const pu = persistence.projectUuid
+  const guard = useEvidenceGuard(pu)
   // 前端呈现层的角色感知(后端 B3 已实际守卫,这里只是不呈现无权限操作)。
   // identity===null(off 模式/未知)一律视为全权 —— off 模式单用户即全权(约束 #0)。
   const role = useAuthStore((s) => s.identity?.role ?? null)
   const canSubmitReview = role === null || role === 'analyst' || role === 'admin'
   const canDecideReview = role === null || role === 'reviewer' || role === 'admin'
 
-  const refresh = () => {
-    if (!pu) { setVersions([]); setCases([]); setReviews([]); return }
-    listProjectVersions(pu).then(setVersions).catch(() => setVersions([]))
-    listProjectCases(pu).then(setCases).catch(() => setCases([]))
-    listProjectReviews(pu).then(setReviews).catch(() => setReviews([]))
+  // FE-06:读失败按 status 分流 —— 401 会话过期进全局重认证(登录墙接管),403 显式无权限,
+  // 其它进错误条;三者都绝不 setXxx([]) 把失败伪装成"暂无数据"。
+  const handleReadError = (e: unknown) => {
+    if (e instanceof StatusError && e.status === 401) {
+      useAuthStore.setState({ identity: null, needsLogin: true })
+      setLoadErr('登录已过期,请重新登录后查看证据链台账。')
+    } else if (e instanceof StatusError && e.status === 403) {
+      setLoadErr('无权限(403):当前账户不能查看该项目的证据链台账。')
+    } else {
+      setLoadErr(`证据链台账读取失败:${e instanceof Error ? e.message : String(e)}`)
+    }
   }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(refresh, [pu])
+  // 写动作(送审/签发/退回/评论/对比)失败:401 同样进重认证,其余入错误条。
+  const handleActionError = (e: unknown) => {
+    if (e instanceof StatusError && e.status === 401) {
+      useAuthStore.setState({ identity: null, needsLogin: true })
+      setErr('登录已过期,请重新登录。')
+    } else setErr(e instanceof Error ? e.message : String(e))
+  }
+
+  // FE-06:版本/案例/评审三读加 {projectUuid, generation} 守卫 —— 只提交仍属当前项目、
+  // 且未被更新请求取代的响应(A 慢 B 快 → 只显 B);切项目(clear)立即进 loading/清空。
+  const refresh = (opts?: { clear?: boolean }) => {
+    if (!pu) { setVersions([]); setCases([]); setReviews([]); setLoading(false); setLoadErr(null); return }
+    if (opts?.clear) { setVersions([]); setCases([]); setReviews([]); setLoadErr(null); setLoading(true) }
+    const one = <T,>(qc: string, fn: () => Promise<T>, apply: (d: T) => void) => {
+      const h = guard.begin(pu, qc)
+      fn().then((d) => { if (guard.isCurrent(h)) { apply(d); setLoading(false) } })
+          .catch((e) => { if (guard.isCurrent(h)) { handleReadError(e); setLoading(false) } })
+    }
+    one('versions', () => listProjectVersions(pu), setVersions)
+    one('cases', () => listProjectCases(pu), setCases)
+    one('reviews', () => listProjectReviews(pu), setReviews)
+  }
+  // 切项目彻底重置:台账进 loading/清空 + 清签发目标/口令/备注(密码绝不跨项目复用)。
+  useEffect(() => {
+    setSignTarget(null); setSignNote(''); setSignPassword('')
+    refresh({ clear: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pu])
 
   const onExport = async (fmt: 'docx' | 'pdf' | 'csv') => {
     if (!etModel) return
@@ -88,14 +129,15 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
   const reviewByVersion = (vid: number) => reviews.find((r) => r.version_id === vid)
 
   // ── Phase 5 台账签发(D-P5-5 方向 A):送审/签发/退回 + 版本评论 ──
-  const [signTarget, setSignTarget] = useState<VersionInfo | null>(null)
-  const [signNote, setSignNote] = useState('')
-  const [signPassword, setSignPassword] = useState('')
+  // (signTarget/signNote/signPassword 已上移至顶部状态块)
   const [actBusy, setActBusy] = useState(false)
   const isLocalAuth = useAuthStore((s) => s.identity?.mode === 'local')
+  // FE-06:签发口令在弹窗任意关闭路径清除(取消/遮罩/确认/切项目),不止确认时;
+  // 卸载由 React state 拆除天然清零。signTarget→null 即触发本效果清口令与备注。
+  useEffect(() => { if (!signTarget) { setSignPassword(''); setSignNote('') } }, [signTarget])
   const doAction = async (fn: () => Promise<unknown>) => {
     setActBusy(true); setErr(null)
-    try { await fn(); refresh() } catch (e: any) { setErr(String(e?.message ?? e)) }
+    try { await fn(); refresh() } catch (e) { handleActionError(e) }
     finally { setActBusy(false) }
   }
   const onSubmitReview = (v: VersionInfo) => { if (pu) doAction(() => submitReview(pu, v.id)) }
@@ -136,9 +178,12 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
   const onDiff = async () => {
     if (!pu || fromV === '' || toV === '') return
     setDiffBusy(true); setErr(null)
-    try { setDiff(await diffProjectVersions(pu, Number(fromV), Number(toV))) }
-    catch (e: any) { setErr(String(e?.message ?? e)) }
-    finally { setDiffBusy(false) }
+    const h = guard.begin(pu, 'diff')                       // FE-06:切项目后迟到的 diff 不落别的项目
+    try {
+      const d = await diffProjectVersions(pu, Number(fromV), Number(toV))
+      if (guard.isCurrent(h)) setDiff(d)
+    } catch (e) { if (guard.isCurrent(h)) handleActionError(e) }
+    finally { if (guard.isCurrent(h)) setDiffBusy(false) }
   }
   const fmtVal = (v: unknown) => {
     const s = typeof v === 'string' ? v : JSON.stringify(v)
@@ -157,17 +202,22 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
   }, [reviews, versions.length, pu])
   useEffect(() => {
     if (!pu || cmVersion === '') { setCmList([]); return }
-    listVersionComments(pu, Number(cmVersion)).then(setCmList).catch(() => setCmList([]))
+    const h = guard.begin(pu, `comments:${cmVersion}`)      // FE-06:评论读也守卫(不串项目、不把 401 呈现为"暂无评论")
+    listVersionComments(pu, Number(cmVersion))
+      .then((d) => { if (guard.isCurrent(h)) setCmList(d) })
+      .catch((e) => { if (guard.isCurrent(h)) handleReadError(e) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pu, cmVersion])
   const onAddComment = async () => {
     if (!pu || cmVersion === '' || !cmText.trim()) return
     setErr(null)
+    const h = guard.begin(pu, `comments:${cmVersion}`)
     try {
       await addVersionComment(pu, Number(cmVersion), cmText.trim())
       setCmText('')
-      setCmList(await listVersionComments(pu, Number(cmVersion)))
-    } catch (e: any) { setErr(String(e?.message ?? e)) }
+      const d = await listVersionComments(pu, Number(cmVersion))
+      if (guard.isCurrent(h)) setCmList(d)
+    } catch (e) { handleActionError(e) }
   }
 
   return (
@@ -201,13 +251,18 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
         </div>
       </div>
       {err && <div style={{ marginBottom: 12, padding: 10, background: 'var(--psa-danger-soft)', color: 'var(--psa-danger-strong)', borderRadius: 6, fontSize: 12 }}>操作失败:{err}</div>}
+      {loadErr && <div style={{ marginBottom: 12, padding: 10, background: 'var(--psa-danger-soft)', color: 'var(--psa-danger-strong)', borderRadius: 6, fontSize: 12 }}>{loadErr}</div>}
 
       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {/* 分析案例台账 */}
         <div style={{ flex: '3 1 460px', minWidth: 340 }}>
           <div style={secHead}>分析案例({cases.length})</div>
           <div className="psa-panel" style={{ overflow: 'hidden' }}>
-            {cases.length === 0 ? (
+            {loading ? (
+              <div style={{ padding: 16, fontSize: 12, color: 'var(--psa-muted)' }}>载入中…</div>
+            ) : loadErr ? (
+              <div style={{ padding: 16, fontSize: 12, color: 'var(--psa-muted)' }}>台账未能读取(见上方提示),不代表"暂无数据"。</div>
+            ) : cases.length === 0 ? (
               <div style={{ padding: 16, fontSize: 12, color: 'var(--psa-muted)' }}>暂无分析案例。带项目上下文导出报告后,案例在此出现并可与报告页脚互查。</div>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -257,7 +312,11 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
         <div style={{ flex: '2 1 320px', minWidth: 280 }}>
           <div style={secHead}>模型版本({versions.length})</div>
           <div className="psa-panel" style={{ overflow: 'hidden' }}>
-            {versions.length === 0 ? (
+            {loading ? (
+              <div style={{ padding: 16, fontSize: 12, color: 'var(--psa-muted)' }}>载入中…</div>
+            ) : loadErr ? (
+              <div style={{ padding: 16, fontSize: 12, color: 'var(--psa-muted)' }}>台账未能读取(见上方提示),不代表"暂无数据"。</div>
+            ) : versions.length === 0 ? (
               <div style={{ padding: 16, fontSize: 12, color: 'var(--psa-muted)' }}>暂无版本。保存项目即产生内容寻址版本(同内容幂等)。</div>
             ) : (
               [...versions].sort((a, b) => b.id - a.id).map((v, idx) => {
@@ -305,7 +364,9 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
           {/* 4a5 版本对比(仿 RiskSpectrum Model Compare) */}
           <div style={{ ...secHead, marginTop: 16 }}>版本对比</div>
           <div className="psa-panel" style={{ padding: 10 }}>
-            {byIdDesc.length < 2 ? (
+            {loadErr ? (
+              <div style={{ fontSize: 12, color: 'var(--psa-muted)' }}>台账未能读取(见上方提示)。</div>
+            ) : byIdDesc.length < 2 ? (
               <div style={{ fontSize: 12, color: 'var(--psa-muted)' }}>需要至少两个版本。</div>
             ) : (
               <>
@@ -355,7 +416,9 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
           {/* Phase 5 版本评论(版本级) */}
           <div style={{ ...secHead, marginTop: 16 }}>版本评论</div>
           <div className="psa-panel" style={{ padding: 10 }}>
-            {byIdDesc.length === 0 ? (
+            {loadErr ? (
+              <div style={{ fontSize: 12, color: 'var(--psa-muted)' }}>台账未能读取(见上方提示)。</div>
+            ) : byIdDesc.length === 0 ? (
               <div style={{ fontSize: 12, color: 'var(--psa-muted)' }}>暂无版本。</div>
             ) : (
               <>

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { draftAiModel, reportAiDraftApplied } from '../../api'
 import type { LibraryData } from '../../api'
+import { flushPending, flushReceipt, pendingReceipts, stageReceipt } from './aiOutbox'
+import type { AiReceipt } from './aiOutbox'
 import { applyAiDraftToProject, draftElements } from '../../aiDraft'
 import type { AiApplyMode, AiDraftResponse, AiDraftTarget, DraftElement } from '../../aiDraft'
 import type { ProjectEta, ProjectPayload } from '../../project'
@@ -67,6 +69,19 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
   useEffect(() => { setAcceptedIds(elements.map((e) => e.id)) }, [elements])
   const toggleElement = (id: string) =>
     setAcceptedIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
+
+  // FE-11 应用回执 outbox:pending 数暴露给外壳(可见"待同步回执 N 条"+ 重试入口)。
+  const sendReceipt = (r: AiReceipt) =>
+    reportAiDraftApplied(r.aiDraftId, { accepted: r.accepted, rejected: r.rejected, mode: r.mode }, r.projectUuid, r.status)
+  const [outboxPending, setOutboxPending] = useState(0)
+  const refreshOutbox = () => setOutboxPending(pendingReceipts().length)
+  const retryAiOutbox = async () => { await flushPending(sendReceipt); refreshOutbox() }
+  // 挂载 / 切项目:后台重试遗留 pending(会话恢复、上次失败的回执),审计最终一致。
+  useEffect(() => {
+    refreshOutbox()
+    if (pendingReceipts().length) void retryAiOutbox()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectUuid])
 
   // R2-审 F5:AI 草案是"当时项目"的上下文产物 —— 切换项目即整体清空,
   // 否则 A 的草案面板在 B 里仍可点「应用」,把 A 语境的模型写进 B(跨项目写入)。
@@ -143,11 +158,20 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
         makeKey: () => `ai${Date.now().toString(36)}${(seq++).toString(36)}`,
         accepted: acceptedIds,                       // D7:只应用接受的元素
       })
-      // 4b2 应用回执(尽力而为):逐元素接受清单入 ai_drafts + 审计
+      // FE-11 应用回执:先本地落一条 pending 回执(同步,审计不丢),再后台冲服务端。
+      // 401/500/网络中断/卸载/切项目均不丢 —— pending 留存 localStorage,可重试(retryAiOutbox / 切项目自动冲)。
       if (aiDraft.ai_draft_id != null) {
-        void reportAiDraftApplied(aiDraft.ai_draft_id,
-          { accepted: acceptedIds, rejected: elements.map((e) => e.id).filter((id) => !acceptedIds.includes(id)), mode: aiMode },
-          projectUuid || undefined)
+        const rejected = elements.map((e) => e.id).filter((id) => !acceptedIds.includes(id))
+        const st = useProjectStore.getState()
+        const { receipt, staged, error } = stageReceipt({
+          aiDraftId: aiDraft.ai_draft_id,
+          projectUuid: projectUuid || undefined,
+          workspaceId: st.workspaceId,
+          modelBaselineHash: st.identity.lastVersionHash,
+          accepted: acceptedIds, rejected, mode: aiMode, status: 'applied',
+        })
+        if (!staged) console.warn(`[ai-outbox] 回执本地暂存失败(${error});将仅尝试直接上报,若也失败则本次审计不可恢复。`)
+        void flushReceipt(receipt.localId, sendReceipt).then(refreshOutbox)
       }
       const tabs = result.etaTabs as ProjectEta[]
       const active = tabs.find((t) => t.key === result.activeKey) ?? tabs[0]
@@ -215,6 +239,7 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
     aiDraft, setAiDraft, aiDraftContext, setAiDraftContext, aiBusy, aiError, setAiError, aiNotice,
     aiAppliedResult, onGenerateAiDraft, onApplyAiDraft, openAiAppliedResult,
     elements, acceptedIds, toggleElement,            // D7 ghost-diff
+    outboxPending, retryAiOutbox,                    // FE-11 应用回执 outbox(待同步数 + 重试)
   }
 }
 

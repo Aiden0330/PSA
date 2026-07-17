@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { listProjectCases, listProjectVersions } from '../../api'
+import { StatusError, listProjectCases, listProjectVersions } from '../../api'
 import type { CaseInfo, ScenarioItem, VersionInfo } from '../../api'
 import type { EtaSummary } from '../../components/EventTreeEditor'
 import { RiskMatrix } from '../../components/RiskMatrix'
@@ -11,6 +11,8 @@ import { formatEtaNumber, formatEtaRate } from '../../etaNumberFormat'
 import { C_COLOR } from '../../riskmatrix'
 import { useViewStore } from '../../stores/viewStore'
 import { useActiveEta } from '../../stores/useActiveEta'
+import { useAuthStore } from '../../stores/authStore'
+import { useEvidenceGuard } from '../report/evidenceGuard'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
 
 const mono = 'var(--psa-font-mono)'
@@ -33,10 +35,22 @@ export function ProjectCockpit(
   const [versions, setVersions] = useState<VersionInfo[]>([])
   const [cases, setCases] = useState<CaseInfo[]>([])
   const pu = persistence.projectUuid
+  const guard = useEvidenceGuard(pu)
+  // FE-06:驾驶舱版本/案例读同样加 {projectUuid, generation} 守卫(A 慢 B 快 → 只落 B),
+  // 且读失败按 status 分流 —— 401 会话过期进全局重认证,绝不把失败清成"0 版本/0 案例"。
   useEffect(() => {
     if (!pu) { setVersions([]); setCases([]); return }
-    listProjectVersions(pu).then(setVersions).catch(() => setVersions([]))
-    listProjectCases(pu).then(setCases).catch(() => setCases([]))
+    const handleErr = (e: unknown) => {
+      if (e instanceof StatusError && e.status === 401) useAuthStore.setState({ identity: null, needsLogin: true })
+      // 403/其它:保留上次值,不呈现为"暂无"(数字面板不把读失败当零风险)
+    }
+    const one = <T,>(qc: string, fn: () => Promise<T>, apply: (d: T) => void) => {
+      const h = guard.begin(pu, qc)
+      fn().then((d) => { if (guard.isCurrent(h)) apply(d) }).catch((e) => { if (guard.isCurrent(h)) handleErr(e) })
+    }
+    one('versions', () => listProjectVersions(pu), setVersions)
+    one('cases', () => listProjectCases(pu), setCases)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pu])
 
   const aggSevere = (aggregateTotals.C4 ?? 0) + (aggregateTotals.C5 ?? 0)
