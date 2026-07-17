@@ -110,6 +110,8 @@ def fault_tree_frequency(model: Model, ft_name: str, cutoff: float = 0.0,
     割集与频率(review F1);limit_order 已整体移除——它截断的是头条数字本身,
     与概率通道(精确 P 不受影响)不同,静默低估不可接受(review F2)。
     """
+    from psaengine.model.rebind import reject_rebind_unwired
+    reject_rebind_unwired(model, "frequency")   # F-1
     if method not in ("sum", "exact"):
         raise ValueError(f"method must be 'sum' or 'exact', got {method!r}")
     ft = model.fault_trees[ft_name]

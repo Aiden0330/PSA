@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AuthRequiredError, SaveConflictError, deleteSaved, listSaved, saveWorkspace, wasSavedOffline } from '../../api'
 import type { SavedItem } from '../../api'
 import { deserializeProject, serializeProject } from '../../project'
@@ -6,7 +6,7 @@ import type { ProjectEta, ProjectPayload } from '../../project'
 import { buildProjectFile, downloadProjectFile } from '../../projectFile'
 import { getOverlay, mergeOverlay } from '../../libraryStore'
 import { loadProjectArchive, importProjectText, projectToTabs, EMPTY_FTS } from './projectIo'
-import { clearSessionDraft, peekSessionDraft, stageSessionDraft } from './sessionDraft'
+import { clearSessionDraft, listSessionDrafts, stageSessionDraft, sessionDraftKey } from './sessionDraft'
 import type { SessionDraftMeta } from './sessionDraft'
 import { composeEta } from '../../stores/derived'
 import { etaDisplayName, useActiveEta } from '../../stores/useActiveEta'
@@ -38,9 +38,10 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   // 三路解决必须作用于发起保存的项目,而不是"当时活动的项目"。
   const [conflict, setConflict] = useState<{ serverHash: string; baseHash: string; name: string; payload: ProjectPayload; wid: string; savedId: string } | null>(null)
   // 会话过期(local 模式,401)暂存的草稿元信息;内容留在 localStorage,这里只镜像name/时间供 UI 显示。
+  // FE-04:草稿按项目为键(v2);UI 仍呈现最近一份可恢复(恢复/丢弃按其 key 定位)。
   const [sessionDraft, setSessionDraft] = useState<SessionDraftMeta | null>(() => {
-    const d = peekSessionDraft()
-    return d ? { name: d.name, at: d.at } : null
+    const d = listSessionDrafts()[0]
+    return d ? { name: d.name, at: d.at, savedId: d.savedId } : null
   })
   // R2:FMEA 随槽(结构性隔离);启动草稿槽一次性从 localStorage 续接(与旧初始行为一致)
   const fmeaRows = useProjectStore((s) => s.fmeaRows)
@@ -84,9 +85,12 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
 
   // 保存项目:identity.savedId 为权威(R2-审 F7:mount 时列表过期不得把原地更新降级为
   // 新建——那会分叉版本链);原地更新带 lastVersionHash(D-P5-4),服务器已前进则 409。
+  // FE-08:保存 in-flight 守卫——按发起槽串行化 save/save-as,双击不创建两个服务端项目
+  const savingRef = useRef<Set<string>>(new Set())
   const onSaveWorkspace = async () => {
     if (!etModel) return
     const wid = useProjectStore.getState().workspaceId   // 槽钉定:发起保存的项目
+    if (savingRef.current.has(wid)) return               // FE-08:该槽保存进行中,忽略重入(双击不建两个项目)
     const payload = buildPayload()
     const existing = saved.find((s) => s.id === savedId)
     // name 在 try 外解出:catch 分支(冲突/会话过期暂存)也要用到用户刚输入的名称 ——
@@ -101,6 +105,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
       if (!prompted) return
       name = prompted
     }
+    savingRef.current.add(wid)
     try {
       if (savedId) {
         captureUuidFor(wid, await saveWorkspace(name, payload, savedId, lastVersionHash))
@@ -119,13 +124,16 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
       if (e instanceof AuthRequiredError) {
         // 会话过期(local 模式):编辑仍在内存里,但显式暂存一份 + 明确告知,
         // 绝不让保存动作静默失败(那样用户会误以为已存到服务器)。
-        stageSessionDraft(name, payload, savedId)
-        setSessionDraft({ name, at: new Date().toISOString() })
-        onError('登录已过期,本次保存未写入服务器 —— 你的编辑仍在,已额外暂存一份草稿到本机;请重新登录后点「恢复草稿」。')
+        // FE-04:暂存带 CAS 基线 + projectUuid(恢复后保存仍受 409 保护);写入失败必须可见。
+        const st = stageSessionDraft(name, payload, savedId, { projectUuid, lastVersionHash })
+        setSessionDraft({ name, at: new Date().toISOString(), savedId })
+        onError(st.ok
+          ? '登录已过期,本次保存未写入服务器 —— 你的编辑仍在,已额外暂存一份草稿到本机;请重新登录后点「恢复草稿」。'
+          : '登录已过期,且本机暂存失败(隐私模式/存储已满)—— 请立即用「导出项目文件」保存你的编辑,再重新登录。')
         return
       }
       throw e
-    }
+    } finally { savingRef.current.delete(wid) }
   }
   // 另存为新项目:总是新建一份副本, 并把当前项目切换为该副本(新建不带 base_version_hash,不可能冲突)
   const onSaveAs = async () => {
@@ -135,7 +143,9 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     const base = saved.find((s) => s.id === savedId)?.name || (at ? etaDisplayName(at, etModel) : '') || 'ETA 项目'
     const name = window.prompt('另存为新项目名称', base + ' 副本')
     if (!name) return
+    if (savingRef.current.has(wid)) return               // FE-08:重入守卫
     const payload = buildPayload()
+    savingRef.current.add(wid)
     try {
       const rec = await saveWorkspace(name, payload)
       setIdentityFor(wid, { savedId: rec.id, displayName: name })
@@ -144,13 +154,15 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
       await refreshList()
     } catch (e) {
       if (e instanceof AuthRequiredError) {
-        stageSessionDraft(name, payload, '')
-        setSessionDraft({ name, at: new Date().toISOString() })
-        onError('登录已过期,本次「另存为」未写入服务器 —— 你的编辑仍在,已额外暂存一份草稿到本机;请重新登录后点「恢复草稿」。')
+        const st = stageSessionDraft(name, payload, '', { projectUuid })
+        setSessionDraft({ name, at: new Date().toISOString(), savedId: '' })
+        onError(st.ok
+          ? '登录已过期,本次「另存为」未写入服务器 —— 你的编辑仍在,已额外暂存一份草稿到本机;请重新登录后点「恢复草稿」。'
+          : '登录已过期,且本机暂存失败(隐私模式/存储已满)—— 请立即用「导出项目文件」保存你的编辑,再重新登录。')
         return
       }
       throw e
-    }
+    } finally { savingRef.current.delete(wid) }
   }
 
   // ── D-P5-4 冲突对话三路径:查看 diff(调用方负责切页)/ 另存副本 / 确认覆盖 ──
@@ -181,12 +193,13 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   // 现在:该项目已打开 → 聚焦它自己的槽再整体载入(uuid 随槽原有,即同一项目,正确;
   // 基线清空 = 下次保存为显式覆盖语义,与"恢复草稿"的用户意图一致);未打开 → 开新槽,身份完整重置。
   const restoreSessionDraft = () => {
-    const d = peekSessionDraft()
+    const d = listSessionDrafts()[0]
     if (!d) { setSessionDraft(null); return }
+    const dkey = sessionDraftKey(d)
     const proj = deserializeProject(d.payload, d.name)
     const tabs = projectToTabs(proj)
     const restoredActiveKey = tabs.some((t) => t.key === proj.activeKey) ? proj.activeKey : (tabs[0]?.key ?? '')
-    if (!tabs.length) { onError('暂存草稿不含任何 ETA,已丢弃。'); clearSessionDraft(); setSessionDraft(null); return }
+    if (!tabs.length) { onError('暂存草稿不含任何 ETA,已丢弃。'); clearSessionDraft(dkey); setSessionDraft(null); return }
     const st = useProjectStore.getState()
     const isOpen = d.savedId !== '' &&
       (st.identity.savedId === d.savedId || Object.values(st.parked).some((sl) => sl.identity.savedId === d.savedId))
@@ -194,19 +207,24 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
       st.openProject(d.savedId, { etas: [], activeKey: '', checkedKeys: {}, identity: { savedId: d.savedId, projectUuid: '', displayName: '' } })  // 去重命中 → 仅聚焦
       const cur = useProjectStore.getState()
       cur.load(tabs, restoredActiveKey, proj.checkedKeys, proj.userFts ?? EMPTY_FTS)
-      cur.setIdentityFor(cur.workspaceId, { displayName: d.name, lastVersionHash: undefined })
+      cur.setIdentityFor(cur.workspaceId, { displayName: d.name, lastVersionHash: d.lastVersionHash })
       applyProjectFmea(proj)
     } else {
       useProjectStore.getState().openProject(d.savedId || `draft-restore:${d.at}`, {
         etas: tabs, activeKey: restoredActiveKey, checkedKeys: proj.checkedKeys, userFts: proj.userFts ?? EMPTY_FTS,
-        identity: { savedId: d.savedId, projectUuid: '', lastVersionHash: undefined, displayName: d.name },
+        identity: { savedId: d.savedId, projectUuid: d.projectUuid, lastVersionHash: d.lastVersionHash, displayName: d.name },
         fmeaRows: proj.fmeaRows, fmeaMapping: proj.fmeaMapping,
       })
     }
-    clearSessionDraft()
-    setSessionDraft(null)
+    clearSessionDraft(dkey)
+    setSessionDraft(listSessionDrafts()[0] ? { name: listSessionDrafts()[0].name, at: listSessionDrafts()[0].at, savedId: listSessionDrafts()[0].savedId } : null)
   }
-  const discardSessionDraft = () => { clearSessionDraft(); setSessionDraft(null) }
+  const discardSessionDraft = () => {
+    const d = listSessionDrafts()[0]
+    if (d) clearSessionDraft(sessionDraftKey(d))
+    const next = listSessionDrafts()[0]
+    setSessionDraft(next ? { name: next.name, at: next.at, savedId: next.savedId } : null)
+  }
 
   // 读取项目存档(R2):已打开(活动/停放)→ 仅聚焦切换,绝不重载(保护未保存编辑);
   // 未打开 → fetch 后作为新槽打开(停放当前项目)。pendingId 保证受控下拉在 await 期间不回弹。

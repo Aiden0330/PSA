@@ -70,6 +70,8 @@ def _build_event_tree(model: Model, et_name: str,
     跨序列共享基本事件因合并到同一 PDAG/管理器而自动正确(成功分支精确否定)。
     边界条件(house 状态)在合并副本上生效;CCF 组在合并后的 PDAG 上展开一次:
     跨屏障共享的共因事件同样精确否定。"""
+    from psaengine.model.rebind import reject_rebind_unwired
+    reject_rebind_unwired(model, "ETA sequence")   # F-1:ETA 通道未接 rebind,响亮拒绝
     et, big, fe_top, params = _merged_barrier_pdag(model, et_name,
                                                    house_states, boundary_condition_set)
     all_basics = sorted(big.basic_events())
@@ -123,6 +125,8 @@ def _build_integrated(model: Model, et_name: str, ie_ft_name: str,
 
     v1 排除(响亮拒绝):IE 树含 house 节点;IE 树事件出现在任何 CCF 组
     (展开语义与初因分组的交互留 v2);非相干 IE 树由频率通道校验拒绝。"""
+    from psaengine.model.rebind import reject_rebind_unwired
+    reject_rebind_unwired(model, "integrated LFT")   # F-1
     from psaengine.preprocess.normalize import normalize
     from psaengine.quantify.cutsets import minimal_cutsets
     from psaengine.quantify.frequency import (_reject_non_coherent,

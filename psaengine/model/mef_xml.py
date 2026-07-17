@@ -64,6 +64,19 @@ def _parse_formula(elem, g: PDAG, owner: str, counter: list) -> str:
     g.gate(nid, op, args, k=k)
     return nid
 
+def _sub_extra_set(sub_extra: dict, name: str, prob: float) -> None:
+    """engine-review F-3:替换基本事件的 MEF 概率并集——同名两处取值不一致时静默首写胜
+    (setdefault)会导致往返数值漂移(割集概率 ×N 静默失真)。不一致响亮拒绝。
+    树内一致性(rule.prob ≠ 库/树值)由 _emit_substitution 调用侧另行核验。"""
+    prior = sub_extra.get(name)
+    if prior is not None and prior != float(prob):
+        raise ValueError(
+            f"substitution basic-event '{name}' assigned conflicting probabilities "
+            f"({prior} vs {float(prob)}) across post-rules — MEF has one define-basic-event "
+            "slot per name; unify the rule probabilities or split the event")
+    sub_extra[name] = float(prob)
+
+
 # ── define-substitution ↔ PostRule(regime-B 后处理规则;规格 §3 映射表)────────────
 # 映射(逐行对照 SCRAM substitution.cc Validate()/type() 与 MEF input.rng L435-468):
 #   mutually_exclusive → type=delete-terms;hypothesis and-2 或 atleast min=2;target false
@@ -99,14 +112,14 @@ def _emit_substitution(parent, rule: PostRule, idx: int, sub_extra: dict) -> Non
         sub.set("type", "recovery-rule")
         _and_or_atleast(events)
         ET.SubElement(ET.SubElement(sub, "target"), "basic-event", name=rule.add_event)
-        sub_extra.setdefault(rule.add_event, float(rule.prob))
+        _sub_extra_set(sub_extra, rule.add_event, float(rule.prob))
     elif rule.kind == "exchange":
         sub.set("type", "exchange-event")
         _and_or_atleast(sorted(set(events) | {rule.source}))
         ET.SubElement(ET.SubElement(sub, "source"), "basic-event", name=rule.source)
         ET.SubElement(ET.SubElement(sub, "target"), "basic-event", name=rule.add_event)
-        sub_extra.setdefault(rule.source, float(rule.source_prob))
-        sub_extra.setdefault(rule.add_event, float(rule.prob))
+        _sub_extra_set(sub_extra, rule.source, float(rule.source_prob))
+        _sub_extra_set(sub_extra, rule.add_event, float(rule.prob))
     else:
         raise ValueError(f"cannot export post-rule kind '{rule.kind}' to MEF substitution")
 
@@ -304,6 +317,15 @@ def save_mef_xml(model: Model, path: str) -> None:
             ET.SubElement(be, "float", value=str(_mef_unavailability(model.parameters.get(b), b)))
     for name in sorted(sub_extra):                   # 树外的替换基本事件:并集规则写入 float
         if name in used_basics or name in ccf_members:
+            # F-3:替换事件已在树内/CCF —— 若 rule 概率与树内库值不一致,往返会静默用库值
+            # 覆盖 rule 值(割集概率漂移)。不一致响亮拒绝,不静默取库值。
+            if name in model.parameters:
+                lib_q = _mef_unavailability(model.parameters.get(name), name)
+                if lib_q != sub_extra[name]:
+                    raise ValueError(
+                        f"substitution event '{name}' has rule probability {sub_extra[name]} but "
+                        f"tree/library value {lib_q} — MEF round-trip would silently use the library "
+                        "value (cut-set probability drift); unify them before export")
             continue                                 # 已在树内/CCF distribution 写过,勿重复
         be = ET.SubElement(md, "define-basic-event", name=name)
         ET.SubElement(be, "float", value=str(sub_extra[name]))

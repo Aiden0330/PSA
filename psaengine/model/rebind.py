@@ -47,11 +47,18 @@ class RebindRule:
 
 
 def _house_base_states(model: "Model") -> dict[str, bool]:
-    """被分析图的 house 节点集与基态(v1 = Analysis 族,across all fault trees)。"""
+    """house 节点集与基态。engine-review F-2:跨树收集时同名 house 基态不一致会静默
+    后写胜——数值随树序列化顺序翻转(审计/复现事故)。模型级规则遇同 id 不一致必炸,
+    绝不让字典序决定风险数。"""
     base: dict[str, bool] = {}
     for ft in model.fault_trees.values():
         for n in ft.pdag.nodes.values():
             if n.is_house:
+                if n.id in base and base[n.id] != bool(n.state):
+                    raise ValueError(
+                        f"house event '{n.id}' has conflicting base states across fault trees "
+                        f"({base[n.id]} vs {bool(n.state)}) — a model-level rebind rule cannot "
+                        "resolve it deterministically; rename or unify the house base state")
                 base[n.id] = bool(n.state)
     return base
 
@@ -60,10 +67,13 @@ def _is_active(rule: RebindRule, house_config: dict, base: dict[str, bool]) -> b
     """规则激活 iff ∀(h,s)∈when:有效 house 态(h)==s。
     有效 house 态 = 显式 house_config > PDAG 基态(4a2 优先级;bc_set 已并入 house_config)。
     when 引用未知 house(不在被分析图)→ 响亮。"""
-    for h, want in rule.when.items():
+    # engine-review F-4:先全量校验 when 键存在性,再判激活——否则前项状态不符即短路,
+    # 后项的未知 house 永不校验(键序决定是否响亮,守卫不完备)。
+    for h in rule.when:
         if h not in base:
             raise ValueError(f"rebind rule '{rule.id}': when references unknown house "
                              f"'{h}' (not a house event in the analyzed graph)")
+    for h, want in rule.when.items():
         eff = house_config.get(h, base[h]) if house_config else base[h]
         if bool(eff) != bool(want):
             return False
@@ -127,3 +137,15 @@ def effective_parameters(model: "Model", house_config: Optional[dict] = None,
                                  "(不可作为 probability 通道的换法则来源)")
             view.add(replace(src, id=r.param))       # 取 target 之律,id 保留为 param
     return view
+
+
+def reject_rebind_unwired(model: "Model", channel: str) -> None:
+    """engine-review F-1:v1 只有 Analysis(point/importance/CCF)通道经 effective_parameters
+    接线;ETA 序列 / 频率 / MC 抽样通道仍读裸 model.parameters,规则会被静默忽略——同模型
+    两页两个数,且方向落在风险低估侧(规则建模「工况劣化 q 升」时低估)。接线补齐前,这些
+    通道对非空 rebind_rules **响亮拒绝**,绝不静默算错数。接线义务见 ROADMAP backlog。"""
+    if getattr(model, "rebind_rules", None):
+        raise ValueError(
+            f"regime-A rebind rules are not yet wired into the {channel} channel (v1: only the "
+            "Analysis point/importance channel honors rebind); refusing to compute silently on the "
+            "base library. Use fault_tree Analysis, or await the ETA/frequency/MC wiring (backlog).")

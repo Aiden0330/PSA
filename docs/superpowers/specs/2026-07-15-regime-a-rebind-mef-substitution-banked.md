@@ -141,3 +141,22 @@ H=true 且重绑 qB:0.1→0.4:P₁ = 1−(1−0.02)(1−0.4·0.25)(1−0.3) = 1�
 先红后绿;`make benchmark` 24/24(q 视图层,应零差异);engine-reviewer 两轮
 (隔离/状态机类:有效视图不得写回模型——R2 后接 R1 再接 R2 的回环锚点防状态泄漏);
 json_io/canonical 往返锁(新字段);MEF 往返锁并入既有 mef 测试族。
+
+## 实现批评审记录(2026-07-17,commit f2fc916 → 收口修)
+
+engine-reviewer 冷读 **FAIL(4 偏离,2 HIGH,均风险低估向)→ 全修**:
+- **F-1(HIGH)通道分裂**:仅 Analysis 接了 effective_parameters;ETA 序列/频率/MC 抽样
+  通道读裸 model.parameters,规则被静默忽略(同模型两页两数,规则「工况劣化 q 升」时低估);
+  `purpose="sampling"` 守卫在真实调用链不设防。修:三通道咽喉(_build_event_tree /
+  _build_integrated / fault_tree_frequency)对非空 rebind_rules **响亮拒绝**(接线义务见下
+  backlog),Analysis 通道不受影响(锚点 F1×4)。
+- **F-2(HIGH)house 基态跨树后写胜**:同名 house 不同基态时数值随树序翻转 5×。修:
+  `_house_base_states` 同 id 基态不一致必炸(锚点 F2)。
+- **F-3(MED)MEF 并集静默漂移**:替换事件 rule 概率 ≠ 库/树值时 setdefault 首写胜 →
+  往返割集概率漂移。修:`_sub_extra_set` 冲突拒绝 + 树内不一致导出拒绝(锚点 F3)。
+- **F-4(LOW)when 短路**:前项不符即短路,后项未知 house 永不校验。修:先全量校验键
+  存在性(锚点 F4)。
+
+**接线义务 backlog(v2)**:ETA 序列 / 频率 / MC 抽样通道经 effective_parameters 接线 +
+锚点(当前响亮拒绝止血);"请求显式 post_rules > model.post_rules" 量化路径接线(当前
+model.post_rules 仅 MEF 交换落点 + json 透传,未接量化)。

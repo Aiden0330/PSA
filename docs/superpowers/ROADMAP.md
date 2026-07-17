@@ -509,3 +509,14 @@ station.md;脚本+数据:docs/reference-assets/pilot-200mwh/。
 收口修复:A10 闭式补 λ 入带项(0.117 非 0.09,区间重定 [0.095,0.14])、集成钉扎
 resolved_settings 的 ie_ft_name 残留 None 改实值。checked_set × 集成树的预存缺口由独立
 会话任务处理中(chip)。基线:py 572+56 · benchmark 24/24。
+
+## 2026-07-17 · regime-A rebind + MEF substitution 落地 + 收口(banked 全清)
+
+Opus `f2fc916`:regime-A 条件参数重绑定(effective_parameters 单一咽喉,identity 零扰动、
+CCF 流经)+ MEF define-substitution I/O(4 kind 往返 + 7 类导入拒绝);27 banked 锚点激活。
+engine-reviewer 冷读 FAIL(F-1 通道分裂 / F-2 house 基态跨树后写胜 / F-3 MEF 并集漂移 /
+F-4 when 短路,2 HIGH 均风险低估向)→ Fable 全修(三通道未接则响亮拒绝、同名 house 基态
+冲突必炸、MEF 概率不一致拒绝、when 键先全校验),+7 收口锚点。**接线欠账入 backlog**:
+ETA/频率/MC 经 effective_parameters 接线 + 请求 post_rules 量化接线(现响亮拒绝止血)。
+banked 库 4 份规格全部兑现(集成 MC / 向量化 / periodic-test Complete / regime-A);CCF-SOKC
+第 5 份待实现。基线:py 640+3skip · benchmark 24/24。

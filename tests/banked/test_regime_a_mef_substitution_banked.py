@@ -350,3 +350,106 @@ class TestMefSubstitutionIO:
         assert (r.kind, r.events, r.source, r.add_event) == \
             ("exchange", ["H"], "A_SRC", "A_TGT")
         assert r.prob == pytest.approx(0.1) and r.source_prob == pytest.approx(0.01)
+
+
+# ── engine-review 收口(f2fc916 冷读 FAIL → 修):F-1..F-4 安全化锚点 ──────────────
+
+class TestRegimeAReviewFixes:
+    def _model_with_rule(self):
+        from psaengine.model.json_io import load_model_from_dict
+        return load_model_from_dict({
+            "model_data": {"parameters": [
+                {"id": "B", "kind": "probability", "value": 0.1}]},
+            "fault_trees": [{"name": "T", "top": "TOP", "nodes": [
+                {"id": "B", "basic": True, "param_ref": "B"},
+                {"id": "H", "house": True, "state": False},
+                {"id": "HOFF", "house": True, "state": False},
+                {"id": "G", "op": "and", "args": ["H", "HOFF"]},
+                {"id": "TOP", "op": "or", "args": ["B", "G"]}]}],
+            "event_trees": [{"name": "TR", "init_event": "IE", "init_frequency": 1e-3,
+                             "functional_events": [{"id": "FE", "link_ft": "T"}],
+                             "sequences": [{"path": {"FE": "success"}, "end_state": "L0"},
+                                           {"path": {"FE": "failure"}, "end_state": "L1"}],
+                             "consequence_bins": {"L0": "C1", "L1": "C2"}}],
+            "rebind_rules": [{"id": "r", "when": {"H": True}, "param": "B", "value": 0.4}]})
+
+    def test_F1_eta_channel_rejects_rebind_not_silent(self):
+        # ETA 序列通道未接 rebind → 响亮拒绝(此前静默按基库算,风险低估方向)
+        import pytest
+        from psaengine.eta.sequence import quantify_event_tree
+        with pytest.raises(ValueError, match="not yet wired"):
+            quantify_event_tree(self._model_with_rule(), "TR")
+
+    def test_F1_mc_channel_rejects_rebind(self):
+        import pytest
+        from psaengine.eta.uncertainty import event_tree_uncertainty
+        with pytest.raises(ValueError, match="not yet wired"):
+            event_tree_uncertainty(self._model_with_rule(), "TR", samples=50, seed=1)
+
+    def test_F1_frequency_channel_rejects_rebind(self):
+        import pytest
+        from psaengine.quantify.frequency import fault_tree_frequency
+        m = self._model_with_rule()
+        with pytest.raises(ValueError, match="not yet wired"):
+            fault_tree_frequency(m, "T")
+
+    def test_F1_analysis_channel_still_honors_rebind(self):
+        # 接线的 Analysis 通道不受守卫影响:H=True 激活 → B q=0.4
+        import pytest
+        from psaengine.analysis import Analysis
+        m = self._model_with_rule()
+        a = Analysis(m, fault_tree="T", house_states={"H": True})
+        assert a.probability() == pytest.approx(0.4, rel=1e-12)   # H 中和(AND(H,HOFF=F)=F)→ TOP≡B;H=T 激活 qB=0.4
+        base = Analysis(m, fault_tree="T", house_states={"H": False})
+        assert base.probability() == pytest.approx(0.1, rel=1e-12)
+
+    def test_F2_cross_tree_house_base_conflict_raises(self):
+        # 同名 house 跨树基态不一致 → 响亮(此前后写胜,数值随树序翻转 5×)
+        import pytest
+        from psaengine.model.json_io import load_model_from_dict
+        from psaengine.analysis import Analysis
+        m = load_model_from_dict({
+            "model_data": {"parameters": [{"id": "B", "kind": "probability", "value": 0.1}]},
+            "fault_trees": [
+                {"name": "T1", "top": "P1", "nodes": [
+                    {"id": "B", "basic": True, "param_ref": "B"},
+                    {"id": "H", "house": True, "state": False},
+                    {"id": "P1", "op": "or", "args": ["B", "H"]}]},
+                {"name": "T2", "top": "P2", "nodes": [
+                    {"id": "H", "house": True, "state": True},
+                    {"id": "P2", "op": "or", "args": ["H"]}]}],
+            "event_trees": [], "ccf_groups": [],
+            "rebind_rules": [{"id": "r", "when": {"H": True}, "param": "B", "value": 0.5}]})
+        with pytest.raises(ValueError, match="conflicting base states"):
+            Analysis(m, fault_tree="T1").probability()
+
+    def test_F4_when_unknown_house_raises_regardless_of_key_order(self):
+        # when 含未知 house,无论键序都响亮(此前前项不符即短路,后项未知永不校验)
+        import pytest
+        from psaengine.model.rebind import RebindRule, _is_active
+        base = {"H": False}
+        # H 不符(want True vs base False)在前,GHOST 未知在后 —— 仍须炸
+        r = RebindRule(id="r", when={"H": True, "GHOST": True}, param="B", value=0.4)
+        with pytest.raises(ValueError, match="unknown house"):
+            _is_active(r, {}, base)
+
+    def test_F3_mef_export_rejects_probability_mismatch(self):
+        # 树内库值 ≠ rule 概率 → 导出响亮(此前往返静默用库值,割集概率漂移)
+        import pytest, tempfile, os
+        from psaengine.model.json_io import load_model_from_dict
+        from psaengine.model.mef_xml import save_mef_xml
+        from psaengine.quantify.postprocess import PostRule
+        m = load_model_from_dict({
+            "model_data": {"parameters": [
+                {"id": "A", "kind": "probability", "value": 0.1},
+                {"id": "R", "kind": "probability", "value": 0.03}]},
+            "fault_trees": [{"name": "T", "top": "TOP", "nodes": [
+                {"id": "A", "basic": True, "param_ref": "A"},
+                {"id": "R", "basic": True, "param_ref": "R"},
+                {"id": "TOP", "op": "or", "args": ["A", "R"]}]}],
+            "event_trees": [], "ccf_groups": []})
+        # recovery 规则 add_event=R(树内,库值 0.03)但 rule.prob=0.5 → 不一致
+        m.post_rules = [PostRule(kind="recovery", events=["A"], add_event="R", prob=0.5)]
+        with pytest.raises(ValueError, match="cut-set probability drift|conflicting probabilities"):
+            with tempfile.TemporaryDirectory() as d:
+                save_mef_xml(m, os.path.join(d, "o.xml"))
