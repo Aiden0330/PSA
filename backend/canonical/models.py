@@ -25,9 +25,28 @@ from __future__ import annotations
 
 from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
+# Document schema versions. "1.0" is the v1 baseline; "2.0" marks a document
+# that carries EB-08 typed-Q(t) semantics (a v2 kind or a v2 typed field). The
+# version is CONTENT-DEPENDENT (assigned by convert.to_canonical): a document
+# using none of the v2 features stays "1.0", so every pre-EB-08 archive keeps
+# its exact content_hash (F3 iron law — see serialize/content_hash and
+# tests/backend/test_execution_replay_v2_p23.py::test_hash_stability_iron_law).
 SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION_V2 = "2.0"
+
+# EB-08: parameter kinds the exact engine already understands (psaengine
+# Parameter). Canonical v1 only modelled the first three; the four Q(t) kinds
+# used to fail canonical validation (weibull/glm/periodic_test → ValidationError)
+# even though the engine could quantify them.
+_PARAM_KINDS = ("probability", "rate", "frequency",
+                "exponential", "glm", "weibull", "periodic_test")
+_V2_PARAM_KINDS = frozenset(("exponential", "glm", "weibull", "periodic_test"))
+# Typed Q(t) fields new in canonical v2. They MUST be omitted from the
+# serialization when None so that a v1 parameter (which never sets them)
+# serializes — and therefore hashes — byte-for-byte as it did before EB-08.
+_V2_TYPED_FIELDS = ("gamma", "alpha", "beta", "t0")
 
 
 class _Strict(BaseModel):
@@ -60,16 +79,39 @@ class Distribution(_Strict):
 class Parameter(_Strict):
     uuid: str
     ref: str
-    kind: Literal["probability", "rate", "frequency"]
+    kind: Literal["probability", "rate", "frequency",
+                  "exponential", "glm", "weibull", "periodic_test"]
     value: float
     mttr: Optional[float] = None
     test_interval: Optional[float] = None
     mission_time: Optional[float] = None
+    # EB-08 typed Q(t) model fields (engine parity: glm γ, weibull α/β/t0).
+    # Optional + omitted-when-None (see model serializer below) so adding them
+    # does not perturb the content_hash of any v1 archive (F3 iron law).
+    gamma: Optional[float] = None
+    alpha: Optional[float] = None
+    beta: Optional[float] = None
+    t0: Optional[float] = None
     distribution: Optional[Distribution] = None
     label: Optional[str] = None
     provenance: Provenance = Field(default_factory=Provenance)
     # Verbatim residue of v2 ParamJson's open fields (round-trip fidelity).
     extra: dict[str, Any] = Field(default_factory=dict)
+
+    @model_serializer(mode="wrap")
+    def _omit_v2_typed_when_none(self, handler):
+        """Drop gamma/alpha/beta/t0 from the serialized form when they are None.
+
+        This is the ONLY iron-law-safe way to add typed fields: a v1 parameter
+        (all four None) serializes exactly as before EB-08, so its content_hash
+        is bit-identical; a v2 typed parameter carries only the fields it uses.
+        Scoped to Parameter — never touches Distribution.params / extra / CCF
+        factors, which may legitimately hold keys named alpha/beta/gamma."""
+        d = handler(self)
+        for k in _V2_TYPED_FIELDS:
+            if d.get(k) is None:
+                d.pop(k, None)
+        return d
 
 
 class FtNode(_Strict):
@@ -186,7 +228,11 @@ class ProjectInfo(_Strict):
 
 
 class ProjectDocument(_Strict):
-    schema_version: Literal["1.0"] = SCHEMA_VERSION
+    # Default stays "1.0"; convert.to_canonical bumps to "2.0" only for a
+    # document that actually carries a v2 kind/typed field, so v1 archives keep
+    # their exact hash while v2 documents self-describe. Stored v1 blobs (which
+    # always carried "1.0") load unchanged.
+    schema_version: Literal["1.0", "2.0"] = SCHEMA_VERSION
     project: ProjectInfo
     event_trees: list[EventTree] = Field(default_factory=list)
     workbench: Workbench = Field(default_factory=Workbench)

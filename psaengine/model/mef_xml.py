@@ -9,6 +9,19 @@ from psaengine.model.model import Model
 _OP = {"and": Op.AND, "or": Op.OR, "not": Op.NOT, "atleast": Op.ATLEAST, "xor": Op.XOR}
 _OP_REV = {v: k for k, v in _OP.items()}
 
+# EB-08:MEF <float> 只承载一个概率标量。时变 Q(t) 模型(exponential/glm/weibull/
+# periodic_test)经 unavailability() 会被**静默固化**成当前 t 的一个数——重导入即失真且
+# 不可辨。导出侧对这四类响亮拒绝并点名参数(probability/rate 的既有扁平化行为零扰动)。
+_QT_KINDS = frozenset(("exponential", "glm", "weibull", "periodic_test"))
+
+
+def _mef_unavailability(param, pid: str) -> float:
+    if param.kind in _QT_KINDS:
+        raise ValueError(
+            f"MEF 导出无法承载参数 '{pid}'(kind='{param.kind}'):时变 Q(t) 模型会被静默"
+            "固化为单个概率标量(重导入失真)。请以支持 Q(t) 的格式导出或先转定值参数。")
+    return param.unavailability()
+
 # MEF ↔ 引擎 CCF 模型名
 _CCF_MODEL = {"beta-factor": "beta", "MGL": "mgl", "alpha-factor": "alpha", "phi-factor": "phi"}
 _CCF_MODEL_REV = {v: k for k, v in _CCF_MODEL.items()}
@@ -145,7 +158,8 @@ def save_mef_xml(model: Model, path: str) -> None:
             ccf_members.add(m)
         if grp.members and grp.members[0] in model.parameters:
             dist = ET.SubElement(cg, "distribution")
-            ET.SubElement(dist, "float", value=str(model.parameters.get(grp.members[0]).unavailability()))
+            m0 = grp.members[0]
+            ET.SubElement(dist, "float", value=str(_mef_unavailability(model.parameters.get(m0), m0)))
         fl = ET.SubElement(cg, "factors")
         for key, val in sorted(grp.factors.items(), key=lambda kv: _factor_level(grp.model, kv[0])):
             fe = ET.SubElement(fl, "factor", level=str(_factor_level(grp.model, key)))
@@ -154,6 +168,6 @@ def save_mef_xml(model: Model, path: str) -> None:
     for b in sorted(used_basics - ccf_members):     # CCF 成员的 Q_t 已在组 distribution 中
         if b in model.parameters:
             be = ET.SubElement(md, "define-basic-event", name=b)
-            ET.SubElement(be, "float", value=str(model.parameters.get(b).unavailability()))
+            ET.SubElement(be, "float", value=str(_mef_unavailability(model.parameters.get(b), b)))
     ET.indent(mef)
     ET.ElementTree(mef).write(path, encoding="utf-8", xml_declaration=True)

@@ -71,9 +71,13 @@ def test_shared_event_request_quantifies_bit_identical():
 
     handwritten = {
         "init_event": "IE", "init_frequency": 1.0,
-        "functional_events": [{"id": "FE1", "link_ft": "FT1"},
-                              {"id": "FE2", "link_ft": "FT2"}],
-        "fault_trees": copy.deepcopy({f["name"]: f for f in fts["fault_trees"]}),
+        # Frontend parity (EB-08): link_ft = the functional-event id, and the
+        # fault tree is keyed by that id (fault_trees[fe.id]) with the tree's
+        # own ref kept as inner `name` — mirrors toEngineRequest exactly.
+        "functional_events": [{"id": "FE1", "link_ft": "FE1"},
+                              {"id": "FE2", "link_ft": "FE2"}],
+        "fault_trees": {"FE1": copy.deepcopy(fts["fault_trees"][0]),
+                        "FE2": copy.deepcopy(fts["fault_trees"][1])},
         "parameters": {"X": {"value": 0.1}, "A": {"value": 0.1}, "B": {"value": 0.1}},
         "sequences": [
             {"path": {"FE1": "success"}, "end_state": "L0"},

@@ -60,8 +60,11 @@ def _prov_from_fe(fe: dict) -> M.Provenance:
 
 
 def _param_from_json(p: dict, ns, scope: str) -> M.Parameter:
+    # EB-08: typed Q(t) fields (gamma/alpha/beta/t0) are now first-class typed
+    # fields, not `extra` residue — so canonical carries the semantics and
+    # engine_request/et_builder can rebuild the exact Q(t) model on replay.
     known = {"id", "kind", "value", "mttr", "test_interval", "mission_time",
-             "distribution", "source"}
+             "gamma", "alpha", "beta", "t0", "distribution", "source"}
     dist = None
     if p.get("distribution") is not None:
         d = p["distribution"]
@@ -73,15 +76,18 @@ def _param_from_json(p: dict, ns, scope: str) -> M.Parameter:
         uuid=entity_uuid(ns, f"{scope}/param:{p['id']}"),
         ref=p["id"], kind=p["kind"], value=p["value"],
         mttr=p.get("mttr"), test_interval=p.get("test_interval"),
-        mission_time=p.get("mission_time"), distribution=dist,
-        provenance=prov,
+        mission_time=p.get("mission_time"),
+        gamma=p.get("gamma"), alpha=p.get("alpha"),
+        beta=p.get("beta"), t0=p.get("t0"),
+        distribution=dist, provenance=prov,
         extra={k: v for k, v in p.items() if k not in known},
     )
 
 
 def _param_to_json(p: M.Parameter) -> dict:
     out: dict[str, Any] = {"id": p.ref, "kind": p.kind, "value": p.value}
-    for k in ("mttr", "test_interval", "mission_time"):
+    for k in ("mttr", "test_interval", "mission_time",
+              "gamma", "alpha", "beta", "t0"):
         v = getattr(p, k)
         if v is not None:
             out[k] = v
@@ -329,10 +335,28 @@ def to_canonical(payload: dict, project_uuid: str,
         sidecar["passthrough"]["userFts"] = copy.deepcopy(payload["userFts"])
 
     doc = M.ProjectDocument(
+        schema_version=_schema_version_for(trees, wb),
         project=M.ProjectInfo(uuid=project_uuid, name=project_name),
         event_trees=trees, workbench=wb,
     )
     return doc, sidecar
+
+
+def _param_is_v2(p: M.Parameter) -> bool:
+    return (p.kind in M._V2_PARAM_KINDS
+            or any(getattr(p, f) is not None for f in M._V2_TYPED_FIELDS))
+
+
+def _schema_version_for(trees: list[M.EventTree], wb: M.Workbench) -> str:
+    """EB-08 content-dependent version: "2.0" iff the document actually uses a
+    v2 kind/typed field, else "1.0". Keeps every v1 archive at "1.0" (iron law)
+    while letting a typed-Q(t) document self-describe."""
+    params: list[M.Parameter] = []
+    for t in trees:
+        params.extend(t.parameters)
+    if wb.user_fts is not None:
+        params.extend(wb.user_fts.parameters)
+    return M.SCHEMA_VERSION_V2 if any(_param_is_v2(p) for p in params) else M.SCHEMA_VERSION
 
 
 def to_v2(doc: M.ProjectDocument, sidecar: Optional[dict] = None) -> dict:

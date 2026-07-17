@@ -92,7 +92,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/88/d9/86e4053d44baa2b64
 
 [[package]]
 name = "bess-psa"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "argon2-cffi" },

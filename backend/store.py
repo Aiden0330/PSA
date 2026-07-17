@@ -136,6 +136,73 @@ def engine_version() -> str:
         return "0.0.0"
 
 
+# ── EB-08 engine fingerprint(F3 阶段 3)────────────────────────────────────────
+# engine_version()(纯 semver)保留供既有调用/审计;新案例与报告页脚经 _pin_case 附
+# 完整指纹,使"数值实现变更后旧案例可辨"——semver 只在发版时动,git_sha/dirty 逐次运行
+# 探测,benchmark_corpus_version 锚定基准语料清单。缺 git / 缺语料目录时降级,绝不崩。
+
+# 引擎请求 schema 版本:canonical v2 typed 参数 + CCF/typed 反构落地即为 "2"
+#(与文档 schema_version 的 "2.0" 内容级标注区分:此为引擎请求契约版本,常量)。
+REQUEST_SCHEMA_VERSION = "2"
+
+
+def _git_sha() -> str:
+    import subprocess
+    try:
+        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                             cwd=os.path.dirname(os.path.abspath(__file__)),
+                             capture_output=True, text=True, timeout=5)
+        sha = out.stdout.strip()
+        return sha if out.returncode == 0 and sha else "unknown"
+    except Exception:
+        return "unknown"
+
+
+def _git_dirty() -> Optional[bool]:
+    import subprocess
+    try:
+        out = subprocess.run(["git", "status", "--porcelain"],
+                             cwd=os.path.dirname(os.path.abspath(__file__)),
+                             capture_output=True, text=True, timeout=5)
+        if out.returncode != 0:
+            return None
+        return bool(out.stdout.strip())
+    except Exception:
+        return None
+
+
+def _benchmark_corpus_version() -> str:
+    """基准语料清单的确定性内容指纹(sha256 前 12)。清单 = corpus.json + models/*.xml
+    每项的 (相对名, 内容 sha256) 排序后再哈希——语料任一比特变动即指纹变。缺目录降级 unknown。"""
+    import glob
+    import hashlib
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests", "benchmark")
+    corpus = os.path.join(base, "corpus.json")
+    if not os.path.exists(corpus):
+        return "unknown"
+    entries: list[tuple[str, str]] = []
+    for path in [corpus] + sorted(glob.glob(os.path.join(base, "models", "*.xml"))):
+        try:
+            with open(path, "rb") as f:
+                entries.append((os.path.basename(path), hashlib.sha256(f.read()).hexdigest()))
+        except OSError:
+            continue
+    blob = json.dumps(sorted(entries), separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()[:12]
+
+
+def engine_fingerprint() -> dict:
+    """完整引擎指纹:{semver, git_sha, dirty, request_schema_version, benchmark_corpus_version}。
+    案例钉扎与报告页脚引用——数值实现变更后旧案例指纹不同,重放可辨(EB-08)。"""
+    return {
+        "semver": engine_version(),
+        "git_sha": _git_sha(),
+        "dirty": _git_dirty(),
+        "request_schema_version": REQUEST_SCHEMA_VERSION,
+        "benchmark_corpus_version": _benchmark_corpus_version(),
+    }
+
+
 # 修复项 ②(ADR-4):server 模式下审计/版本/案例的"谁"= 会话身份。
 # 请求中间件解析 cookie 后 set;actor() 优先读它,空则回退 OS 用户(off 模式逐位不变)。
 from contextvars import ContextVar

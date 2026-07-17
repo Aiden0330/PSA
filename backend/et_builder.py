@@ -26,8 +26,19 @@ def build_model_from_request(req: dict) -> Model:
                 {"id": fid, "op": "null", "args": [fid + "_E"]}]})
         fes.append({"id": fid, "link_ft": fid})
     for pid, spec in req.get("parameters", {}).items():
-        val = spec["value"] if isinstance(spec, dict) else spec
-        params.append({"id": pid, "kind": "probability", "value": float(val)})
+        # EB-08:带 kind 键的类型化参数(canonical v2 反构的 Q(t):rate/weibull/glm/…)
+        # 透传 kind 与全部类型字段,replay 重建精确不可用度;不带 kind 的旧形状(前端
+        # {value} 或裸标量)维持 probability 强转,逐位零扰动。
+        if isinstance(spec, dict) and "kind" in spec:
+            p: dict = {"id": pid, "kind": spec["kind"], "value": float(spec["value"])}
+            for f in ("mttr", "test_interval", "mission_time",
+                      "gamma", "alpha", "beta", "t0"):
+                if spec.get(f) is not None:
+                    p[f] = float(spec[f])
+            params.append(p)
+        else:
+            val = spec["value"] if isinstance(spec, dict) else spec
+            params.append({"id": pid, "kind": "probability", "value": float(val)})
     ie = req.get("ie_fault_tree")
     if ie:
         # 序列级 LFT 集成:IE 块自带类型化参数(初因 kind=frequency)——不得走上面的
