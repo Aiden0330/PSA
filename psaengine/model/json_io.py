@@ -6,6 +6,8 @@ from psaengine.model.fault_tree import FaultTree
 from psaengine.model.event_tree import EventTree, FunctionalEvent
 from psaengine.model.ccf import CCFGroup
 from psaengine.model.model import Model
+from psaengine.model.rebind import RebindRule
+from psaengine.quantify.postprocess import PostRule
 
 def _param(d: dict) -> Parameter:
     dist = None
@@ -70,7 +72,12 @@ def load_model_from_dict(d: dict) -> Model:
             for c in d.get("ccf_groups", [])]
     bc_sets = {b["name"]: {k: bool(v) for k, v in b.get("house_states", {}).items()}
                for b in d.get("boundary_condition_sets", [])}
-    return Model(parameters=lib, fault_trees=fts, event_trees=ets, ccf_groups=ccfs, bc_sets=bc_sets)
+    rebind_rules = [RebindRule(id=r["id"], when={k: bool(v) for k, v in r["when"].items()},
+                               param=r["param"], value=r.get("value"), to_param=r.get("to_param"))
+                    for r in d.get("rebind_rules", [])]
+    post_rules = [PostRule.from_dict(r) for r in d.get("post_rules", [])]
+    return Model(parameters=lib, fault_trees=fts, event_trees=ets, ccf_groups=ccfs,
+                 bc_sets=bc_sets, rebind_rules=rebind_rules, post_rules=post_rules)
 
 def node_to_json(n) -> dict:
     if n.is_basic: return {"id": n.id, "basic": True, "param_ref": n.param_ref}
@@ -93,9 +100,35 @@ def ccf_groups_to_json(groups) -> list[dict]:
     return [{"id": c.id, "members": c.members, "model": c.model, "factors": c.factors,
              **({"staggered": True} if getattr(c, "staggered", False) else {})} for c in groups or []]
 
+def rebind_rules_to_json(rules) -> list[dict]:
+    out = []
+    for r in rules or []:
+        d = {"id": r.id, "when": r.when, "param": r.param}
+        if r.value is not None:
+            d["value"] = r.value
+        if r.to_param is not None:
+            d["to_param"] = r.to_param
+        out.append(d)
+    return out
+
+def post_rules_to_json(rules) -> list[dict]:
+    out = []
+    for r in rules or []:
+        d = {"kind": r.kind, "events": list(r.events)}
+        for k in ("add_event", "prob", "source", "source_prob"):
+            v = getattr(r, k)
+            if v is not None:
+                d[k] = v
+        out.append(d)
+    return out
+
 def save_model(m: Model, path: str) -> None:
     d = {"model_data": {"parameters": parameters_to_json(m.parameters)},
          "fault_trees": [fault_tree_to_dict(name, ft) for name, ft in m.fault_trees.items()],
          "event_trees": [], "ccf_groups": ccf_groups_to_json(m.ccf_groups)}
+    if m.rebind_rules:
+        d["rebind_rules"] = rebind_rules_to_json(m.rebind_rules)
+    if m.post_rules:
+        d["post_rules"] = post_rules_to_json(m.post_rules)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)

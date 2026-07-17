@@ -5,6 +5,7 @@ from psaengine.model.parameters import Parameter, ParameterLibrary
 from psaengine.model.fault_tree import FaultTree
 from psaengine.model.ccf import CCFGroup
 from psaengine.model.model import Model
+from psaengine.quantify.postprocess import PostRule
 
 _OP = {"and": Op.AND, "or": Op.OR, "not": Op.NOT, "atleast": Op.ATLEAST, "xor": Op.XOR}
 _OP_REV = {v: k for k, v in _OP.items()}
@@ -62,6 +63,130 @@ def _parse_formula(elem, g: PDAG, owner: str, counter: list) -> str:
     k = int(elem.attrib["min"]) if tag == "atleast" else None
     g.gate(nid, op, args, k=k)
     return nid
+
+# ── define-substitution ↔ PostRule(regime-B 后处理规则;规格 §3 映射表)────────────
+# 映射(逐行对照 SCRAM substitution.cc Validate()/type() 与 MEF input.rng L435-468):
+#   mutually_exclusive → type=delete-terms;hypothesis and-2 或 atleast min=2;target false
+#   delete_contains    → 无 type 声明式;hypothesis and;target false
+#   recovery           → type=recovery-rule;hypothesis and;target basic-event(add_event)
+#   exchange           → type=exchange-event 非声明式;hypothesis and(sorted(events∪source));
+#                        <source> 单事件;target basic-event(add_event)
+# model-data 并集规则:替换引用的树外基本事件(source/target/add_event)也必须写入 float,
+# 否则导入侧概率不可解析(往返即断)。
+
+def _emit_substitution(parent, rule: PostRule, idx: int, sub_extra: dict) -> None:
+    sub = ET.SubElement(parent, "define-substitution", name=f"rule-{idx}")
+    events = list(rule.events)
+
+    def _and_or_atleast(hyp_events, force_atleast=False):
+        hyp = ET.SubElement(sub, "hypothesis")
+        if force_atleast and len(hyp_events) > 2:
+            conn = ET.SubElement(hyp, "atleast")
+            conn.set("min", "2")
+        else:                                        # 一元 hypothesis 亦导出 <and> 单子(评审 S2)
+            conn = ET.SubElement(hyp, "and")
+        for e in hyp_events:
+            ET.SubElement(conn, "basic-event", name=e)
+
+    if rule.kind == "mutually_exclusive":
+        sub.set("type", "delete-terms")
+        _and_or_atleast(events, force_atleast=True)
+        ET.SubElement(ET.SubElement(sub, "target"), "constant", value="false")
+    elif rule.kind == "delete_contains":
+        _and_or_atleast(events)                      # 无 type 属性(合法未定型声明式替换)
+        ET.SubElement(ET.SubElement(sub, "target"), "constant", value="false")
+    elif rule.kind == "recovery":
+        sub.set("type", "recovery-rule")
+        _and_or_atleast(events)
+        ET.SubElement(ET.SubElement(sub, "target"), "basic-event", name=rule.add_event)
+        sub_extra.setdefault(rule.add_event, float(rule.prob))
+    elif rule.kind == "exchange":
+        sub.set("type", "exchange-event")
+        _and_or_atleast(sorted(set(events) | {rule.source}))
+        ET.SubElement(ET.SubElement(sub, "source"), "basic-event", name=rule.source)
+        ET.SubElement(ET.SubElement(sub, "target"), "basic-event", name=rule.add_event)
+        sub_extra.setdefault(rule.source, float(rule.source_prob))
+        sub_extra.setdefault(rule.add_event, float(rule.prob))
+    else:
+        raise ValueError(f"cannot export post-rule kind '{rule.kind}' to MEF substitution")
+
+
+def _parse_substitution(sub, basics: dict) -> PostRule:
+    name = sub.attrib.get("name", "?")
+    hyp = sub.find("hypothesis")
+    if hyp is None:
+        raise ValueError(f"substitution '{name}': missing <hypothesis>")
+    conns = list(hyp)
+    if len(conns) != 1:
+        raise ValueError(f"substitution '{name}': hypothesis needs exactly one connective "
+                         f"(got {len(conns)})")
+    conn = conns[0]
+    if conn.tag not in ("and", "atleast"):
+        raise ValueError(f"substitution '{name}': hypothesis connective '{conn.tag}' unsupported "
+                         "(coherent and/atleast only; xor/not/or 属非相干或嵌套,拒收)")
+    if conn.tag == "atleast" and conn.attrib.get("min") != "2":
+        raise ValueError(f"substitution '{name}': atleast min must be 2 "
+                         f"(got {conn.attrib.get('min')!r}; min≠2 属 k-of-n 表决,非替换语义)")
+    hyp_events = []
+    for c in list(conn):
+        if c.tag != "basic-event":                   # 嵌套 formula / house / gate → 拒
+            raise ValueError(f"substitution '{name}': hypothesis must contain only basic-events "
+                             f"(found '{c.tag}' — 嵌套 hypothesis 或含 house/gate)")
+        hyp_events.append(c.attrib["name"])
+
+    src_el = sub.find("source")
+    sources = []
+    if src_el is not None:
+        for c in list(src_el):
+            if c.tag != "basic-event":
+                raise ValueError(f"substitution '{name}': <source> must be basic-events")
+            sources.append(c.attrib["name"])
+        if len(sources) != 1:                        # 多 source = 替换型 recovery(v2)
+            raise ValueError(f"substitution '{name}': exactly one source supported "
+                             f"(got {len(sources)}; 多 source 替换型 recovery 属 v2)")
+
+    tgt = sub.find("target")
+    if tgt is None or len(list(tgt)) != 1:
+        raise ValueError(f"substitution '{name}': target needs exactly one child")
+    tchild = list(tgt)[0]
+    is_const = tchild.tag == "constant"
+
+    def _prob(ev: str, role: str) -> float:
+        if ev not in basics:
+            raise ValueError(f"substitution '{name}': {role} '{ev}' has no probability in "
+                             "model-data (import cannot resolve; model-data 并集规则)")
+        return basics[ev]
+
+    if sources:                                      # 非声明式 = exchange
+        if is_const:                                 # target=false/true 皆无 source 意义
+            raise ValueError(f"substitution '{name}': non-declarative (with <source>) requires a "
+                             f"basic-event target, not constant '{tchild.attrib.get('value')}'")
+        source = sources[0]
+        add_event = tchild.attrib["name"]
+        events = sorted(set(hyp_events) - {source})
+        return PostRule.from_dict({"kind": "exchange", "events": events, "source": source,
+                                   "source_prob": _prob(source, "source"),
+                                   "add_event": add_event, "prob": _prob(add_event, "target")})
+
+    if is_const:                                     # 声明式,constant target
+        val = (tchild.attrib.get("value") or "").lower()
+        if val == "true":
+            raise ValueError(f"substitution '{name}': declarative target=true 无效果(拒收)")
+        if val != "false":
+            raise ValueError(f"substitution '{name}': constant target must be false/true "
+                             f"(got {tchild.attrib.get('value')!r})")
+        if conn.tag == "atleast" or sub.attrib.get("type") == "delete-terms":
+            return PostRule.from_dict({"kind": "mutually_exclusive", "events": sorted(hyp_events)})
+        stype = sub.attrib.get("type")
+        if stype is not None:
+            raise ValueError(f"substitution '{name}': unsupported declarative type '{stype}'")
+        return PostRule.from_dict({"kind": "delete_contains", "events": sorted(hyp_events)})
+
+    # 声明式,basic-event target → recovery
+    add_event = tchild.attrib["name"]
+    return PostRule.from_dict({"kind": "recovery", "events": sorted(hyp_events),
+                               "add_event": add_event, "prob": _prob(add_event, "recovery target")})
+
 
 def load_mef_xml(path: str) -> Model:
     root = ET.parse(path).getroot()
@@ -128,7 +253,10 @@ def load_mef_xml(path: str) -> Model:
         g.top = tops[0] if tops else gate_ids[-1]
         g.validate()
         fts[ft.attrib["name"]] = FaultTree(g.top, g)
-    return Model(parameters=lib, fault_trees=fts, ccf_groups=ccfs)
+    # define-substitution → post_rules(7 类响亮拒收在 _parse_substitution 内)
+    post_rules = [_parse_substitution(sub, basics)
+                  for sub in root.findall("define-substitution")]
+    return Model(parameters=lib, fault_trees=fts, ccf_groups=ccfs, post_rules=post_rules)
 
 def save_mef_xml(model: Model, path: str) -> None:
     mef = ET.Element("opsa-mef")
@@ -165,10 +293,19 @@ def save_mef_xml(model: Model, path: str) -> None:
         for key, val in sorted(grp.factors.items(), key=lambda kv: _factor_level(grp.model, kv[0])):
             fe = ET.SubElement(fl, "factor", level=str(_factor_level(grp.model, key)))
             ET.SubElement(fe, "float", value=str(val))
+    # define-substitution(post_rules ↔ MEF;规格 §3:fault-tree 之后、model-data 之前)
+    sub_extra: dict[str, float] = {}                 # 替换引用的树外基本事件(model-data 并集规则)
+    for i, r in enumerate(getattr(model, "post_rules", None) or []):
+        _emit_substitution(mef, r, i, sub_extra)
     md = ET.SubElement(mef, "model-data")
     for b in sorted(used_basics - ccf_members):     # CCF 成员的 Q_t 已在组 distribution 中
         if b in model.parameters:
             be = ET.SubElement(md, "define-basic-event", name=b)
             ET.SubElement(be, "float", value=str(_mef_unavailability(model.parameters.get(b), b)))
+    for name in sorted(sub_extra):                   # 树外的替换基本事件:并集规则写入 float
+        if name in used_basics or name in ccf_members:
+            continue                                 # 已在树内/CCF distribution 写过,勿重复
+        be = ET.SubElement(md, "define-basic-event", name=name)
+        ET.SubElement(be, "float", value=str(sub_extra[name]))
     ET.indent(mef)
     ET.ElementTree(mef).write(path, encoding="utf-8", xml_declaration=True)

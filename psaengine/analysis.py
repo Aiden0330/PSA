@@ -34,12 +34,17 @@ class Analysis:
         self.model = model
         self.ft_name = fault_tree or next(iter(model.fault_trees))
         ft = model.fault_trees[self.ft_name]
-        pdag, params = ft.pdag, model.parameters
+        pdag = ft.pdag
         # 4a2 边界条件:命名集 + 显式覆盖 → house 状态(在副本上生效,模型本体不变)
         from psaengine.preprocess.boundary import resolve_house_states, apply_house_states
         states = resolve_house_states(model, house_states, boundary_condition_set)
         if states:
             pdag = apply_house_states(pdag, states)
+        # regime-A 条件参数重绑定:单一咽喉。解析后 house 配置取有效库视图(purpose="point");
+        # CCF 展开与 self.q 等全部下游经此视图 → 被绑参数(含 CCF 成员)自动一致(R4/R5),
+        # 模型本体绝不改写(R2b)。零规则/无激活规则时返回原库,基准/常规模型逐位零扰动。
+        from psaengine.model.rebind import effective_parameters
+        params = effective_parameters(model, states, purpose="point")
         if model.ccf_groups:                       # CCF 展开(beta 集总 / mgl·alpha·phi 多层)
             from psaengine.preprocess.ccf_expand import apply_ccf
             pdag, params = apply_ccf(pdag, model.ccf_groups, params)
