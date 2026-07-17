@@ -24,12 +24,15 @@ def _payload():
 
 
 def _et_req():
+    # 与 _payload() 一致(init_frequency=0.001;序列 DFS 成功优先 L0,L1 = 前端 toEngineRequest
+    # 实序):EB-02 钉扎一致性要求计算所用请求可从 project_payload 反构。此前 fixture 的
+    # init_frequency=1.0 与 [failure,success] 反序均属不实分歧,被旧的无校验钉扎静默吞下。
     return {
-        "init_event": "IE", "init_frequency": 1.0,
+        "init_event": "IE", "init_frequency": 0.001,
         "functional_events": [{"id": "FE1", "pfd": 0.1}],
         "fault_trees": {}, "parameters": {},
-        "sequences": [{"path": {"FE1": "failure"}, "end_state": "L1"},
-                      {"path": {"FE1": "success"}, "end_state": "L0"}],
+        "sequences": [{"path": {"FE1": "success"}, "end_state": "L0"},
+                      {"path": {"FE1": "failure"}, "end_state": "L1"}],
         "consequence_bins": {"L0": "C1", "L1": "C2"},
     }
 

@@ -208,9 +208,14 @@ def _is_signed(evidence: dict | None) -> bool:
 
 
 def _evidence_line(ev: dict) -> str:
-    """ADR-2 证据链页脚:报告数字 → 分析案例 → 版本哈希 → 引擎版本(→ 签发行,Phase 5)。"""
+    """ADR-2 证据链页脚:报告数字 → 分析案例 → 版本哈希 → 引擎指纹(→ 签发行,Phase 5)。
+    F3 阶段 3:引擎版本后附 git 短哈希(+dirty),使"哪套代码算出这个数"可追溯。"""
+    eng = f"引擎 bess-psa {ev['engine_version']}"
+    fp = ev.get("engine_fingerprint") or {}
+    if fp.get("git_sha") and fp["git_sha"] != "unknown":
+        eng += f"@{fp['git_sha']}" + ("+dirty" if fp.get("dirty") else "")
     base = (f"评价依据:分析案例 #{ev['case_id']} · 模型版本 {ev['version_hash'][:8]}"
-            f" · 引擎 bess-psa {ev['engine_version']} · {ev['created_at']}")
+            f" · {eng} · {ev['created_at']}")
     so = ev.get("signoff")
     if so:
         return base + f" · 签发 {so['signer']} {str(so['signed_at'])[:10]}"

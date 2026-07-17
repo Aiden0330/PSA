@@ -67,8 +67,10 @@ def test_saved_non_v2_payload_keeps_legacy_behavior(tmp_path, monkeypatch):
 
 
 def _report_req():
+    # init_frequency 与 _payload() 一致(0.001):EB-02 钉扎一致性要求计算所用请求可从
+    # project_payload 反构(此前 1.0≠0.001 的 fixture 分歧被旧的无校验钉扎静默吞下)。
     return {
-        "init_event": "IE", "init_frequency": 1.0,
+        "init_event": "IE", "init_frequency": 0.001,
         "functional_events": [{"id": "FE1", "pfd": 0.1}, {"id": "FE2", "pfd": 0.2}],
         "fault_trees": {}, "parameters": {},
         "sequences": [

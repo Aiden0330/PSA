@@ -164,21 +164,46 @@ def api_event_tree_quantify(req: schemas.EtQuantifyRequest, _=Depends(require_ro
     return schemas.EtQuantifyResponse(sequences=res["sequences"], consequences=res["consequences"])
 
 def _pin_case(project_uuid: str, project_payload, kind: str, name_hint: str | None,
-              settings: dict, results: dict, audit_action: str):
-    """ADR-2 自动钉扎:项目上下文 → 版本(幂等)+ 分析案例。返回 {case_id, version_hash, engine_version}。"""
+              settings: dict, results: dict, audit_action: str,
+              computed_request_hash: str | None = None,
+              resolved_settings: dict | None = None):
+    """ADR-2 自动钉扎 + EB-02 钉扎一致性。返回 {case_id, version_hash, engine_version, engine_fingerprint}。
+
+    computed_request_hash 非空 → 从 project_payload 的 canonical 版本**反构逐树引擎请求**,
+    其 request_hash 集合必须含计算所用请求的哈希;不在集合内 → 409(结果与钉扎载荷不一致,
+    证据链拒绝绑定)。这堵住 EB-02:PFD=.9 算出的报告不能静默钉到 PFD=.1 的版本。
+    请求哈希 + resolved_settings + 完整引擎指纹随案例落库(settings_json 附加,免 schema 迁移)。"""
     from backend import store
-    from backend.canonical import to_canonical
+    from backend.canonical import to_canonical, build_engine_request
+    from backend.execution import request_hash
     try:
         doc, sidecar = to_canonical(project_payload, project_uuid)
     except Exception as e:
         raise HTTPException(400, f"project_payload 无法规范化: {e}")
+    # EB-02 一致性:任何库写之前先比对,不一致即 409(不留半钉扎)。
+    if computed_request_hash is not None:
+        rebuilt: set[str] = set()
+        for t in doc.event_trees:
+            try:
+                rebuilt.add(request_hash(build_engine_request(doc, t.ref)))
+            except Exception:
+                continue                       # 反构失败的树不入集合,不阻断其它树的匹配
+        if computed_request_hash not in rebuilt:
+            raise HTTPException(409, "结果与钉扎载荷不一致:计算所用请求无法从 project_payload "
+                                     "反构(PFD/初频/结构与画布不符),证据链拒绝绑定该结果。")
+    fp = store.engine_fingerprint()
+    settings = {**settings, "engine_fingerprint": fp}
+    if computed_request_hash is not None:
+        settings["request_hash"] = computed_request_hash
+    if resolved_settings is not None:
+        settings["resolved_settings"] = resolved_settings
     store.ensure_project(project_uuid, name_hint or "项目")
     ver = store.create_version(project_uuid, doc, sidecar, origin="auto_pin",
                                message=f"auto: {kind}")
     case_id = store.create_case(project_uuid, ver["id"], kind, settings=settings,
                                 results=results, audit_action=audit_action)
     return {"case_id": case_id, "version_id": ver["id"], "version_hash": ver["content_hash"],
-            "engine_version": store.engine_version()}
+            "engine_version": store.engine_version(), "engine_fingerprint": fp}
 
 
 def _checked_set_trees(req) -> list:
@@ -223,12 +248,17 @@ def api_report(req: schemas.ReportRequest, format: str = "docx", _=Depends(requi
         pin_results = {"consequences": data["consequences"], "bands": data["bands"],
                        "per_tree": [{"key": p["key"], "name": p["name"], "consequences": p["consequences"]}
                                     for p in data["aggregate"]["per_tree"]]}
+        # checked_set 聚合无单一反构请求(聚合覆盖多棵勾选树,与 project_payload 单 eta 不对应)——
+        # EB-02 一致性检查为 v2 候选(规格 §5),此路记指纹但不做请求哈希绑定。
+        pin_request_hash = None
+        pin_resolved = {"scope": "checked_set", "samples": req.samples, "seed": req.seed,
+                        "error_factor": req.error_factor}
     else:
         model = build_model_from_request(dumped)
         linked_ids = [fe["id"] for fe in dumped["functional_events"] if fe.get("link_ft")]
         # F3 阶段 1(EB-01):报告经单一分派透传集成 LFT + house/bc——此前固定走普通 ETA
         # 且不接 house,集成/边界模型的报告发布错误频率。
-        from backend.execution import resolve_ie_ft_name
+        from backend.execution import resolve_ie_ft_name, request_hash
         ie_ft_name = resolve_ie_ft_name(dumped.get("ie_fault_tree"))
         data = rx.build_report_data(model, "TR", ie_ft_name=ie_ft_name,
                                     house_states=req.house_states or None,
@@ -239,13 +269,22 @@ def api_report(req: schemas.ReportRequest, format: str = "docx", _=Depends(requi
         pin_settings = {"format": format, "samples": req.samples, "seed": req.seed,
                         "error_factor": req.error_factor, "scenario_name": req.scenario_name}
         pin_results = {"consequences": data["consequences"], "bands": data["bands"]}
+        # EB-02:computed_request_hash = 计算所用请求(dumped)的模型指纹。集成 LFT 通道的
+        # 反构含 IE 块分流,忠实重建为 v2 候选(规格 §5)→ 此路跳过一致性绑定,仅记指纹。
+        pin_request_hash = None if ie_ft_name else request_hash(dumped)
+        pin_resolved = {"house_states": req.house_states or {},
+                        "boundary_condition_set": req.boundary_condition_set,
+                        "ie_ft_name": ie_ft_name, "samples": req.samples, "seed": req.seed,
+                        "error_factor": req.error_factor}
     # ADR-2 自动钉扎:携带项目上下文的报告 → 版本(幂等)+ 分析案例 + 页脚证据链。
     evidence, case_id = None, None
     if req.project_uuid and req.project_payload is not None:
         from datetime import datetime, timezone
         pinned = _pin_case(req.project_uuid, req.project_payload, "report", req.scenario_name,
                            settings=pin_settings, results=pin_results,
-                           audit_action="report.export")
+                           audit_action="report.export",
+                           computed_request_hash=pin_request_hash,
+                           resolved_settings=pin_resolved)
         case_id = pinned["case_id"]
         evidence = {**pinned,
                     "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
@@ -397,13 +436,16 @@ def api_event_tree_uncertainty(req: schemas.EtUncertaintyRequest, _=Depends(requ
         res = {"point": agg["point"], "bands": agg["bands"],
                "scope": "checked_set", "per_tree": per_tree}
         if req.project_uuid and req.project_payload is not None:
+            # checked_set 聚合无单一反构请求(见 report 同注)→ 记指纹,不做请求哈希绑定。
             pinned = _pin_case(req.project_uuid, req.project_payload, "uncertainty", req.scenario_name,
                                settings={"samples": req.samples, "seed": req.seed,
                                          "error_factor": req.error_factor, "scope": "checked_set",
                                          "scenarios": [{"key": t["key"], "name": t["name"]} for t in trees]},
                                results={"consequences": agg["point"], "bands": agg["bands"],
                                         "per_tree": per_tree},
-                               audit_action="analysis.uncertainty")
+                               audit_action="analysis.uncertainty",
+                               resolved_settings={"scope": "checked_set", "samples": req.samples,
+                                                  "seed": req.seed, "error_factor": req.error_factor})
             res = {**res, "case": pinned}
         return res
     # F3 阶段 1(EB-01/G3):集成 LFT 模式无 MC 不确定性变体 → 响亮 422,绝不回退普通 ETA
@@ -411,14 +453,21 @@ def api_event_tree_uncertainty(req: schemas.EtUncertaintyRequest, _=Depends(requ
     if req.ie_fault_tree:
         raise HTTPException(422, "集成 LFT 模式(ie_fault_tree)的 MC 不确定性为 v2 候选,尚未实现;"
                                  "不回退普通 ETA。点估计频率请用 /api/event-tree/quantify 或报告。")
-    model = build_model_from_request(req.model_dump())
+    dumped = req.model_dump()
+    model = build_model_from_request(dumped)
     res = event_tree_uncertainty(model, "TR", samples=req.samples, seed=req.seed, error_factor=req.error_factor,
                                  house_states=req.house_states or None,
                                  boundary_condition_set=req.boundary_condition_set)
     if req.project_uuid and req.project_payload is not None:   # 4a4:不确定性运行钉扎为案例
+        from backend.execution import request_hash
         pinned = _pin_case(req.project_uuid, req.project_payload, "uncertainty", req.scenario_name,
                            settings={"samples": req.samples, "seed": req.seed, "error_factor": req.error_factor},
-                           results=res, audit_action="analysis.uncertainty")
+                           results=res, audit_action="analysis.uncertainty",
+                           computed_request_hash=request_hash(dumped),
+                           resolved_settings={"house_states": req.house_states or {},
+                                              "boundary_condition_set": req.boundary_condition_set,
+                                              "ie_ft_name": None, "samples": req.samples,
+                                              "seed": req.seed, "error_factor": req.error_factor})
         res = {**res, "case": pinned}
     return res
 
@@ -431,14 +480,20 @@ def api_event_tree_importance(req: schemas.EtQuantifyRequest, _=Depends(require_
     if req.ie_fault_tree:
         raise HTTPException(422, "集成 LFT 模式(ie_fault_tree)的屏障重要度为 v2 候选,尚未实现;"
                                  "不回退普通 ETA。")
-    model = build_model_from_request(req.model_dump())
+    dumped = req.model_dump()
+    model = build_model_from_request(dumped)
     imp = barrier_importance_exact(model, "TR", house_states=req.house_states or None,
                                    boundary_condition_set=req.boundary_condition_set)
     out: dict = {"importance": imp}
     if req.project_uuid and req.project_payload is not None:   # 4a4:重要度运行钉扎为案例
+        from backend.execution import request_hash
         out["case"] = _pin_case(req.project_uuid, req.project_payload, "importance", req.scenario_name,
                                 settings={"method": "perturbation-exact"},
-                                results={"importance": imp}, audit_action="analysis.importance")
+                                results={"importance": imp}, audit_action="analysis.importance",
+                                computed_request_hash=request_hash(dumped),
+                                resolved_settings={"house_states": req.house_states or {},
+                                                   "boundary_condition_set": req.boundary_condition_set,
+                                                   "ie_ft_name": None})
     return out
 
 @app.get("/api/bess/library")

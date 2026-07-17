@@ -359,3 +359,109 @@ def test_et_builder_typed_param_passthrough():
     model = build_model_from_request(req)
     w1 = model.parameters.get("W1")
     assert w1.kind == "weibull" and w1.alpha == 1000.0 and w1.beta == 2.0 and w1.mission_time == 500.0
+
+
+# ── 阶段 2(EB-02):request_hash + 钉扎一致性 ─────────────────────────────────
+
+def _pfd_payload(fail):
+    return {"v": 2, "etas": [{"key": "t", "name": "T", "model": {
+        "initEvent": "IE", "initFreq": 0.001,
+        "functionalEvents": [{"id": "FE1", "failProb": fail}],
+        "root": {"kind": "branch", "feId": "FE1",
+                 "success": {"kind": "leaf", "consequence": "C1"},
+                 "failure": {"kind": "leaf", "consequence": "C2"}}},
+        "fts": {"model_data": {"parameters": []}, "fault_trees": []}, "pfds": {}}],
+        "activeKey": "t", "checkedKeys": {"t": True}}
+
+
+def _pfd_req(pfd):
+    # 前端 toEngineRequest 实序:DFS 成功优先(L0,L1),link_ft 缺省(pfd-only)。
+    return {"init_event": "IE", "init_frequency": 0.001,
+            "functional_events": [{"id": "FE1", "pfd": pfd}],
+            "fault_trees": {}, "parameters": {},
+            "sequences": [{"path": {"FE1": "success"}, "end_state": "L0"},
+                          {"path": {"FE1": "failure"}, "end_state": "L1"}],
+            "consequence_bins": {"L0": "C1", "L1": "C2"}}
+
+
+def test_request_hash_consistent_matches_reconstruction():
+    # 一致载荷:flat 请求的 request_hash 必等于从 canonical 反构请求的 request_hash。
+    from backend.execution import request_hash
+    doc, _ = to_canonical(_pfd_payload(0.1), PUUID)
+    assert request_hash(_pfd_req(0.1)) == request_hash(build_engine_request(doc, "t"))
+    # PFD 变 → 哈希变(模型指纹随参数动)
+    assert request_hash(_pfd_req(0.9)) != request_hash(build_engine_request(doc, "t"))
+
+
+def test_G4_consistent_pin_records_request_hash_and_fingerprint(tmp_path, monkeypatch):
+    import backend.storage as storage
+    monkeypatch.setattr(storage, "_DIR", str(tmp_path / "saved"))
+    puuid = "aa000000-0000-5000-8000-00000000c001"
+    ctx = {"project_uuid": puuid, "project_payload": _pfd_payload(0.1), "scenario_name": "X"}
+    r = client.post("/api/report?format=csv", json={**_pfd_req(0.1), **ctx})
+    assert r.status_code == 200, r.text
+    cases = client.get(f"/api/projects/{puuid}/cases").json()
+    assert len(cases) == 1
+    settings = json.loads(cases[0]["settings_json"])
+    assert settings.get("request_hash")                       # 请求哈希入案例
+    assert settings["engine_fingerprint"]["semver"] == "0.2.0"
+    assert settings["engine_fingerprint"]["request_schema_version"] == "2"
+    assert settings["resolved_settings"]["house_states"] == {}
+
+
+def test_G4_payload_request_mismatch_rejected_409(tmp_path, monkeypatch):
+    import backend.storage as storage
+    monkeypatch.setattr(storage, "_DIR", str(tmp_path / "saved"))
+    puuid = "aa000000-0000-5000-8000-00000000c002"
+    # project_payload PFD=.1、计算请求 PFD=.9 → 409,绝不 200+钉扎错版本(EB-02)
+    ctx = {"project_uuid": puuid, "project_payload": _pfd_payload(0.1), "scenario_name": "X"}
+    r = client.post("/api/report?format=csv", json={**_pfd_req(0.9), **ctx})
+    assert r.status_code == 409, f"应 409,得 {r.status_code}: {r.text[:200]}"
+    assert "一致" in r.text or "inconsistent" in r.text.lower()
+    # 一个案例都不得留下(反构不匹配 → 库写前即拒)
+    cases = client.get(f"/api/projects/{puuid}/cases").json()
+    assert cases == []
+
+
+# ── G5:从钉扎版本反构重放逐位一致(含 CCF)─────────────────────────────────────
+
+def _ccf_pinnable():
+    payload = _beta_ccf_payload()
+    payload["etas"][0]["model"]["initFreq"] = 1.0             # 与 flat 请求初频一致
+    flat = {"init_event": "IE", "init_frequency": 1.0,
+            "functional_events": [{"id": "FE1", "link_ft": "FE1"}],
+            "fault_trees": {"FE1": {"name": "FT1", "top": "FT1", "nodes": [
+                {"id": "A", "basic": True, "param_ref": "A"},
+                {"id": "B", "basic": True, "param_ref": "B"},
+                {"id": "FT1", "op": "and", "args": ["A", "B"]}]}},
+            "parameters": {"A": {"value": 0.1}, "B": {"value": 0.1}},
+            "sequences": [{"path": {"FE1": "success"}, "end_state": "L0"},
+                          {"path": {"FE1": "failure"}, "end_state": "L1"}],
+            "consequence_bins": {"L0": "C1", "L1": "C2"},
+            "ccf_groups": [{"id": "CCF_AB", "members": ["A", "B"], "model": "beta",
+                            "factors": {"beta": 0.1}}]}
+    return payload, flat
+
+
+def test_G5_replay_from_pinned_version_bit_identical(tmp_path, monkeypatch):
+    import backend.storage as storage
+    from backend.canonical.models import ProjectDocument
+    monkeypatch.setattr(storage, "_DIR", str(tmp_path / "saved"))
+    payload, flat = _ccf_pinnable()
+    puuid = "aa000000-0000-5000-8000-00000000c003"
+    r = client.post("/api/event-tree/importance",
+                    json={**flat, "project_uuid": puuid, "project_payload": payload,
+                          "scenario_name": "CCF"})
+    assert r.status_code == 200, r.text
+    case = client.get(f"/api/projects/{puuid}/cases").json()[0]
+    settings = json.loads(case["settings_json"])
+    assert settings.get("request_hash") and settings["engine_fingerprint"]["semver"] == "0.2.0"
+
+    # 反构:从钉扎版本(库中 canonical)重建引擎请求 → quantify;与计算所用请求 quantify 逐位一致
+    raw = store.get_version_raw(puuid, case["version_id"])
+    doc = ProjectDocument.model_validate(raw[0])
+    replay = quantify_event_tree(build_model_from_request(build_engine_request(doc, "t")), "TR")
+    direct = quantify_event_tree(build_model_from_request(flat), "TR")
+    assert replay["sequences"] == direct["sequences"]         # 逐位
+    assert replay["consequences"] == direct["consequences"]
+    assert replay["consequences"]["C2"] == pytest.approx(0.018019, rel=1e-6)   # CCF 重放
