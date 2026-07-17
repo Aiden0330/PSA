@@ -2,8 +2,13 @@ from __future__ import annotations
 from math import fsum, isfinite, log
 import numpy as np
 from psaengine.model.model import Model
-from psaengine.quantify.probability import exact_probability
+from psaengine.quantify.probability import exact_probability, exact_probability_batch
 from psaengine.eta.sequence import _build_event_tree, quantify_event_tree
+
+
+def _as_vec(v, n: int) -> np.ndarray:
+    """batch 求值对常量表达式(house 强制等)返回 float——广播成列向量。"""
+    return v if isinstance(v, np.ndarray) else np.full(n, float(v))
 
 _CLASSES = ["C1", "C2", "C3", "C4", "C5"]
 
@@ -44,17 +49,26 @@ def event_tree_uncertainty(model: Model, et_name: str, samples: int = 1000,
     refs = sorted(median_by_ref)              # 确定序 → 与 aggregate 同流,可复现
     rng = np.random.default_rng(seed)
     sigma = log(error_factor) / 1.645 if error_factor > 1 else 0.0
-    series = {c: np.zeros(samples) for c in _CLASSES}
+    # P-7 向量化:抽样循环逐字不动(RNG 流与标量版逐位同),抽完按 ref 收列向量;
+    # BDD 求值改 batch(每序列一次遍历,节点级全样本 numpy 乘加——与标量同表达式
+    # ⇒ 每样本逐位同);逐样本后果 Σ 仍 fsum(S-B 口径)。57s/千样本 → 秒级。
+    sample_by_ref = {ref: np.empty(samples) for ref in refs}
     for i in range(samples):
         if sigma > 0:
             sampled = {ref: (float(np.clip(np.exp(rng.normal(log(median_by_ref[ref]), sigma)), 0.0, 1.0))
                              if median_by_ref[ref] > 0 else 0.0) for ref in refs}
         else:
             sampled = {ref: median_by_ref[ref] for ref in refs}
-        q = {bb: sampled[ref] for bb, ref in ref_of.items()}
+        for ref in refs:
+            sample_by_ref[ref][i] = sampled[ref]
+    q_vec = {bb: sample_by_ref[ref] for bb, ref in ref_of.items()}
+    seq_probs = [(c, _as_vec(exact_probability_batch(m, expr, q_vec), samples))
+                 for c, expr in seq_exprs]
+    series = {c: np.zeros(samples) for c in _CLASSES}
+    for i in range(samples):
         contribs: dict[str, list] = {}
-        for c, expr in seq_exprs:
-            contribs.setdefault(c, []).append(et.init_frequency * exact_probability(m, expr, q))
+        for c, pv in seq_probs:
+            contribs.setdefault(c, []).append(et.init_frequency * float(pv[i]))
         for c in _CLASSES:
             series[c][i] = fsum(contribs.get(c, ()))
     point = quantify_event_tree(model, et_name, house_states=house_states,
@@ -135,19 +149,28 @@ def aggregate_event_tree_uncertainty(specs: list, samples: int = 1000,
     refs = sorted(median_by_ref)              # 确定序 → 联合抽样可复现
     rng = np.random.default_rng(seed)         # 单一 RNG 流(不逐树重播种)
     sigma = log(error_factor) / 1.645 if error_factor > 1 else 0.0
-    series = {c: np.zeros(samples) for c in _CLASSES}
+    # P-7 向量化:抽样循环逐字不动 → 收列向量;每 (树,序列) 一次 batch 遍历。
+    sample_by_ref = {ref: np.empty(samples) for ref in refs}
     for i in range(samples):
         if sigma > 0:                          # 一次迭代 = 一个联合参数向量(按 ref 名)
             sampled = {ref: (float(np.clip(np.exp(rng.normal(log(median_by_ref[ref]), sigma)), 0.0, 1.0))
                              if median_by_ref[ref] > 0 else 0.0) for ref in refs}
         else:
             sampled = {ref: median_by_ref[ref] for ref in refs}
+        for ref in refs:
+            sample_by_ref[ref][i] = sampled[ref]
+    tree_probs = []                            # [(init_frequency, [(c, N 向量)…])…] 保持树序
+    for t in trees:
+        q_vec = {bb: sample_by_ref[ref] for bb, ref in t["ref_of"].items()}
+        tree_probs.append((t["init_frequency"],
+                           [(c, _as_vec(exact_probability_batch(t["m"], expr, q_vec), samples))
+                            for c, expr in t["seq_exprs"]]))
+    series = {c: np.zeros(samples) for c in _CLASSES}
+    for i in range(samples):
         contribs: dict[str, list] = {}
-        for t in trees:                        # 同一抽样施加到全部树,逐级相加(fsum,S-B)
-            q = {bb: sampled[ref] for bb, ref in t["ref_of"].items()}
-            for c, expr in t["seq_exprs"]:
-                contribs.setdefault(c, []).append(
-                    t["init_frequency"] * exact_probability(t["m"], expr, q))
+        for init_freq, pairs in tree_probs:    # 同一抽样施加到全部树,逐级相加(fsum,S-B)
+            for c, pv in pairs:
+                contribs.setdefault(c, []).append(init_freq * float(pv[i]))
         for c in _CLASSES:
             series[c][i] = fsum(contribs.get(c, ()))
 
@@ -236,7 +259,8 @@ def event_tree_uncertainty_integrated(model: Model, et_name: str, ie_ft_name: st
     refs = sorted(median_by_ref)
     rng = np.random.default_rng(seed)
     sigma = log(error_factor) / 1.645 if error_factor > 1 else 0.0
-    series = {c: np.zeros(samples) for c in _CLASSES}
+    # P-7 向量化:抽样循环逐字不动 → 收列向量;每 (初因,序列) 对一次 batch 遍历。
+    sample_by_ref = {ref: np.empty(samples) for ref in refs}
     for i in range(samples):
         if sigma > 0:
             sampled = {}
@@ -249,12 +273,21 @@ def event_tree_uncertainty_integrated(model: Model, et_name: str, ie_ft_name: st
                 sampled[ref] = draw if ref in freq_refs else float(np.clip(draw, 0.0, 1.0))
         else:
             sampled = {ref: median_by_ref[ref] for ref in refs}
-        q_s = {bb: sampled[ref] for bb, ref in ref_of.items()}
+        for ref in refs:
+            sample_by_ref[ref][i] = sampled[ref]
+    q_vec = {bb: sample_by_ref[ref] for bb, ref in ref_of.items()}
+    seq_probs = []                             # [(c, [(λ 向量, P 向量)…按 initiators 序])…]
+    for c, expr in seq_pairs:
+        per_init = [(sample_by_ref[lam_ref[init]],
+                     _as_vec(exact_probability_batch(m, m.apply_and(e_bdd, expr), q_vec), samples))
+                    for init, _, e_bdd in initiators]
+        seq_probs.append((c, per_init))
+    series = {c: np.zeros(samples) for c in _CLASSES}
+    for i in range(samples):
         contribs: dict[str, list] = {}
-        for c, expr in seq_pairs:
+        for c, per_init in seq_probs:
             contribs.setdefault(c, []).append(fsum(
-                sampled[lam_ref[init]] * exact_probability(m, m.apply_and(e_bdd, expr), q_s)
-                for init, _, e_bdd in initiators))
+                float(lam_v[i]) * float(p_v[i]) for lam_v, p_v in per_init))
         for c in _CLASSES:
             series[c][i] = fsum(contribs.get(c, ()))
     point = quantify_event_tree_integrated(model, et_name, ie_ft_name,
