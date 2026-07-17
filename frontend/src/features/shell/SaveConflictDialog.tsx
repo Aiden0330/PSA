@@ -1,5 +1,7 @@
+import { useId } from 'react'
 import type { CSSProperties } from 'react'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
+import { useDialogA11y } from './a11y'
 
 /**
  * D-P5-4 乐观并发冲突对话:他人已保存更新版本时的三条路(规格 §6):
@@ -8,11 +10,14 @@ import type { ProjectPersistence } from '../persistence/useProjectPersistence'
  */
 export function SaveConflictDialog({ persistence, onGoToDiff }: { persistence: ProjectPersistence; onGoToDiff: () => void }) {
   const c = persistence.conflict
+  // FE-13:role=dialog + aria-modal + aria-labelledby + Esc(= 取消,先不保存)+ 焦点回环/恢复
+  const titleId = useId()
+  const dialogRef = useDialogA11y(persistence.dismissConflict, !!c)
   if (!c) return null
   return (
     <div style={overlay}>
-      <div className="psa-panel" style={box}>
-        <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--psa-danger-strong)', marginBottom: 8 }}>保存冲突</div>
+      <div ref={dialogRef} className="psa-panel" style={box} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
+        <div id={titleId} style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--psa-danger-strong)', marginBottom: 8 }}>保存冲突</div>
         <div style={{ fontSize: 12.5, color: 'var(--psa-ink-2)', lineHeight: 1.7, marginBottom: 12 }}>
           他人已保存了更新的版本 —— 你这次保存未写入服务器,当前编辑仍在本机,可选择:
         </div>

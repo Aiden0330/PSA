@@ -19,6 +19,7 @@ import { CommandPalette } from './features/shell/CommandPalette'
 import { LoginWall } from './features/shell/LoginWall'
 import { AccountsPanel } from './features/shell/AccountsPanel'
 import { SaveConflictDialog } from './features/shell/SaveConflictDialog'
+import { ErrorBoundary } from './features/shell/ErrorBoundary'
 import { useViewStore } from './stores/viewStore'
 import { useActiveEta } from './stores/useActiveEta'
 import { useAuthStore } from './stores/authStore'
@@ -130,7 +131,10 @@ function AppShell() {
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
         <ExplorerTree persistence={persistence} tab={tab} setTab={setTab} />
-        {/* 懒页签统一挂起点:总览/ETA 为即时组件,其余页签首次进入时按需拉块 */}
+        {/* 懒页签统一挂起点:总览/ETA 为即时组件,其余页签首次进入时按需拉块。
+            FE-13:ErrorBoundary 包裹——chunk 加载失败不再留白屏/永久 loading;key={tab}
+            使某页签失败不污染其他页签,切回即重试。 */}
+        <ErrorBoundary key={tab}>
         <Suspense fallback={<TabFallback />}>
         {tab === 'home' ? (
           <ProjectCockpit summaries={summaries} aggregateTotals={aggregateTotals} scenarios={scenarios} persistence={persistence} onOpenScenario={openScenario} />
@@ -139,7 +143,12 @@ function AppShell() {
         ) : tab === 'ft' ? (
           <FtaWorkbench lib={lib} ai={ai} persistence={persistence} example={example} />
         ) : tab === 'params' ? (
-          <div style={{ flex: 1, minHeight: 0, background: 'var(--exp-bg)' }}>
+          <div style={{ flex: 1, minHeight: 0, background: 'var(--exp-bg)', display: 'flex', flexDirection: 'column' }}>
+            {/* FE-09:此页编辑的是全局示例模型,不进当前项目 / 报告 / 版本库——醒目告知,消除误改项目参数的错觉。 */}
+            <div role="note" style={exampleBanner}>
+              <span aria-hidden="true" style={{ fontSize: 14 }}>ⓘ</span>
+              <span><strong style={{ fontWeight: 700 }}>示例模型</strong>：改动不进入当前项目与报告，也不随项目保存 —— 仅供参数库 / CCF 教学演示。</span>
+            </div>
             {example.model && (
               <ParamLibrary
                 model={example.model}
@@ -173,6 +182,7 @@ function AppShell() {
             onError={setError} getReportContext={getReportContext} />
         )}
         </Suspense>
+        </ErrorBoundary>
       </div>
 
       <StatusBar tab={tab} persistence={persistence} />
@@ -185,4 +195,6 @@ function AppShell() {
 }
 
 const errBar: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px', background: 'var(--psa-danger-soft)', color: 'var(--psa-danger-strong)', fontSize: 12.5, borderBottom: '1px solid rgba(220,38,38,.2)', flexShrink: 0 }
+// FE-09 示例模型横幅(醒目琥珀条):区别于错误条(红)与草稿条(蓝)
+const exampleBanner: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: '#fef3c7', color: '#92400e', fontSize: 12.5, borderBottom: '1px solid #fde68a', flexShrink: 0, fontWeight: 500 }
 const draftBar: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px', background: 'var(--psa-primary-soft)', color: 'var(--psa-primary-strong)', fontSize: 12.5, borderBottom: '1px solid rgba(37,99,235,.2)', flexShrink: 0 }

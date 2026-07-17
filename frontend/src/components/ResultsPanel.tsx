@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { EChart } from './EChart'
 import type { QuantifyResult } from '../api'
+import { activateOnKey } from '../features/shell/a11y'
 
 interface Props {
   result: QuantifyResult | null
@@ -68,9 +69,11 @@ export function ResultsPanel({ result, onCutsetClick }: Props) {
       <div style={{ overflowX: 'auto' }}>
         {result.cutsets.map((c, i) => {
           const pct = (100 * c.probability) / total
+          const pick = () => { setActive(i); onCutsetClick?.(c.events) }
           return (
-            <div key={i}
-              onClick={() => { setActive(i); onCutsetClick?.(c.events) }}
+            <div key={i} className="psa-focus-row" role="button" tabIndex={0} aria-pressed={active === i}
+              aria-label={`割集 ${i + 1}，${c.events.join(' 与 ')}`}
+              onClick={pick} onKeyDown={activateOnKey(pick)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '6px 14px', cursor: 'pointer', fontSize: 12,

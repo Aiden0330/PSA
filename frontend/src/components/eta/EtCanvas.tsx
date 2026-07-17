@@ -7,6 +7,7 @@ import { formatEtaNumber } from '../../etaNumberFormat'
 import type { SeqRow } from './types'
 import { ETA_CANVAS_CONTENT_ATTR } from './types'
 import { useCanvasZoom } from './useCanvasZoom'
+import { activateOnKey } from '../../features/shell/a11y'
 
 const mono = 'var(--psa-font-mono)'
 
@@ -135,7 +136,10 @@ export function EtCanvas(
             const r = seqRows[i]
             const branchCol = lf.path.length && lf.path[lf.path.length - 1] === 'failure' ? '#dc2626' : '#16a34a'
             return (
-              <g key={'l' + i} style={{ cursor: 'pointer' }} onClick={() => onSelect(lf.path)}>
+              <g key={'l' + i} className="psa-svg-focus" role="button" tabIndex={0}
+                aria-label={`序列末态 ${gradeLabel(lvl)} · ${nm}`} aria-pressed={on}
+                style={{ cursor: 'pointer' }}
+                onClick={() => onSelect(lf.path)} onKeyDown={activateOnKey(() => onSelect(lf.path))}>
                 <line x1={colX(lf.depth)} y1={lf.y} x2={rightX} y2={lf.y} stroke={branchCol} strokeWidth={1.5} />
                 {on && <rect x={rightX - 7} y={lf.y - 10} width={158} height={20} rx={5} fill={cc} opacity={0.12} />}
                 <rect x={rightX - 5} y={lf.y - 5.5} width={11} height={11} rx={2.5} fill={cc} />
@@ -152,11 +156,16 @@ export function EtCanvas(
           })}
 
           {/* 分支锚点 */}
-          {nodes.filter((n) => n.kind === 'branch').map((n, i) => (
-            <circle key={'a' + i} cx={colX(n.depth)} cy={n.y} r={4.5}
-              fill={selKey === n.path.join('/') ? '#f59e0b' : 'var(--psa-surface)'} stroke="var(--psa-primary)" strokeWidth={1.4}
-              style={{ cursor: 'pointer' }} onClick={() => onSelect(n.path)} />
-          ))}
+          {nodes.filter((n) => n.kind === 'branch').map((n, i) => {
+            const feHere = model.functionalEvents[n.depth]
+            return (
+              <circle key={'a' + i} className="psa-svg-focus" role="button" tabIndex={0}
+                aria-label={`分支节点 · ${feHere?.label || feHere?.id || ''}`} aria-pressed={selKey === n.path.join('/')}
+                cx={colX(n.depth)} cy={n.y} r={4.5}
+                fill={selKey === n.path.join('/') ? '#f59e0b' : 'var(--psa-surface)'} stroke="var(--psa-primary)" strokeWidth={1.4}
+                style={{ cursor: 'pointer' }} onClick={() => onSelect(n.path)} onKeyDown={activateOnKey(() => onSelect(n.path))} />
+            )
+          })}
 
           {/* 选中可继续的叶 → 后续屏障(popup 是同一 <g> 的子节点,随缩放/平移自动跟随,无需额外坐标换算) */}
           {(() => {
@@ -170,12 +179,17 @@ export function EtCanvas(
               <g>
                 <rect x={mx} y={lf.y - 14} width={mw} height={18 + subs.length * ih} rx={6} fill="var(--psa-surface)" stroke="#f59e0b" strokeWidth={1} />
                 <text x={mx + 8} y={lf.y - 1} fontSize={9} fontWeight={700} fill="var(--psa-warn)">＋继续到屏障:</text>
-                {subs.map((f, k) => (
-                  <g key={f.id} style={{ cursor: 'pointer' }} onClick={() => { onChange(branchLeaf(model, lf.path, f.id)); onSelect(null) }}>
+                {subs.map((f, k) => {
+                  const extend = () => { onChange(branchLeaf(model, lf.path, f.id)); onSelect(null) }
+                  return (
+                  <g key={f.id} className="psa-svg-focus" role="button" tabIndex={0}
+                    aria-label={`继续到屏障 ${f.label || f.id}`} style={{ cursor: 'pointer' }}
+                    onClick={extend} onKeyDown={activateOnKey(extend)}>
                     <rect x={mx + 5} y={lf.y + 4 + k * ih} width={mw - 10} height={ih - 2} rx={4} fill="var(--psa-soft)" />
                     <text x={mx + 10} y={lf.y + 4 + k * ih + 12} fontSize={10} fill="var(--psa-ink-2)">{(f.label || f.id).slice(0, 16)}<title>{f.label || f.id}（{f.id}）</title></text>
                   </g>
-                ))}
+                  )
+                })}
               </g>
             )
           })()}

@@ -212,3 +212,11 @@
 .exp-popover { position:absolute; top:100%; left:0; margin-top:6px; z-index:20; min-width:320px; max-width:380px;
   max-height:70vh; overflow:auto; background:var(--psa-surface); border:1px solid var(--psa-line-2);
   border-radius:10px; box-shadow:var(--psa-shadow-pop); }
+
+/* ── FE-13 a11y:键盘焦点可见环。非原生交互控件(role=button/treeitem 的 div、
+   ETA 画布可聚焦 SVG 节点)默认无焦点样式,补统一 focus-visible 轮廓——仅键盘 Tab
+   聚焦时显示,鼠标点击不显示,不改视觉常态。 ── */
+.exp-tree [role="treeitem"]:focus-visible { outline:2px solid var(--psa-primary); outline-offset:-2px; border-radius:6px; }
+.psa-focus-row:focus-visible { outline:2px solid var(--psa-primary); outline-offset:-2px; border-radius:4px; }
+.psa-svg-focus:focus { outline:none; }
+.psa-svg-focus:focus-visible { outline:2px solid var(--psa-primary); outline-offset:1px; }

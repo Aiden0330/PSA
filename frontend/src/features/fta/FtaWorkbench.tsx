@@ -25,6 +25,7 @@ import type { ExampleModelState } from './useExampleModel'
 import { AnalysisSettingsPanel } from '../analysis/AnalysisSettingsPanel'
 import { EMPTY_SETTINGS, listHouseEvents, settingsActive, toQuantifyOptions } from '../analysis/analysisSettings'
 import type { AnalysisSettings } from '../analysis/analysisSettings'
+import { activateOnKey } from '../shell/a11y'
 
 function buildHeat(importance: Record<string, { fv: number }>): Record<string, number> {
   const max = Math.max(...Object.values(importance).map((v) => v.fv), 1e-12)
@@ -195,10 +196,12 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
                   const justGenerated = aiAppliedResult?.kind === 'fta'
                     && aiAppliedResult.etaKey === row.etaKey
                     && aiAppliedResult.treeName === row.name
+                  const pickRow = () => { if (row.etaKey !== activeKey) selectEta(row.etaKey); setFtEditTarget({ src: 'eta', etaKey: row.etaKey, name: row.name }); setSelected(null); setResult(null); setError(null) }
                   return (
-                    <div key={row.etaKey + ':' + row.name}
+                    <div key={row.etaKey + ':' + row.name} className="psa-focus-row" role="button" tabIndex={0}
+                      aria-label={`故障树 ${row.etaName} / ${row.label}`}
                       style={ftSidebarRow(ftIsEta && ftEtaName === row.name && ftEtaKey === row.etaKey, justGenerated)}
-                      onClick={() => { if (row.etaKey !== activeKey) selectEta(row.etaKey); setFtEditTarget({ src: 'eta', etaKey: row.etaKey, name: row.name }); setSelected(null); setResult(null); setError(null) }}
+                      onClick={pickRow} onKeyDown={activateOnKey(pickRow)}
                       title={`${row.etaName} / ${row.label}`}
                     >
                       <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
@@ -211,28 +214,34 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
             ))
         }
         <div style={{ ...ftSidebarGroup, marginTop: 10 }}>示例模型</div>
-        {examples.map((e) => (
-          <div key={e.id}
+        {examples.map((e) => {
+          const pickExample = () => { setCurrent(e.id); setFtEditTarget({ src: 'model' }); setSelected(null); setResult(null); setError(null) }
+          return (
+          <div key={e.id} className="psa-focus-row" role="button" tabIndex={0} aria-label={`示例模型 ${e.name}`}
             style={ftSidebarRow(!ftIsEta && !ftIsStandalone && current === e.id)}
-            onClick={() => { setCurrent(e.id); setFtEditTarget({ src: 'model' }); setSelected(null); setResult(null); setError(null) }}
+            onClick={pickExample} onKeyDown={activateOnKey(pickExample)}
             title={e.name}
           >
             <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
           </div>
-        ))}
+          )
+        })}
         <div style={{ ...ftSidebarGroup, marginTop: 10 }}>自建 FTA</div>
         <button onClick={onAddFt} className="psa-btn" style={{ margin: '4px 10px', width: 'calc(100% - 20px)', justifyContent: 'center', fontSize: 12 }}><Icon name="plus" size={13} />新增 FTA</button>
-        {userFtsModel.fault_trees.map((ft) => (
-          <div key={'u:' + ft.name}
+        {userFtsModel.fault_trees.map((ft) => {
+          const pickStandalone = () => { setFtEditTarget({ src: 'standalone', name: ft.name }); setSelected(null); setResult(null); setError(null) }
+          return (
+          <div key={'u:' + ft.name} className="psa-focus-row" role="button" tabIndex={0} aria-label={`自建故障树 ${ft.name}`}
             style={{ ...ftSidebarRow(ftIsStandalone && ftStandaloneName === ft.name, aiAppliedResult?.kind === 'standalone_fta' && aiAppliedResult.treeName === ft.name), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-            onClick={() => { setFtEditTarget({ src: 'standalone', name: ft.name }); setSelected(null); setResult(null); setError(null) }}
+            onClick={pickStandalone} onKeyDown={activateOnKey(pickStandalone)}
             title={ft.name}
           >
             <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ft.name}</span>
             {aiAppliedResult?.kind === 'standalone_fta' && aiAppliedResult.treeName === ft.name && <span style={ftAiTag}>刚生成</span>}
             <span onClick={(e) => { e.stopPropagation(); onDeleteFt(ft.name) }} title="删除" style={{ color: 'var(--psa-faint)', fontSize: 13, flexShrink: 0, paddingLeft: 6 }}>✕</span>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* 画布区 */}

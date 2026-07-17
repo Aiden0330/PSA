@@ -6,6 +6,7 @@ import { useViewStore } from '../../stores/viewStore'
 import type { MainTab } from '../../stores/viewStore'
 import { useActiveEta } from '../../stores/useActiveEta'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
+import { useDialogA11y } from './a11y'
 
 export interface PaletteCommand { id: string; group: string; label: string; hint?: string; run: () => void }
 
@@ -33,6 +34,8 @@ export function CommandPalette(
   const [q, setQ] = useState('')
   const [idx, setIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  // FE-13:role=dialog + aria-modal + Esc 关闭 + Tab 焦点回环 + 关闭后焦点恢复
+  const dialogRef = useDialogA11y(() => setOpen(false), open)
 
   useEffect(() => { if (open) { setQ(''); setIdx(0); setTimeout(() => inputRef.current?.focus(), 0) } }, [open])
 
@@ -59,13 +62,13 @@ export function CommandPalette(
 
   return (
     <div style={backdrop} onClick={() => setOpen(false)}>
-      <div style={panel} onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} style={panel} role="dialog" aria-modal="true" aria-label="命令板" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <input
-          ref={inputRef} value={q} placeholder="输入命令、ETA、场景或存档名…  (Esc 关闭)"
+          ref={inputRef} data-autofocus value={q} placeholder="输入命令、ETA、场景或存档名…  (Esc 关闭)"
+          aria-label="命令、ETA、场景或存档搜索"
           onChange={(e) => { setQ(e.target.value); setIdx(0) }}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') setOpen(false)
-            else if (e.key === 'ArrowDown') { e.preventDefault(); setIdx((i) => Math.min(i + 1, filtered.length - 1)) }
+            if (e.key === 'ArrowDown') { e.preventDefault(); setIdx((i) => Math.min(i + 1, filtered.length - 1)) }
             else if (e.key === 'ArrowUp') { e.preventDefault(); setIdx((i) => Math.max(i - 1, 0)) }
             else if (e.key === 'Enter' && filtered[idx]) run(filtered[idx])
           }}

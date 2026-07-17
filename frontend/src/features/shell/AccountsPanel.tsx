@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { createAccount, listAccounts, setAccountDisabled } from '../../api'
 import type { AccountInfo } from '../../api'
+import { useDialogA11y } from './a11y'
 
 const ROLE_LABEL: Record<string, string> = { admin: '管理员', analyst: '分析员', reviewer: '评审人' }
 
@@ -14,6 +15,9 @@ export function AccountsPanel({ onClose }: { onClose: () => void }) {
   const [pw, setPw] = useState('')
   const [role, setRole] = useState('analyst')
   const [display, setDisplay] = useState('')
+  // FE-13:role=dialog + aria-modal + aria-labelledby + Esc 关闭 + 焦点回环/恢复
+  const titleId = useId()
+  const dialogRef = useDialogA11y(onClose)
 
   const refresh = () => { listAccounts().then(setAccounts).catch((e) => setErr(String(e?.message ?? e))) }
   useEffect(refresh, [])
@@ -37,9 +41,9 @@ export function AccountsPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div style={overlay} onClick={onClose}>
-      <div className="psa-panel" style={box} onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="psa-panel" style={box} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-          <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--psa-ink)' }}>账户管理</div>
+          <div id={titleId} style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--psa-ink)' }}>账户管理</div>
           <button onClick={onClose} className="psa-btn" style={{ marginLeft: 'auto' }}>关闭</button>
         </div>
         {err && <div style={{ marginBottom: 10, padding: 8, background: 'var(--psa-danger-soft)', color: 'var(--psa-danger-strong)', borderRadius: 6, fontSize: 12 }}>{err}</div>}

@@ -2,6 +2,7 @@ import type { EventTreeModel } from '../eventtree'
 import { consLevel, consText, gradeLabel } from '../eventtree'
 import { C_COLOR } from '../riskmatrix'
 import { formatEtaRate } from '../etaNumberFormat'
+import { activateOnKey } from '../features/shell/a11y'
 
 const mono = 'var(--psa-font-mono)'
 
@@ -31,7 +32,9 @@ export function SequencePaths({ rows, model, selKey, onSelect }: {
         const cc = C_COLOR[lvl] || '#64748b'
         const active = selKey === r.lf.path.join('/')
         return (
-          <div key={r.i} onClick={() => onSelect(r.lf.path)}
+          <div key={r.i} className="psa-focus-row" role="button" tabIndex={0} aria-pressed={active}
+            aria-label={`序列 ${r.seq}，后果 ${gradeLabel(lvl)}`}
+            onClick={() => onSelect(r.lf.path)} onKeyDown={activateOnKey(() => onSelect(r.lf.path))}
             style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', borderBottom: '1px solid var(--psa-line)', cursor: 'pointer', background: active ? 'var(--psa-primary-soft)' : 'transparent' }}>
             <span style={{ width: 20, height: 20, borderRadius: 5, background: cc, color: '#fff', fontFamily: mono, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{r.seq}</span>
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, fontSize: 11.5, color: 'var(--psa-faint)' }}>
