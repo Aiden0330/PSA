@@ -897,7 +897,10 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
     <li><strong>确定性身份</strong>:实体 UUID = <code>uuid5(项目命名空间, 实体路径)</code> —— 同内容必同 ID,
       是幂等与 diff 的前提;</li>
     <li><strong>内容哈希</strong>:规范 JSON(键排序、紧凑、剥离易变时间戳)取 SHA-256;
-      <strong>保存即版本、同哈希幂等返回既有版本</strong>,父链成历史;</li>
+      <strong>保存即版本、同哈希幂等返回既有版本</strong>,父链成历史;<strong>导出门即此内容寻址幂等</strong>——
+      对已签发版本,重导命中签发章要求<strong>原始载荷</strong>逐字节重现:canonical-normal 再生载荷(如从钉扎版本反构的
+      规范化 v2,<code>to_v2(doc, None)</code>)与原件语义等价但序列化不同 → 新哈希 → 落为工作稿。此乃设计
+      (防"看起来一样"的内容擅带签发章),操作口径 = <strong>从保存的工作区原件重导</strong>,而非从版本反构再序列化(试点 P-2);</li>
     <li><strong>append-only 审计</strong>:代码层无改写路径,数据库层 <code>BEFORE UPDATE/DELETE</code>
       触发器 <code>RAISE(ABORT)</code> 双保险,属性测试直接以裸 SQL 篡改并断言被拒;</li>
     <li><strong>分析案例</strong>:报告/不确定性/重要度运行自动钉扎 —— 绑定版本 id、引擎版本、完整设置与

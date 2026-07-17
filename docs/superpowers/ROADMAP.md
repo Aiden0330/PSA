@@ -492,3 +492,9 @@ station.md;脚本+数据:docs/reference-assets/pilot-200mwh/。
 恒等式锁,g≥9 仍拒)。**迁移注记**:MC 带与末位数字相对 0.2.x 变化,semver 升 0.3.0
 (案例指纹可辨新旧);banked A7 特征化锁实测流不变(节点序恰=排序 ref 序)原样存活。
 基线:py 558+65skip · benchmark 24/24 零差异。
+
+## 待办(试点 P-5)· 库内项目治理
+
+- 库内项目治理入 **UI backlog(低优先)**:项目改名 / 归档 / 合并 / 清理孤儿行。
+- 诱因:save 流与钉扎流 uuid 不一致时产生成对项目行,崩溃重跑产生重复行,当前无清理 / 合并入口。
+- 源:试点 P-5(`docs/reviews/2026-07-16-pilot-200mwh-station.md`)。
