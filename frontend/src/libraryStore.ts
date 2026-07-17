@@ -1,4 +1,7 @@
 import type { LibraryData } from './api'
+import { isolateCorrupt } from './storageSafe'
+// 注:libraryValidation 反向 type/值依赖本模块(LIBRARY_SECTIONS)——两侧均在函数体内惰性使用,无 TDZ 循环问题。
+import { validateOverlayForImport, MAX_LIBRARY_FILE_BYTES } from './libraryValidation'
 
 export type LibrarySection = 'component_failure_rates' | 'barrier_effectiveness' | 'initiating_events'
 export const LIBRARY_SECTIONS: LibrarySection[] = ['component_failure_rates', 'barrier_effectiveness', 'initiating_events']
@@ -19,17 +22,20 @@ export function emptyOverlay(): LibraryOverlay {
 }
 
 export function getOverlay(): LibraryOverlay {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return emptyOverlay()
-    const o = JSON.parse(raw)
-    const base = emptyOverlay()
-    if (o && typeof o === 'object') for (const s of LIBRARY_SECTIONS) {
-      if (o.upsert?.[s] && typeof o.upsert[s] === 'object') base.upsert[s] = o.upsert[s]
-      if (Array.isArray(o.deleted?.[s])) base.deleted[s] = o.deleted[s]
+  let raw: string | null
+  try { raw = localStorage.getItem(KEY) } catch { return emptyOverlay() } // 存储不可读
+  if (!raw) return emptyOverlay()
+  let o: unknown
+  try { o = JSON.parse(raw) } catch { isolateCorrupt(KEY, raw); return emptyOverlay() } // 坏 JSON → 隔离,不静默丢失
+  const base = emptyOverlay()
+  if (o && typeof o === 'object') {
+    const oo = o as { upsert?: Record<string, unknown>; deleted?: Record<string, unknown> }
+    for (const s of LIBRARY_SECTIONS) {
+      if (oo.upsert?.[s] && typeof oo.upsert[s] === 'object') base.upsert[s] = oo.upsert[s] as Record<string, LibraryRow>
+      if (Array.isArray(oo.deleted?.[s])) base.deleted[s] = oo.deleted[s] as string[]
     }
-    return base
-  } catch { return emptyOverlay() } // 坏 JSON / 不可读 → 空覆盖层
+  }
+  return base
 }
 
 export function setOverlay(o: LibraryOverlay): void {
@@ -85,10 +91,26 @@ export interface LibraryFile { kind: 'bess-psa-library'; version: 1; exportedAt:
 export function buildLibraryFile(): LibraryFile {
   return { kind: 'bess-psa-library', version: 1, exportedAt: new Date().toISOString(), overlay: getOverlay() }
 }
+/**
+ * 解析并**事务式校验**参考库文件:大小/版本/结构/逐行范围-单位-来源全通过才返回,
+ * 任一不合法即点名抛错(调用方在合并前拦截 → 覆盖层逐位不变)。
+ */
 export function parseLibraryFile(text: string): LibraryOverlay {
-  let o: any
+  if (text.length > MAX_LIBRARY_FILE_BYTES) throw new Error(`参考库文件过大(上限 ${Math.floor(MAX_LIBRARY_FILE_BYTES / 1024 / 1024)}MB)`)
+  let o: unknown
   try { o = JSON.parse(text) } catch { throw new Error('文件不是有效的 JSON') }
-  if (o?.kind === 'bess-psa-library' && o.overlay) return o.overlay as LibraryOverlay
-  if (o?.upsert && o?.deleted) return o as LibraryOverlay
-  throw new Error('参考库文件格式无法识别')
+  const obj = o as { kind?: unknown; version?: unknown; overlay?: unknown; upsert?: unknown; deleted?: unknown } | null
+  let overlay: unknown
+  if (obj?.kind === 'bess-psa-library') {
+    if (obj.version !== 1) throw new Error(`不支持的参考库文件版本:${String(obj.version)}`)
+    if (!obj.overlay) throw new Error('参考库文件缺少 overlay')
+    overlay = obj.overlay
+  } else if (obj?.upsert && obj?.deleted) {
+    overlay = obj
+  } else {
+    throw new Error('参考库文件格式无法识别')
+  }
+  const err = validateOverlayForImport(overlay)
+  if (err) throw new Error(`参考库文件校验失败:${err}`)
+  return overlay as LibraryOverlay
 }

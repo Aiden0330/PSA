@@ -8,8 +8,13 @@
     "build": "tsc -b && vite build",
     "bundle": "vite build --mode singlefile && node scripts/inline-html.mjs",
     "lint": "eslint .",
+    "lint:gate": "node scripts/lint-baseline.cjs",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "//engines": "Node 下限锚定锁文件 ESLint 10 的 ^20.19.0(FE-14);上限 <21 与 Vite5/React18 版本钉一致"
+  },
+  "engines": {
+    "node": ">=20.19.0 <21"
   },
   "dependencies": {
     "ag-grid-community": "^32.3.9",

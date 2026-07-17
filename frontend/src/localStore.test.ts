@@ -63,6 +63,17 @@ describe('localStore', () => {
     expect(lsList()).toEqual([])
   })
 
+  it('坏 JSON → 隔离到 corrupt-* 侧键 + console.warn(不静默丢失)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    localStorage.setItem('bess-eta:saved:v1', '{not json')
+    expect(lsList()).toEqual([])
+    const corruptKey = Object.keys(localStorage).find((k) => k.startsWith('bess-eta:saved:v1:corrupt-'))
+    expect(corruptKey).toBeTruthy()
+    expect(localStorage.getItem(corruptKey!)).toBe('{not json')
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
   it('setItem 抛错(配额/隐私模式) → lsSave 抛可读错误', () => {
     const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new DOMException('full', 'QuotaExceededError')

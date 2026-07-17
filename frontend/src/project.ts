@@ -26,6 +26,48 @@ export interface ProjectPayload {
 const EMPTY_FTS: ModelJson = { model_data: { parameters: [] }, fault_trees: [] }
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
 
+const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x)
+
+/** 递归校验事件树节点形状(branch:feId+success+failure;leaf:consequence)。返回带路径的错误或 null。 */
+function validateEtNode(node: unknown, path: string): string | null {
+  if (!isObj(node)) return `${path} 不是对象`
+  if (node.kind === 'leaf') {
+    if (typeof node.consequence !== 'string') return `${path}.consequence 应为字符串`
+    return null
+  }
+  if (node.kind === 'branch') {
+    if (typeof node.feId !== 'string' || !node.feId) return `${path}.feId 应为非空字符串`
+    return validateEtNode(node.success, `${path}.success`) ?? validateEtNode(node.failure, `${path}.failure`)
+  }
+  return `${path}.kind 非法(应为 branch/leaf):${String(node.kind)}`
+}
+
+/**
+ * v2 项目 payload 深校验(FE-10):etas 数组、每 eta {key,name,model{initEvent,initFreq 有限,
+ * functionalEvents[],root 树形},fts 形状}。返回首个带路径错误或 null(通过)。绝不半载入的前置门。
+ */
+export function validateProjectPayload(payload: unknown): string | null {
+  if (!isObj(payload)) return '项目 payload 不是对象'
+  if (payload.v !== 2) return `不支持的项目 payload 版本:${String(payload.v)}`
+  if (!Array.isArray(payload.etas)) return 'etas 应为数组'
+  for (let i = 0; i < payload.etas.length; i++) {
+    const e = payload.etas[i]
+    const at = `etas[${i}]`
+    if (!isObj(e)) return `${at} 不是对象`
+    if (typeof e.key !== 'string' || !e.key) return `${at}.key 应为非空字符串`
+    if (typeof e.name !== 'string') return `${at}.name 应为字符串`
+    if (!isObj(e.model)) return `${at}.model 不是对象`
+    const m = e.model
+    if (typeof m.initEvent !== 'string') return `${at}.model.initEvent 应为字符串`
+    if (typeof m.initFreq !== 'number' || !Number.isFinite(m.initFreq)) return `${at}.model.initFreq 应为有限数`
+    if (!Array.isArray(m.functionalEvents)) return `${at}.model.functionalEvents 应为数组`
+    const treeErr = validateEtNode(m.root, `${at}.model.root`)
+    if (treeErr) return `${at}.model.root 畸形:${treeErr}`
+    if (e.fts !== undefined && (!isObj(e.fts) || !Array.isArray((e.fts as Record<string, unknown>).fault_trees))) return `${at}.fts 形状非法(fault_trees 应为数组)`
+  }
+  return null
+}
+
 function nextDuplicateName(names: Set<string>, baseName: string): string {
   const base = `${baseName.trim() || 'ETA'} 副本`
   if (!names.has(base)) return base

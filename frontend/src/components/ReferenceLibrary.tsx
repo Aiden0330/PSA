@@ -7,6 +7,7 @@ import {
   mergeOverlay, buildLibraryFile, parseLibraryFile,
 } from '../libraryStore'
 import type { LibrarySection, LibraryRow } from '../libraryStore'
+import { validateFieldEdit, validateGradeEdit } from '../libraryValidation'
 import { Icon } from './icons'
 import { posteriorPfd, posteriorRate } from '../bayes'
 import type { BayesPrior } from '../bayes'
@@ -69,6 +70,16 @@ export function ReferenceLibrary({ onLibraryChange }: { onLibraryChange?: () => 
 
   const refresh = useCallback(() => { force((n) => n + 1); onLibraryChange?.() }, [onLibraryChange])
   const guard = (fn: () => void) => { setErr(null); try { fn(); refresh() } catch (e: any) { setErr(String(e?.message ?? e)) } }
+  // 单元格原子提交(FE-10):blur/Enter 时校验被编辑字段。返回 true=已提交,false=被拒。
+  // 被拒时丢弃草稿、覆盖层逐位不动并显红;显示层的复原由调用点(onBlur/onKeyDown)命令式回填,
+  // 因为受控 value 在 draft→null 后不总能触发 DOM 重同步(草稿态编辑的已知取舍)。
+  const commitCell = (spec: SectionSpec, row: LibraryRow, c: Col, raw: string): boolean => {
+    const fieldErr = validateFieldEdit(spec.section, row, c.key, raw)
+    if (fieldErr) { setErr(`${spec.title} · ${row[spec.cols[0].key] ?? row.id}:${fieldErr}`); setDraft(null); return false }
+    setDraft(null)
+    guard(() => upsertEntry(spec.section, withCell(row, c, raw)))
+    return true
+  }
   const applyBayes = (which: 'mean' | 'p95') => {
     if (!bayes) return
     const r = bayes.row
@@ -194,7 +205,11 @@ export function ReferenceLibrary({ onLibraryChange }: { onLibraryChange?: () => 
                           return (
                             <td key={c.key} style={td}>
                               <select value={g} title={m.desc}
-                                onChange={(e) => guard(() => upsertEntry(spec.section, withCell(row, c, e.target.value)))}
+                                onChange={(e) => {
+                                  const gerr = validateGradeEdit(row, e.target.value)
+                                  if (gerr) { setErr(`${spec.title} · ${row[spec.cols[0].key] ?? row.id}:${gerr}`); return }
+                                  guard(() => upsertEntry(spec.section, withCell(row, c, e.target.value)))
+                                }}
                                 style={{ border: '1px solid var(--psa-line)', borderRadius: 6, padding: '2px 6px', fontSize: 12, fontWeight: 600, fontFamily: 'var(--psa-font-mono)', cursor: 'pointer', background: m.bg, color: m.color }}>
                                 {GRADES.map((gg) => <option key={gg} value={gg}>{gg}</option>)}
                                 {!GRADES.includes(g) && <option value={g}>{g}</option>}
@@ -209,9 +224,14 @@ export function ReferenceLibrary({ onLibraryChange }: { onLibraryChange?: () => 
                               style={{ ...inp, ...(c.num ? { fontFamily: 'var(--psa-font-mono)', fontVariantNumeric: 'tabular-nums' } : {}) }}
                               className={c.num ? 'psa-num' : undefined}
                               type="text" inputMode={c.num ? 'decimal' : undefined} value={shown}
-                              onChange={(e) => { const raw = e.target.value; setDraft({ k, v: raw }); guard(() => upsertEntry(spec.section, withCell(row, c, raw))) }}
+                              onChange={(e) => setDraft({ k, v: e.target.value })}
+                              onKeyDown={(e) => {
+                                const el = e.currentTarget
+                                if (e.key === 'Enter') { e.preventDefault(); if (!commitCell(spec, row, c, el.value)) el.value = String(cellVal(row, c)); el.blur() }
+                                else if (e.key === 'Escape') { e.preventDefault(); setDraft(null); el.value = String(cellVal(row, c)); el.blur() }
+                              }}
                               onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--psa-primary)')}
-                              onBlur={(e) => { setDraft(null); e.currentTarget.style.borderColor = 'transparent' }} />
+                              onBlur={(e) => { const el = e.currentTarget; const orig = String(cellVal(row, c)); if (el.value !== orig && !commitCell(spec, row, c, el.value)) el.value = orig; el.style.borderColor = 'transparent' }} />
                           </td>
                         )
                       })}

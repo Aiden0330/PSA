@@ -5,6 +5,7 @@ import type { PortfolioRow, ReviewState } from '../../api'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
 import type { MainTab } from '../../stores/viewStore'
 import { bgLevel, cGE3, worseCell, SEV_RANK } from './portfolioMath'
+import { fmtE } from './portfolioFmt'
 
 /**
  * 多项目组合总览(R5,规格 2026-07-13-explorer-redesign §4)。
@@ -21,7 +22,6 @@ const RISK_HEX: Record<string, string> = { low: '#16a34a', medium: '#eab308', hi
 const LEVEL_ZH: Record<string, string> = { low: '低', medium: '中', high: '高', extreme: '极高' }
 const MARKERS = ['●', '▲', '■', '◆', '★', '⬢', '▼', '✦']
 
-const fmtE = (x: number | undefined): string => (x && x > 0 ? x.toExponential(2) : '—')
 const hash8 = (h: string | null | undefined) => (h ? h.slice(0, 8) : '—')
 
 const STATE_STYLE: Record<ReviewState, { bg: string; fg: string; zh: string }> = {

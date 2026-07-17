@@ -7,6 +7,7 @@ import type { FmeaRow, ApLevel, SxDZone, MappingConfig, FreqBin } from '../fmea'
 import { rpn, ap, mustPrioritize, sxdCell, consequenceToS, freqToO, detectionToD, barrierS, componentS } from '../fmea'
 import { loadRows, saveRows } from '../fmeaStore'
 import { loadMapping, saveMapping, resetMapping } from '../mappingStore'
+import { csvDocument } from '../csvExport'
 
 type LibComponent = LibraryData['component_failure_rates'][number]
 type LibBarrier = LibraryData['barrier_effectiveness'][number]
@@ -356,19 +357,13 @@ export function FmeaWorkbench({ etModel, lib, rows: controlledRows, onRowsChange
     }
   }
 
-  // ── 导出 CSV ──
+  // ── 导出 CSV(单一 RFC 4180 编码器 + 公式注入防护,见 csvExport.ts) ──
   function exportCsv() {
-    const header = ['对象', '失效模式', 'S', 'O', 'D', 'RPN', 'AP', '需优先', '来源'].join(',')
-    const dataLines = rows.map((r) => [
-      `"${r.object}"`,
-      `"${r.mode}"`,
-      r.S, r.O, r.D,
-      rpn(r),
-      `"${ap(r)}"`,
-      mustPrioritize(r) ? '是' : '',
-      `"${r.source ?? ''}"`,
-    ].join(','))
-    const csv = [header, ...dataLines].join('\n')
+    const header = ['对象', '失效模式', 'S', 'O', 'D', 'RPN', 'AP', '需优先', '来源']
+    const dataRows = rows.map((r) => [
+      r.object, r.mode, r.S, r.O, r.D, rpn(r), ap(r), mustPrioritize(r) ? '是' : '', r.source ?? '',
+    ])
+    const csv = csvDocument([header, ...dataRows])
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

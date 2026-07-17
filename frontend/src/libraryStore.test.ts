@@ -88,3 +88,57 @@ describe('libraryStore', () => {
     spy.mockRestore()
   })
 })
+
+const validFile = (overlay: object) => JSON.stringify({ kind: 'bess-psa-library', version: 1, exportedAt: '2026-07-17', overlay })
+
+describe('parseLibraryFile — 导入事务式校验(FE-10)', () => {
+  const goodOverlay = {
+    upsert: { component_failure_rates: {}, barrier_effectiveness: { B9: { id: 'B9', name: 'x', category: 'm', pfd: 0.3, source: { citation: 'a' } } }, initiating_events: {} },
+    deleted: { component_failure_rates: [], barrier_effectiveness: [], initiating_events: [] },
+  }
+  it('合法文件通过并透传 overlay', () => {
+    expect(parseLibraryFile(validFile(goodOverlay)).upsert.barrier_effectiveness.B9.pfd).toBe(0.3)
+  })
+  it('未知版本点名拒绝', () => {
+    expect(() => parseLibraryFile(JSON.stringify({ kind: 'bess-psa-library', version: 99, overlay: goodOverlay }))).toThrow(/版本/)
+  })
+  it('越界值(PFD>1)拒绝且带分区+id', () => {
+    const bad = { ...goodOverlay, upsert: { ...goodOverlay.upsert, barrier_effectiveness: { B9: { id: 'B9', name: 'x', category: 'm', pfd: 5, source: { citation: 'a' } } } } }
+    expect(() => parseLibraryFile(validFile(bad))).toThrow(/barrier_effectiveness.*B9/)
+  })
+  it('空 citation 拒绝', () => {
+    const bad = { ...goodOverlay, upsert: { ...goodOverlay.upsert, barrier_effectiveness: { B9: { id: 'B9', name: 'x', category: 'm', pfd: 0.3, source: { citation: '' } } } } }
+    expect(() => parseLibraryFile(validFile(bad))).toThrow(/citation|来源/)
+  })
+  it('跨分区重复 id 拒绝', () => {
+    const bad = { ...goodOverlay, upsert: {
+      component_failure_rates: { X1: { id: 'X1', name: 'c', failure_mode: 'm', rate: 1e-7, unit: '/cell·yr', grade: 'D', source: { citation: 'a' } } },
+      barrier_effectiveness: { X1: { id: 'X1', name: 'x', category: 'm', pfd: 0.3, source: { citation: 'a' } } }, initiating_events: {},
+    } }
+    expect(() => parseLibraryFile(validFile(bad))).toThrow(/重复|X1/)
+  })
+  it('超大文件拒绝(>2MB)', () => {
+    const huge = 'x'.repeat(2 * 1024 * 1024 + 1)
+    expect(() => parseLibraryFile(huge)).toThrow(/过大/)
+  })
+  it('校验失败时不改本地覆盖层(事务式)', () => {
+    upsertEntry('barrier_effectiveness', { id: 'KEEP', name: 'k', category: 'm', pfd: 0.2, source: { citation: 'a' } })
+    const before = JSON.stringify(getOverlay())
+    const bad = { ...goodOverlay, upsert: { ...goodOverlay.upsert, barrier_effectiveness: { B9: { id: 'B9', name: 'x', category: 'm', pfd: 5, source: { citation: 'a' } } } } }
+    expect(() => parseLibraryFile(validFile(bad))).toThrow()
+    expect(JSON.stringify(getOverlay())).toBe(before)
+  })
+})
+
+describe('getOverlay — 坏 JSON 隔离(不静默丢失)', () => {
+  it('坏 JSON 搬到 corrupt-* 侧键并 console.warn, 原键回落空', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    localStorage.setItem('bess-eta:library-overlay:v1', '{corrupt')
+    expect(getOverlay()).toEqual(emptyOverlay())
+    const corruptKey = Object.keys(localStorage).find((k) => k.startsWith('bess-eta:library-overlay:v1:corrupt-'))
+    expect(corruptKey).toBeTruthy()
+    expect(localStorage.getItem(corruptKey!)).toBe('{corrupt')
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+})

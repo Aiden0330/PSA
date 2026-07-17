@@ -1,18 +1,17 @@
 import type { SavedItem, SavedRecord } from './api'
+import { isolateCorrupt } from './storageSafe'
 
 // 单键存全部存档; import type 确保与 api.ts 仅类型耦合(运行时无循环依赖)
 const KEY = 'bess-eta:saved:v1'
 type Store = Record<string, SavedRecord>
 
 function readStore(): Store {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return {}
-    const o = JSON.parse(raw)
-    return o && typeof o === 'object' ? (o as Store) : {}
-  } catch {
-    return {} // 坏 JSON / localStorage 不可读 → 视为空(镜像后端吞坏文件)
-  }
+  let raw: string | null
+  try { raw = localStorage.getItem(KEY) } catch { return {} } // 存储不可读
+  if (!raw) return {}
+  let o: unknown
+  try { o = JSON.parse(raw) } catch { isolateCorrupt(KEY, raw); return {} } // 坏 JSON → 隔离侧键,不静默丢全部本地项目
+  return o && typeof o === 'object' ? (o as Store) : {}
 }
 
 function writeStore(s: Store): void {

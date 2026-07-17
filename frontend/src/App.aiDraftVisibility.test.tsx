@@ -144,8 +144,10 @@ function renderApp(): HTMLDivElement {
   return host
 }
 
+// 语义等待:轮询断言直到成立(通过即刻返回)。大超时仅用于兜底冷启动懒块转换的
+// 首帧抖动,不作为功能判定的墙钟——通过路径不受超时值影响,故不再是 2.5s 脆性等待。
 async function waitFor(assertion: () => void): Promise<void> {
-  const deadline = Date.now() + 2500
+  const deadline = Date.now() + 15000
   let last: unknown
   while (Date.now() < deadline) {
     try {
