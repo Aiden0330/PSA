@@ -21,6 +21,7 @@ import { EtaSummaryList } from './eta/EtaSummaryList'
 import type { SeqRow } from './eta/types'
 import { ETA_CANVAS_CONTENT_ATTR } from './eta/types'
 import { Icon } from './icons'
+import { ErrorBoundary } from '../features/shell/ErrorBoundary'
 
 // 懒加载:reactflow 只随故障树画布进入,ETA 关键路径不解析它(性能报障修复 2026-07-09)
 const BarrierFtModal = lazy(() => import('./BarrierFtModal').then((m) => ({ default: m.BarrierFtModal })))
@@ -337,10 +338,28 @@ export function EventTreeEditor(
       />
 
       {editingFt && fts && ftsApi && (
-        <Suspense fallback={null}>
-          <BarrierFtModal model={fts} ftName={editingFt} api={ftsApi} pfd={pfds?.[editingFt]} libComponents={libComponents}
-            onClose={() => { const id = editingFt; setEditingFt(null); onFtEdited?.(id) }} />
-        </Suspense>
+        // FE-13 收口:懒模态包 ErrorBoundary(此前仅 Suspense fallback=null,子树渲染抛错
+        // 即整页白屏——屏障挂树后重编辑白屏的兜底)。加载态给可见文案而非空白。
+        <ErrorBoundary
+          fallback={(reset) => (
+            <div role="alertdialog" aria-label="故障树编辑器出错" style={{ position: 'fixed', inset: 0, zIndex: 60,
+              background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onClick={() => { reset(); setEditingFt(null) }}>
+              <div className="psa-panel" style={{ padding: 20, maxWidth: 380, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>故障树编辑器打开失败</div>
+                <div style={{ fontSize: 12, color: 'var(--psa-muted)', lineHeight: 1.6, marginBottom: 12 }}>
+                  该屏障的故障树无法渲染(可能是空树或数据不一致)。已安全关闭编辑器,你的事件树未受影响。
+                </div>
+                <button type="button" className="psa-btn" onClick={() => { reset(); setEditingFt(null) }}>关闭</button>
+              </div>
+            </div>
+          )}>
+          <Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13 }}>载入故障树编辑器…</div>}>
+            <BarrierFtModal model={fts} ftName={editingFt} api={ftsApi} pfd={pfds?.[editingFt]} libComponents={libComponents}
+              onClose={() => { const id = editingFt; setEditingFt(null); onFtEdited?.(id) }} />
+          </Suspense>
+        </ErrorBoundary>
       )}
     </div>
   )

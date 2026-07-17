@@ -12,6 +12,10 @@ const NODE_H = 72
  *  positions 中的节点用其(手拖)坐标覆盖 dagre, 其余仍 dagre。 */
 export function layoutFaultTree(model: ModelJson, ftName: string, positions?: Record<string, { x: number; y: number }>, bandLeaves = false): { nodes: Node[]; edges: Edge[] } {
   const ft = getFt(model, ftName)
+  // 防御:命名树缺失且 fault_trees 为空时 getFt 返回 undefined —— 此前直接
+  // `for (const n of ft.nodes)` 抛 TypeError,经无 ErrorBoundary 的懒模态 Suspense
+  // 冒泡即白屏(ETA 屏障挂树→重编辑白屏)。缺树 = 空图,绝不抛。
+  if (!ft) return { nodes: [], edges: [] }
   const g = new dagre.graphlib.Graph()
   g.setGraph({ rankdir: 'TB', nodesep: 30, ranksep: 70, marginx: 20, marginy: 20 })
   g.setDefaultEdgeLabel(() => ({}))
