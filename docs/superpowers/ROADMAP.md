@@ -453,3 +453,22 @@ run.ps1   .claude/launch.json(预览)
 - 引擎设计/计划:`docs/superpowers/specs/2026-06-20-bess-psa-engine-design.md`、`docs/superpowers/plans/2026-06-20-bess-psa-engine.md`、`...-phase1.5.md`、`...-frontend-v1.md`。
 - 领域/算法/对标调研:`docs/research/compass_artifact_*.md`、`RiskSpectrum_PSA_ETA_调研报告.docx`。
 - 技能蓝图:`bess-tr-event-tree.skill`、`fta-eta-quantification-engine.skill`、`etafta-frontend.skill`。
+
+## 2026-07-16(晚)· F3 阶段 2+3 落地 + 收口二轮(GPT-5.6 评审全项收口)
+
+- **阶段 3(EB-08,Opus `17f209e`)**:canonical v2 七 kind + typed Q(t) 字段(缺省不落盘守
+  铁律:合成 3 + 真机存档 9 逐位)、引擎指纹 `{semver 0.2.0, git_sha, dirty,
+  request_schema_version, benchmark_corpus_version}`、反构忠实化(CCF/typed)。
+- **阶段 2(EB-02,Opus `620299a`)**:请求哈希入案例 + 钉扎一致性(payload↔request 不符
+  → 409,写前拒零残留)。
+- **收口二轮(Fable)**:engine-reviewer FAIL(F-1..F-5)+ domain-reviewer 有条件通过
+  (D-1..D-7)→ 指纹改**语义投影白名单**(label 门/自引用 param_ref/int 值不再误拒);
+  bc 集定义入指纹 + 入 canonical(`EventTree.boundary_condition_sets`)+ 效果映射落卷
+  (静默替换窗口封死);集成 LFT 钉扎经 `integrated_variant` 转硬核验(ie 块语义入指纹);
+  typed 键提升按 kind 门控(杂散键存档铁律成立);`pin_binding` 绑定强度标记(案例/页脚/
+  台账三面可辨);**前端 typed 参数直传**(活路径 rate λ·MTTR 24× 静默低估修正——
+  vitest 锁旧形状零扰动);staggered CCF 收编;checked_set 顶层边界条件 400;页脚 git
+  三态;报告正文披露分析设置。锚点 tests/backend/test_execution_replay_v2_r2.py(22,
+  先红后绿)。基线:py 546+56skip · fe 323 · benchmark 24/24 · bundle 2.81MB。
+- 评审裁定书状态:12 属实项 + F3 三阶段全落地;残留 = checked_set 聚合"仅记录"通道与
+  集成 MC 422(均显式标注,规格 §5 v2 候选)。

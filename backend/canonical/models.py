@@ -140,7 +140,25 @@ class CcfGroup(_Strict):
     members: list[str] = Field(default_factory=list)   # refs (v1 deviation)
     model: str                                          # beta|mgl|alpha|phi by convention
     factors: dict[str, float] = Field(default_factory=dict)
+    # 收口二轮:staggered(错开检验)是展开语义,此前 canonical 丢失 → 重放展开公式不同。
+    # Optional + 缺省不落盘(铁律):非错开组序列化与 EB-08 前逐位同。
+    staggered: Optional[bool] = None
     provenance: Provenance = Field(default_factory=Provenance)
+
+    @model_serializer(mode="wrap")
+    def _omit_staggered_when_none(self, handler):
+        d = handler(self)
+        if d.get("staggered") is None:
+            d.pop("staggered", None)
+        return d
+
+
+class BoundaryConditionSet(_Strict):
+    """命名边界条件集**定义**(4a2;收口二轮 F-1/D-1 收编入 canonical)。
+    定义是模型内容(et_builder 喂进 Model、请求哈希覆盖):此前只以逐字 fts 存活在
+    sidecar,定义改动不改 content_hash → 同哈希去重把新定义静默钉到旧 sidecar。"""
+    name: str
+    house_states: dict[str, bool] = Field(default_factory=dict)
 
 
 class ProductDims(_Strict):
@@ -202,6 +220,17 @@ class EventTree(_Strict):
     parameters: list[Parameter] = Field(default_factory=list)
     fault_trees: list[FaultTree] = Field(default_factory=list)
     ccf_groups: list[CcfGroup] = Field(default_factory=list)
+    # 收口二轮 F-1/D-1:bc 集定义入正文(入 content_hash)。Optional + 空/缺省不落盘
+    # (铁律):无 bc 集的文档序列化与 EB-08 前逐位同;带定义的载荷此前定义被静默丢弃,
+    # 收编后同载荷产出更丰富的 canonical(新 content_hash = 新版本事件,非历史哈希变动)。
+    boundary_condition_sets: Optional[list[BoundaryConditionSet]] = None
+
+    @model_serializer(mode="wrap")
+    def _omit_bc_when_absent(self, handler):
+        d = handler(self)
+        if not d.get("boundary_condition_sets"):
+            d.pop("boundary_condition_sets", None)
+        return d
 
 
 class ModelBundle(_Strict):

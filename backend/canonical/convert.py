@@ -60,11 +60,16 @@ def _prov_from_fe(fe: dict) -> M.Provenance:
 
 
 def _param_from_json(p: dict, ns, scope: str) -> M.Parameter:
-    # EB-08: typed Q(t) fields (gamma/alpha/beta/t0) are now first-class typed
-    # fields, not `extra` residue — so canonical carries the semantics and
-    # engine_request/et_builder can rebuild the exact Q(t) model on replay.
+    # EB-08: typed Q(t) fields (gamma/alpha/beta/t0) become first-class typed
+    # fields — but ONLY for the four v2 kinds (收口二轮 F-4)。v1 kind(probability/
+    # rate/frequency)参数上的同名杂散键(用户注记等,ParamJson 开放字段)必须留 extra
+    # 残渣:无条件提升会 (a) 改既有存档哈希(铁律违反 → 幂等钉扎失效、假新版本),
+    # (b) 把非数值注记变 ValidationError(可存载荷变 400)。
     known = {"id", "kind", "value", "mttr", "test_interval", "mission_time",
-             "gamma", "alpha", "beta", "t0", "distribution", "source"}
+             "distribution", "source"}
+    v2kind = p.get("kind") in M._V2_PARAM_KINDS
+    if v2kind:
+        known |= set(M._V2_TYPED_FIELDS)
     dist = None
     if p.get("distribution") is not None:
         d = p["distribution"]
@@ -77,8 +82,10 @@ def _param_from_json(p: dict, ns, scope: str) -> M.Parameter:
         ref=p["id"], kind=p["kind"], value=p["value"],
         mttr=p.get("mttr"), test_interval=p.get("test_interval"),
         mission_time=p.get("mission_time"),
-        gamma=p.get("gamma"), alpha=p.get("alpha"),
-        beta=p.get("beta"), t0=p.get("t0"),
+        gamma=p.get("gamma") if v2kind else None,
+        alpha=p.get("alpha") if v2kind else None,
+        beta=p.get("beta") if v2kind else None,
+        t0=p.get("t0") if v2kind else None,
         distribution=dist, provenance=prov,
         extra={k: v for k, v in p.items() if k not in known},
     )
@@ -133,13 +140,21 @@ def _bundle_from_modeljson(mj: dict, ns, scope: str) -> tuple[list[M.Parameter],
         ))
     ccfs = [M.CcfGroup(uuid=entity_uuid(ns, f"{scope}/ccf:{c['id']}"), ref=c["id"],
                        members=list(c.get("members", [])), model=c.get("model", "beta"),
-                       factors=dict(c.get("factors", {})))
+                       factors=dict(c.get("factors", {})),
+                       # 收口二轮:staggered=False/缺省 → None(缺省不落盘,铁律)
+                       staggered=(True if c.get("staggered") else None))
             for c in mj.get("ccf_groups") or []]
-    return params, trees, ccfs
+    # 收口二轮 F-1/D-1:bc 集定义收编入 canonical(此前只在 sidecar 逐字层)。
+    bcsets = [M.BoundaryConditionSet(
+                  name=b["name"],
+                  house_states={k: bool(v) for k, v in (b.get("house_states") or {}).items()})
+              for b in mj.get("boundary_condition_sets") or []]
+    return params, trees, ccfs, bcsets
 
 
 def _bundle_to_modeljson(params: list[M.Parameter], trees: list[M.FaultTree],
-                         ccfs: list[M.CcfGroup]) -> dict:
+                         ccfs: list[M.CcfGroup],
+                         bcsets: Optional[list[M.BoundaryConditionSet]] = None) -> dict:
     """Canonical-normal ModelJson regeneration (sidecar-less path)."""
     node_ref = {}
     for t in trees:
@@ -169,7 +184,11 @@ def _bundle_to_modeljson(params: list[M.Parameter], trees: list[M.FaultTree],
            "fault_trees": fts}
     if ccfs:
         out["ccf_groups"] = [{"id": c.ref, "members": c.members, "model": c.model,
-                              "factors": c.factors} for c in ccfs]
+                              "factors": c.factors,
+                              **({"staggered": True} if c.staggered else {})} for c in ccfs]
+    if bcsets:
+        out["boundary_condition_sets"] = [{"name": b.name, "house_states": dict(b.house_states)}
+                                          for b in bcsets]
     return out
 
 
@@ -232,7 +251,7 @@ def to_canonical(payload: dict, project_uuid: str,
             pt["consequenceDefs"] = copy.deepcopy(m["consequenceDefs"])
         sidecar["derived"]["pfds"][ref] = copy.deepcopy(e.get("pfds") or {})
 
-        params, fts, ccfs = _bundle_from_modeljson(pt["fts"], ns, escope)
+        params, fts, ccfs, bcsets = _bundle_from_modeljson(pt["fts"], ns, escope)
         tree_by_ref = {t.ref: t for t in fts}
         param_by_ref = {p.ref: p for p in params}
 
@@ -321,6 +340,7 @@ def to_canonical(payload: dict, project_uuid: str,
             name_locked=bool(e.get("renamed", False)),
             initiating_event=ie, functional_events=fes, root=root,
             consequences=cons, parameters=params, fault_trees=fts, ccf_groups=ccfs,
+            boundary_condition_sets=bcsets or None,
         ))
 
     wb = M.Workbench(
@@ -330,7 +350,8 @@ def to_canonical(payload: dict, project_uuid: str,
         fmea_mapping=copy.deepcopy(payload.get("fmeaMapping")) if "fmeaMapping" in payload else None,
     )
     if "userFts" in payload:
-        up, ut, uc = _bundle_from_modeljson(payload["userFts"] or {}, ns, "wb")
+        # userFts 的 bc 集定义不入 canonical(工作台树不进 ET 请求;逐字层保真)
+        up, ut, uc, _ubc = _bundle_from_modeljson(payload["userFts"] or {}, ns, "wb")
         wb.user_fts = M.ModelBundle(parameters=up, fault_trees=ut, ccf_groups=uc)
         sidecar["passthrough"]["userFts"] = copy.deepcopy(payload["userFts"])
 
@@ -427,7 +448,7 @@ def to_v2(doc: M.ProjectDocument, sidecar: Optional[dict] = None) -> dict:
             eta["renamed"] = t.name_locked
         eta["model"] = model
         eta["fts"] = copy.deepcopy(pt["fts"]) if "fts" in pt else _bundle_to_modeljson(
-            t.parameters, t.fault_trees, t.ccf_groups)
+            t.parameters, t.fault_trees, t.ccf_groups, t.boundary_condition_sets)
         eta["pfds"] = copy.deepcopy(sc.get("derived", {}).get("pfds", {}).get(t.ref, {}))
         etas.append(eta)
 

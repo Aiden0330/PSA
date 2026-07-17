@@ -143,6 +143,8 @@ def engine_version() -> str:
 
 # 引擎请求 schema 版本:canonical v2 typed 参数 + CCF/typed 反构落地即为 "2"
 #(与文档 schema_version 的 "2.0" 内容级标注区分:此为引擎请求契约版本,常量)。
+# 维护注记(收口二轮 D-7):手维常量,无自动钩子——改动引擎请求契约形状
+#(et_builder 消费面 / execution.request_hash 投影面)时必须同步升位,否则指纹撒谎。
 REQUEST_SCHEMA_VERSION = "2"
 
 

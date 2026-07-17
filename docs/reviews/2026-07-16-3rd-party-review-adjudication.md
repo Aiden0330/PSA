@@ -16,10 +16,13 @@
 | O5 | EB-11+12 CUDD 前置断言 + charset + 能力声明核对 | `7c6cf0d`(Opus) | — |
 | F3 规格 | EB-01/02/08「分析执行与证据重放 v2」+ 9 黄金锚点 | `c79c2ac` | 规格 + 先红门控锚点 |
 | F3 阶段 1 | EB-01 报告接集成 LFT + house/bc + 集成拒绝(**报告解冻**) | `46c8a38` | G1-G3/G9 活;live 实测 C3 2e-4 |
+| F3 阶段 3 | EB-08 canonical v2(七 kind + typed)+ 引擎指纹 + 忠实反构 | `17f209e`(Opus) | G5-G8 + 铁律锁(合成 3 + 真机存档 9 逐位) |
+| F3 阶段 2 | EB-02 请求哈希 + 钉扎一致性 409 | `620299a`(Opus) | G4;写前拒,零案例残留 |
+| F3 收口二轮 | engine-reviewer **FAIL**(F-1 bc 定义三重逃逸 / F-2 反构不镜像前端→真实模型一律 409 / F-3 集成钉扎零绑定 / F-4 铁律对杂散 typed 键不成立)+ domain-reviewer 有条件通过(D-1..D-7,偏离裁可附条件)→ 全部修复:指纹改语义投影、bc 定义入指纹+canonical、集成变体硬核验、typed 提升按 kind 门控、pin_binding 标记、前端 typed 直传(活路径 rate 24× 低估修正)、staggered CCF 收编、checked_set 顶层 bc 400、页脚 dirty 三态、正文设置披露 | (Fable,本 commit) | r2 锚点 22 先红后绿 + vitest 3;两审查报告全项收口 |
 
-**残留**:F3 阶段 2(EB-02 钉扎请求哈希完整性)、阶段 3(EB-08 canonical v2 + 引擎指纹 +
-反构重放)——见规格 `docs/superpowers/specs/2026-07-16-analysis-execution-evidence-replay-v2.md`
-§4 分阶段,阶段实现为锚点执行级,可交 Opus。EB-01 止血后报告冻结已解除。CI 四门全绿。
+**状态**:12 条属实项 + F3 三阶段**全部落地**。唯一残留跳绑通道 = checked_set 聚合钉扎
+(pin_binding=recorded_only 显式标注,规格 §5 v2 候选);集成 MC 不确定性/重要度仍 422
+(响亮拒绝,引擎无变体,规格 §5)。CI 四门全绿。
 
 ## 0 · 总裁定
 

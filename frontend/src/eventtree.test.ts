@@ -200,3 +200,38 @@ describe('branchFeOptions / setBranchFe', () => {
     expect(setBranchFe(m, [], 'NOPE')).toBe(m)
   })
 })
+
+describe('typed params ride the engine request (F3 收口二轮 F-2b)', () => {
+  const linked = {
+    fault_trees: [{ name: 'FT1', top: 'TOP', nodes: [
+      { id: 'R1', basic: true },
+      { id: 'TOP', op: 'or', args: ['R1'], label: '中间事件' }] }],
+    parameters: [
+      { id: 'R1', kind: 'rate', value: 1e-5, mttr: 24, note: '杂散注记不进请求' },
+      { id: 'P1', kind: 'probability', value: 0.02 },
+      { id: 'X', value: 0.3 },                       // 无 kind 旧形状
+    ],
+  }
+  const withLink = () => {
+    let m = newBlankEta('x')
+    m = { ...m, functionalEvents: m.functionalEvents.map((fe, i) =>
+      i === 0 ? { ...fe, linkFt: 'FT1' } : fe) }
+    return m
+  }
+
+  it('probability / kind-less params keep the historical {value} shape bit-for-bit', () => {
+    const req = toEngineRequest(withLink(), linked as any)
+    expect(req.parameters.P1).toEqual({ value: 0.02 })
+    expect(req.parameters.X).toEqual({ value: 0.3 })
+  })
+
+  it('typed kinds pass kind + typed fields (rate λ·MTTR no longer flattened to λ)', () => {
+    const req = toEngineRequest(withLink(), linked as any)
+    expect(req.parameters.R1).toEqual({ kind: 'rate', value: 1e-5, mttr: 24 })
+  })
+
+  it('stray keys on typed params never enter the request (whitelist emission)', () => {
+    const req = toEngineRequest(withLink(), linked as any)
+    expect('note' in req.parameters.R1).toBe(false)
+  })
+})

@@ -391,6 +391,20 @@ export interface EtQuantifyRequest {
   ie_fault_tree?: IeFaultTreeBlock
 }
 
+/** F3 收口二轮 F-2b:参数按类型直传引擎(与 canonical 反构 _param_json 同形,钉扎哈希两侧同源)。
+ *  probability / 无 kind → `{value}`(旧形状,逐字节零扰动);typed kind(rate/frequency/
+ *  exponential/glm/weibull/periodic_test)→ `{kind, value, <typed 字段>}`,引擎按精确
+ *  Q(t) 求值——此前一律压平为 `{value}` 被当概率:rate λ=1e-5/MTTR=24 时活路径 q=λ,
+ *  真值 λ·MTTR=2.4e-4,24× 静默低估(安全工具不可接受方向);重放侧(canonical 反构)
+ *  算的是对的数,两表面两套数。typed 字段白名单排放(杂散注记键不进请求)。 */
+const TYPED_PARAM_FIELDS = ['mttr', 'test_interval', 'mission_time', 'gamma', 'alpha', 'beta', 't0'] as const
+function engineParamJson(p: any): Record<string, any> {
+  if (!p.kind || p.kind === 'probability') return { value: p.value }
+  const out: Record<string, any> = { kind: p.kind, value: p.value }
+  for (const f of TYPED_PARAM_FIELDS) if (p[f] !== undefined && p[f] !== null) out[f] = p[f]
+  return out
+}
+
 /** 叶按 DFS(成功优先, 与 layout 同序)枚举为 end_state L0,L1,...;path 仅含各分支显式 feId(子集路径)。
  *  功能事件默认带前端 PFD; 若 linked 提供非平凡故障树则改用 link_ft(共享事件精确)。 */
 export function toEngineRequest(
@@ -423,7 +437,7 @@ export function toEngineRequest(
   for (const fe of m.functionalEvents) {
     if (fe.linkFt && ftByName.has(fe.linkFt)) fault_trees[fe.id] = ftByName.get(fe.linkFt)
   }
-  for (const p of linked?.parameters ?? []) parameters[p.id] = { value: p.value }
+  for (const p of linked?.parameters ?? []) parameters[p.id] = engineParamJson(p)
   return {
     init_event: m.initEvent, init_frequency: m.initFreq, functional_events, fault_trees, parameters, sequences, consequence_bins,
     // 4a1:挂载工作区带 CCF 组时透传(合并 PDAG 上展开;空缺省略保持既有请求形状)

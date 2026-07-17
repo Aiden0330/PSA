@@ -174,27 +174,54 @@ def _pin_case(project_uuid: str, project_payload, kind: str, name_hint: str | No
     证据链拒绝绑定)。这堵住 EB-02:PFD=.9 算出的报告不能静默钉到 PFD=.1 的版本。
     请求哈希 + resolved_settings + 完整引擎指纹随案例落库(settings_json 附加,免 schema 迁移)。"""
     from backend import store
-    from backend.canonical import to_canonical, build_engine_request
-    from backend.execution import request_hash
+    from backend.canonical import to_canonical, build_engine_request, integrated_variant
+    from backend.execution import request_hash, REQUEST_HASH_SCHEME
     try:
         doc, sidecar = to_canonical(project_payload, project_uuid)
     except Exception as e:
         raise HTTPException(400, f"project_payload 无法规范化: {e}")
     # EB-02 一致性:任何库写之前先比对,不一致即 409(不留半钉扎)。
+    # 比对集合 = 逐树反构请求 × 变体(收口二轮):
+    #   ×2 集成变体(freq_source=ft + __init__ 树 → withIeFaultTree 同法则分流,F-3);
+    #   ×2 bc 定义剥离变体(前端仅在选中命名集时携带定义;未选中时定义对本次计算惰性,
+    #      不得因此误拒——选中时定义必须逐字匹配,F-1)。
     if computed_request_hash is not None:
         rebuilt: set[str] = set()
         for t in doc.event_trees:
             try:
-                rebuilt.add(request_hash(build_engine_request(doc, t.ref)))
+                base = build_engine_request(doc, t.ref)
             except Exception:
                 continue                       # 反构失败的树不入集合,不阻断其它树的匹配
+            cands = [base]
+            try:
+                iv = integrated_variant(doc, t.ref, base)
+                if iv is not None:
+                    cands.append(iv)
+            except Exception:
+                pass
+            for c in list(cands):
+                if c.get("boundary_condition_sets"):
+                    cands.append({k: v for k, v in c.items()
+                                  if k != "boundary_condition_sets"})
+            for c in cands:
+                try:
+                    rebuilt.add(request_hash(c))
+                except Exception:
+                    continue
         if computed_request_hash not in rebuilt:
             raise HTTPException(409, "结果与钉扎载荷不一致:计算所用请求无法从 project_payload "
-                                     "反构(PFD/初频/结构与画布不符),证据链拒绝绑定该结果。")
+                                     "反构(PFD/初频/结构/CCF/边界条件集定义与画布不符),"
+                                     "证据链拒绝绑定该结果。")
     fp = store.engine_fingerprint()
     settings = {**settings, "engine_fingerprint": fp}
+    # D-2:绑定强度显式标记——硬核验与仅落卷在案例与页脚可辨(监管口径:沉默即等同声明)。
     if computed_request_hash is not None:
         settings["request_hash"] = computed_request_hash
+        settings["request_hash_scheme"] = REQUEST_HASH_SCHEME
+        settings["pin_binding"] = "request_hash_verified"
+    else:
+        settings["pin_binding"] = "recorded_only"
+        settings["pin_binding_reason"] = "checked_set"   # 唯一跳绑通道(规格 §5 v2 候选)
     if resolved_settings is not None:
         settings["resolved_settings"] = resolved_settings
     store.ensure_project(project_uuid, name_hint or "项目")
@@ -203,7 +230,32 @@ def _pin_case(project_uuid: str, project_payload, kind: str, name_hint: str | No
     case_id = store.create_case(project_uuid, ver["id"], kind, settings=settings,
                                 results=results, audit_action=audit_action)
     return {"case_id": case_id, "version_id": ver["id"], "version_hash": ver["content_hash"],
-            "engine_version": store.engine_version(), "engine_fingerprint": fp}
+            "engine_version": store.engine_version(), "engine_fingerprint": fp,
+            "pin_binding": settings["pin_binding"]}
+
+
+def _single_resolved(req, dumped: dict, ie_ft_name: str | None,
+                     samples: int | None = None, seed: int | None = None,
+                     error_factor: float | None = None) -> dict:
+    """单树钉扎的 resolved_settings(收口二轮 D-1/D-3:'resolved' 名副其实)。
+
+    - bc 集**定义**与选中名同卷:重放免疫定义漂移(案例自含计算时刻的定义);
+      boundary_condition_effective = 按名解析出的生效 house 映射(未随请求携带定义的
+      异常调用方 → None,照记不伪造)。
+    - ie_fault_tree 块逐字落卷(集成通道:决定 Σλ·P 的树与 typed 参数)。"""
+    out: dict = {"house_states": req.house_states or {},
+                 "boundary_condition_set": req.boundary_condition_set,
+                 "boundary_condition_sets": dumped.get("boundary_condition_sets") or [],
+                 "ie_ft_name": ie_ft_name}
+    if req.boundary_condition_set:
+        out["boundary_condition_effective"] = next(
+            (b.get("house_states") for b in out["boundary_condition_sets"]
+             if b.get("name") == req.boundary_condition_set), None)
+    if dumped.get("ie_fault_tree"):
+        out["ie_fault_tree"] = dumped["ie_fault_tree"]
+    if samples is not None:
+        out.update({"samples": samples, "seed": seed, "error_factor": error_factor})
+    return out
 
 
 def _checked_set_trees(req) -> list:
@@ -212,6 +264,11 @@ def _checked_set_trees(req) -> list:
     from backend.et_builder import build_model_from_request
     if len(req.trees) < 1:
         raise HTTPException(400, "scope=checked_set 需要至少 1 棵勾选事件树(trees 为空)")
+    # 收口二轮 D-4:顶层边界条件在聚合路径同样不消费——静默忽略违反 O1「响亮拒绝」口径。
+    if req.house_states or req.boundary_condition_set:
+        raise HTTPException(400, "scope=checked_set 不支持顶层边界条件"
+                                 "(house_states/boundary_condition_set)——与逐树字段同拒,"
+                                 "绝不静默忽略分析设置")
     for t in req.trees:
         if t.house_states or t.boundary_condition_set:
             raise HTTPException(400, "勾选集聚合暂不支持逐树边界条件(house_states/boundary_condition_set)")
@@ -269,13 +326,10 @@ def api_report(req: schemas.ReportRequest, format: str = "docx", _=Depends(requi
         pin_settings = {"format": format, "samples": req.samples, "seed": req.seed,
                         "error_factor": req.error_factor, "scenario_name": req.scenario_name}
         pin_results = {"consequences": data["consequences"], "bands": data["bands"]}
-        # EB-02:computed_request_hash = 计算所用请求(dumped)的模型指纹。集成 LFT 通道的
-        # 反构含 IE 块分流,忠实重建为 v2 候选(规格 §5)→ 此路跳过一致性绑定,仅记指纹。
-        pin_request_hash = None if ie_ft_name else request_hash(dumped)
-        pin_resolved = {"house_states": req.house_states or {},
-                        "boundary_condition_set": req.boundary_condition_set,
-                        "ie_ft_name": ie_ft_name, "samples": req.samples, "seed": req.seed,
-                        "error_factor": req.error_factor}
+        # EB-02(收口二轮 F-3):集成通道同样哈希核验——指纹覆盖屏障侧 + ie 块语义,
+        # 反构侧由 _pin_case 生成 withIeFaultTree 同法则的集成变体。不再跳绑。
+        pin_request_hash = request_hash(dumped)
+        pin_resolved = _single_resolved(req, dumped, ie_ft_name)
     # ADR-2 自动钉扎:携带项目上下文的报告 → 版本(幂等)+ 分析案例 + 页脚证据链。
     evidence, case_id = None, None
     if req.project_uuid and req.project_payload is not None:
@@ -464,10 +518,9 @@ def api_event_tree_uncertainty(req: schemas.EtUncertaintyRequest, _=Depends(requ
                            settings={"samples": req.samples, "seed": req.seed, "error_factor": req.error_factor},
                            results=res, audit_action="analysis.uncertainty",
                            computed_request_hash=request_hash(dumped),
-                           resolved_settings={"house_states": req.house_states or {},
-                                              "boundary_condition_set": req.boundary_condition_set,
-                                              "ie_ft_name": None, "samples": req.samples,
-                                              "seed": req.seed, "error_factor": req.error_factor})
+                           resolved_settings=_single_resolved(req, dumped, None,
+                                                              samples=req.samples, seed=req.seed,
+                                                              error_factor=req.error_factor))
         res = {**res, "case": pinned}
     return res
 
@@ -491,9 +544,7 @@ def api_event_tree_importance(req: schemas.EtQuantifyRequest, _=Depends(require_
                                 settings={"method": "perturbation-exact"},
                                 results={"importance": imp}, audit_action="analysis.importance",
                                 computed_request_hash=request_hash(dumped),
-                                resolved_settings={"house_states": req.house_states or {},
-                                                   "boundary_condition_set": req.boundary_condition_set,
-                                                   "ie_ft_name": None})
+                                resolved_settings=_single_resolved(req, dumped, None))
     return out
 
 @app.get("/api/bess/library")

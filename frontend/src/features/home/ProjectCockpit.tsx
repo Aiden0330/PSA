@@ -117,7 +117,7 @@ export function ProjectCockpit(
             </div>
           ) : (
             <div className="psa-panel" style={{ padding: 8, fontSize: 12 }}>
-              {[...cases.map((c) => ({ t: c.created_at, node: `分析案例 #${c.id} · ${c.kind} · 引擎 ${c.engine_version}` })),
+              {[...cases.map((c) => ({ t: c.created_at, node: `分析案例 #${c.id} · ${c.kind} · 引擎 ${c.engine_version}${pinBindingLabel(c.settings_json)}` })),
                 ...versions.map((v) => ({ t: v.created_at, node: `版本 ${v.content_hash.slice(0, 8)} · ${v.origin === 'auto_pin' ? '报告钉扎' : v.origin === 'import' ? '导入' : '保存'}` }))]
                 .sort((a, b) => (a.t < b.t ? 1 : -1)).slice(0, 8)
                 .map((r, i) => (
@@ -142,6 +142,18 @@ export function ProjectCockpit(
       </div>
     </div>
   )
+}
+
+/** F3 收口二轮 D-2:绑定强度在台账可辨——硬核验(request_hash_verified)/仅落卷
+ *  (recorded_only,checked_set 聚合)/F3 之前的历史案例(无标记)三态不混同。 */
+function pinBindingLabel(settingsJson?: string): string {
+  if (!settingsJson) return ''
+  try {
+    const b = JSON.parse(settingsJson)?.pin_binding
+    if (b === 'request_hash_verified') return ' · 绑定已核验'
+    if (b === 'recorded_only') return ' · 绑定仅记录'
+  } catch { /* 旧案例/异形 settings:不标注,不臆造 */ }
+  return ''
 }
 
 const secHead: CSSProperties = { fontSize: 12, fontWeight: 700, color: 'var(--psa-muted)', textTransform: 'uppercase', letterSpacing: '.5px', margin: '0 0 8px 2px' }

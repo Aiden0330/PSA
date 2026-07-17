@@ -902,6 +902,17 @@ kbd{font-family:var(--mono);font-size:.82em;border:1px solid var(--line2);border
       触发器 <code>RAISE(ABORT)</code> 双保险,属性测试直接以裸 SQL 篡改并断言被拒;</li>
     <li><strong>分析案例</strong>:报告/不确定性/重要度运行自动钉扎 —— 绑定版本 id、引擎版本、完整设置与
       结果,报告产物再回写 sha256;</li>
+    <li><strong>钉扎一致性(EB-02)</strong>:计算所用请求的<strong>模型指纹</strong>(语义投影哈希:结构、
+      参数值与类型、CCF、边界条件集定义、集成初因树)必须能从钉扎载荷的 canonical 反构复现,不一致即
+      409 拒绝绑定;运行设置(house 覆盖、边界条件集<em>选择</em>、抽样 N/seed/EF)不入指纹,逐字记入案例
+      <code>resolved_settings</code>(重放 = 版本反构 + 设置叠加)。案例携带绑定强度标记
+      <code>pin_binding</code>(已核验 / 仅记录),页脚与台账同现——勾选集聚合暂为"仅记录"通道;</li>
+    <li><strong>模式版本口径</strong>:canonical 文档的 <code>schema_version</code> 是"解读本文档所需的最低
+      模式版本"(特征存在标记):仅当文档实际使用 v2 类型化 Q(t) 参数时标 "2.0",随内容升降,非格式代际
+      ——同一项目的版本史出现 1.0 与 2.0 交替属正常(加了 Weibull 参数再删除即回落),v1 存档哈希因此
+      永不受模式演进扰动。引擎指纹另含 <code>request_schema_version</code>、git 短哈希与基准语料哈希;
+      页脚 git 状态三态:干净(无标)/ <code>+dirty</code>(工作树有未提交改动)/ "git状态未知"
+      (探测失败,不伪装干净);</li>
     <li><strong>模型对比</strong>:两版本的规范文档按 UUID 对齐,输出 added/removed/changed(含参数值
       前后)——对标 RiskSpectrum Model Compare,前端报告页内置对比视图。</li>
   </ul>

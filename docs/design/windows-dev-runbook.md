@@ -188,6 +188,10 @@ npm --prefix frontend ci
 ### 2.4 中文编码注意
 
 - **源码一律 UTF-8**:仓库文件已是 UTF-8,git 会原样保留,勿让编辑器改存 GBK。
+- **克隆前设 `git config core.autocrlf false`**(或 `--global core.autocrlf input`):
+  引擎指纹的 `benchmark_corpus_version` 按语料文件**原始字节**哈希——autocrlf=true 检出
+  会把 `tests/benchmark/` 语料换行改写为 CRLF,同一套语料在 Windows 上得出不同指纹,
+  报告页脚与 macOS/CI 不可对账(F3 收口二轮 F-5 备注)。
 - **后端响应无需担心**:`backend/app.py` 用 `UTF8JSONResponse` 强制
   `application/json; charset=utf-8`(约束 #6),CSV 导出也带 `charset=utf-8`,
   客户端不会因编码乱码。

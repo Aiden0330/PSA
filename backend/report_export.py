@@ -123,8 +123,19 @@ def build_report_data(model, et_name: str = "TR", *, ie_ft_name: str | None = No
                        sorted(fv.items(), key=lambda kv: kv[1], reverse=True)[:top_n]],
         }
 
+    # 收口二轮 D-7:分析设置入正文——单份报告(不查案例库)也答得出"这些数在什么
+    # 边界条件/抽样设置下算的"。逐项与本次计算实际消费的入参同源。
+    parts = [f"抽样 N={samples} seed={seed} EF={error_factor}"]
+    if house_states:
+        parts.append("house 覆盖 " + ", ".join(
+            f"{k}={'True' if v else 'False'}" for k, v in sorted(house_states.items())))
+    if boundary_condition_set:
+        parts.append(f"边界条件集「{boundary_condition_set}」")
+    if integrated:
+        parts.append(f"初因源=故障树({ie_ft_name})")
     out = {"consequences": {c: float(cons.get(c, 0.0)) for c in _SEV}, "bands": bands,
-           "importance": imp, "consequence_defs": consequence_out, "sequences": sequences, "fta": fta}
+           "importance": imp, "consequence_defs": consequence_out, "sequences": sequences, "fta": fta,
+           "analysis_settings_note": "分析设置:" + " · ".join(parts)}
     if integrated_note:
         out["integrated_note"] = integrated_note
     return out
@@ -209,13 +220,21 @@ def _is_signed(evidence: dict | None) -> bool:
 
 def _evidence_line(ev: dict) -> str:
     """ADR-2 证据链页脚:报告数字 → 分析案例 → 版本哈希 → 引擎指纹(→ 签发行,Phase 5)。
-    F3 阶段 3:引擎版本后附 git 短哈希(+dirty),使"哪套代码算出这个数"可追溯。"""
+    F3 阶段 3:引擎版本后附 git 短哈希(+dirty;收口二轮 D-6:状态探测失败 ≠ 干净,
+    标"git状态未知")。收口二轮 D-2:绑定强度显式可辨——硬核验(request_hash_verified)
+    与仅落卷(recorded_only,checked_set 聚合)在页脚措辞不同,沉默不得造成等同声明。"""
     eng = f"引擎 bess-psa {ev['engine_version']}"
     fp = ev.get("engine_fingerprint") or {}
     if fp.get("git_sha") and fp["git_sha"] != "unknown":
-        eng += f"@{fp['git_sha']}" + ("+dirty" if fp.get("dirty") else "")
+        d = fp.get("dirty")
+        eng += f"@{fp['git_sha']}" + ("+dirty" if d else ("(git状态未知)" if d is None else ""))
     base = (f"评价依据:分析案例 #{ev['case_id']} · 模型版本 {ev['version_hash'][:8]}"
             f" · {eng} · {ev['created_at']}")
+    binding = ev.get("pin_binding")
+    if binding == "request_hash_verified":
+        base += " · 模型绑定已核验"
+    elif binding == "recorded_only":
+        base += " · 模型绑定仅记录(未经请求一致性核验)"
     so = ev.get("signoff")
     if so:
         return base + f" · 签发 {so['signer']} {str(so['signed_at'])[:10]}"
@@ -232,6 +251,8 @@ def report_csv(data: dict, evidence: dict | None = None) -> bytes:
     if agg:   # spec A §2.4:CSV 口径元数据行(scope + n 树 + 场景名)
         w.writerow(["# 口径", "勾选集聚合", f"{agg['tree_count']} 树",
                     "、".join(s["name"] for s in agg["scenarios"])])
+    if data.get("analysis_settings_note"):        # 收口二轮 D-7:设置披露入正文
+        w.writerow([f"# {data['analysis_settings_note']}"])
     w.writerow(["后果", "内涵", "点估计/yr", "p05", "p50", "p95"])
     for c in _SEV:
         b = data["bands"].get(c, {})
@@ -292,6 +313,8 @@ def report_docx(data: dict, scenario_name: str, tree_png: bytes | None,
     doc.add_paragraph(f"场景:{scenario_name}")
     if agg:   # spec A §2.4:scope 标识不能只靠页脚 —— 标题 + 口径行 + C1–C5 表标题同现
         doc.add_paragraph(f"口径:{mark} — " + "、".join(s["name"] for s in agg["scenarios"]))
+    if data.get("analysis_settings_note"):        # 收口二轮 D-7:设置披露入正文
+        doc.add_paragraph(data["analysis_settings_note"])
     if not _is_signed(evidence):
         doc.add_paragraph(f"⚠ {_WORKING_MARK}")
 
@@ -422,6 +445,8 @@ def report_pdf(data: dict, scenario_name: str, tree_png: bytes | None,
     if agg:   # §2.4:scope 标识不能只靠页脚
         names = "、".join(s["name"] for s in agg["scenarios"]) if cn else ", ".join(s["name"] for s in agg["scenarios"])
         story += [Paragraph((f"口径:{mark} — {names}" if cn else f"Scope: {mark} — {names}"), nm), Spacer(1, 4)]
+    if data.get("analysis_settings_note"):        # 收口二轮 D-7:设置披露入正文
+        story += [Paragraph(data["analysis_settings_note"], nm), Spacer(1, 4)]
     if not _is_signed(evidence):
         story += [Paragraph(f"⚠ {_WORKING_MARK}" if cn else "WORKING COPY — NOT SIGNED OFF", nm),
                   Spacer(1, 8)]

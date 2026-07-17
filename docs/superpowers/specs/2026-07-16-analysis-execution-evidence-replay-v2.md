@@ -154,3 +154,27 @@ Q(t) 为当前概率标量)。
   EB-08 models.py:62 三 kind + engine_request.py:72 仅 value);集成 uncertainty/importance
   引擎侧确不存在(必须拒而非回退);EB-01 薄片(report 透传既有继承的 house_states)确认为
   最便宜止血点。
+- **round-1(2026-07-16,阶段 2+3 收口,Fable 裁决)**:Opus 实现(`17f209e`/`620299a`)经
+  engine-reviewer(FAIL:F-1..F-5)+ domain-reviewer(有条件通过:D-1..D-7)双审后,收口
+  二轮修复裁定如下,**为本规格 §2.3 的最终口径(取代字面稿)**:
+  1. **request_hash = 语义投影白名单**(与 et_builder 消费面同源),非黑名单+去空:呈现
+     字段(节点 label、树内 name)天然出局,param_ref 自引用规范化,数字统一 float。
+     初版黑名单法对真实编辑流(每个用户新增门带 `label:'中间事件'`)一律 409 误拒(F-2)。
+  2. **模型身份 ↔ 运行设置分工**(domain-reviewer 裁可):house_states / bc **选择名** /
+     samples/seed/EF 不入指纹,逐字记入 resolved_settings;重放 = 钉扎版本反构 +
+     resolved_settings 叠加。**bc 集定义是模型内容**:入指纹 + 入 canonical 正文
+     (`EventTree.boundary_condition_sets`,缺省不落盘守铁律)+ 选中时效果映射落卷(F-1/D-1
+     三重逃逸收口)。前端仅在选中时携带定义 → 比对侧生成带/不带定义双变体。
+  3. **集成 LFT 钉扎转硬核验**(F-3):ie 块语义(树+typed 参数)入指纹、标量 init_frequency
+     (引擎忽略)出局;反构侧 `integrated_variant` 按 withIeFaultTree 同法则(freq_source=ft
+     + `__init__` 树 + ie 独占参数分流)生成集成变体。唯一残留跳绑通道 = checked_set(§5)。
+  4. **绑定强度显式标记**(D-2):案例 settings `pin_binding: request_hash_verified |
+     recorded_only`(+reason),页脚与台账可辨;历史案例无标记=第三态。
+  5. **typed 键提升按 kind 门控**(F-4):gamma/alpha/beta/t0 仅当 kind∈四 Q(t) 类才离开
+     extra 残渣——v1 kind 参数带同名杂散键的存档哈希逐位不变、非数值注记不再 ValidationError。
+  6. **前端参数直传**(F-2b,活路径数值修正):toEngineRequest 不再把 typed 参数压平为
+     `{value}`——rate λ=1e-5/MTTR=24 的活路径 q 由 λ(24× 低估)修正为 λ·MTTR=2.4e-4;
+     probability/无 kind 维持 `{value}` 零扰动。canonical staggered CCF 字段同批收编。
+  7. 周边:checked_set 顶层边界条件 400(D-4);页脚 dirty=None 标"git状态未知"(D-6);
+     报告正文披露分析设置行(D-7);G5 补 house 叠加重放锚(D-5)。
+  锚点:tests/backend/test_execution_replay_v2_r2.py(22,先红后绿)+ vitest typed 直传 3。
