@@ -87,13 +87,19 @@ def build_report_data(model, et_name: str = "TR", *, ie_ft_name: str | None = No
         _contrib.setdefault(s["consequence"], []).append(s["frequency"])
     cons: dict[str, float] = {c: fsum(v) for c, v in _contrib.items()}
     if integrated:
-        # 集成模式:MC 不确定性/屏障重要度为 v2 候选(引擎无 integrated 变体)——
-        # 带退化为点值(p05=p50=p95=点估计,非零伪 spread),报告注记说明。
-        bands = {c: {"p05": float(cons.get(c, 0.0)), "p50": float(cons.get(c, 0.0)),
-                     "p95": float(cons.get(c, 0.0))} for c in _SEV}
-        imp = {}
-        integrated_note = ("集成模式(序列级 LFT):点估计频率精确;MC 不确定性带与屏障重要度"
-                           "为 v2 候选,本报告分位列显示点值(非抽样区间)。")
+        # banked 集成 MC/重要度落地(A9):真实 MC 带 + 扰动重要度——退化点值带与
+        # "非抽样区间"注记退役(banked 规格 §4 清单第 3 条)。
+        from psaengine.eta.uncertainty import (barrier_importance_exact_integrated,
+                                               event_tree_uncertainty_integrated)
+        unc = event_tree_uncertainty_integrated(
+            model, et_name, ie_ft_name, samples=samples, seed=seed,
+            error_factor=error_factor, house_states=house_states,
+            boundary_condition_set=boundary_condition_set)
+        imp = barrier_importance_exact_integrated(
+            model, et_name, ie_ft_name, house_states=house_states,
+            boundary_condition_set=boundary_condition_set)
+        bands = unc["bands"]
+        integrated_note = None
     else:
         unc = event_tree_uncertainty(model, et_name, samples=samples, seed=seed,
                                      error_factor=error_factor, house_states=house_states,

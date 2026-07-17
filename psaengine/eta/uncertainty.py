@@ -194,3 +194,119 @@ def barrier_importance_exact(model: Model, et_name: str,
         rows.sort(key=lambda x: -x["fv"])
         out[c] = rows
     return out
+
+
+# ── 集成 LFT 模式(banked 规格 2026-07-16-integrated-mc-uncertainty-importance)──
+
+def event_tree_uncertainty_integrated(model: Model, et_name: str, ie_ft_name: str = "__init__",
+                                      *, samples: int = 1000, seed: int = 42,
+                                      error_factor: float = 3.0,
+                                      house_states: dict | None = None,
+                                      boundary_condition_set: str | None = None) -> dict:
+    """集成模式 MC:rate(s) = Σᵢ λᵢ·P(Eᵢ∧Path_s) 逐样本重算,出 p05/p50/p95。
+
+    语义(规格 S1–S8):按参数 **ref** 排序联合抽样、单一 RNG 流(SOKC,与单树/聚合
+    批次 F 同法则);**量纲分流**:frequency 类 ref 只截 [0,∞) 上不封顶(λ 中位 0.8/yr
+    EF3 的 p95 就该是 2.4/yr),probability/Q(t) 类截 [0,1];初因 λᵢ 入带(S3——IE-FT
+    模式的 λ 是带认知不确定性的库参数);Q(t) 谱施于 unavailability(S4);逐样本后果
+    Σ 用 fsum(批次 F S-B 口径);点估计 = quantify_event_tree_integrated 逐位同源。"""
+    from psaengine.eta.sequence import (_build_integrated,
+                                        quantify_event_tree_integrated)
+    _validate_mc_params(samples, error_factor)
+    et, m, fe_bdd, initiators, q_base, big, params = _build_integrated(
+        model, et_name, ie_ft_name, house_states, boundary_condition_set)
+    seq_pairs = []                                  # (consequence, path_expr)
+    for seq in et.sequences:
+        expr = m.one
+        for fe_id, branch in seq["path"].items():
+            g = fe_bdd[fe_id]
+            expr = m.apply_and(expr, g if branch == "failure" else m.apply_not(g))
+        seq_pairs.append((et.consequence_of(seq["end_state"]), expr))
+    # 联合 ref 空间 = P 侧(非频率底事件)∪ λ 侧;中位:频率取 .value,其余 unavailability()
+    ref_of = {bb: big.nodes[bb].param_ref for bb in q_base}
+    lam_ref = {init: big.nodes[init].param_ref for init, _, _ in initiators}
+    median_by_ref: dict[str, float] = {}
+    freq_refs: set[str] = set()
+    for ref in set(ref_of.values()):
+        median_by_ref[ref] = params.get(ref).unavailability()
+    for init, lam, _ in initiators:
+        r = lam_ref[init]
+        median_by_ref[r] = params.get(r).value      # λ 本值(频率语境,勿走 unavailability 护栏)
+        freq_refs.add(r)
+    refs = sorted(median_by_ref)
+    rng = np.random.default_rng(seed)
+    sigma = log(error_factor) / 1.645 if error_factor > 1 else 0.0
+    series = {c: np.zeros(samples) for c in _CLASSES}
+    for i in range(samples):
+        if sigma > 0:
+            sampled = {}
+            for ref in refs:
+                mu = median_by_ref[ref]
+                if mu <= 0:
+                    sampled[ref] = 0.0
+                    continue
+                draw = float(np.exp(rng.normal(log(mu), sigma)))
+                sampled[ref] = draw if ref in freq_refs else float(np.clip(draw, 0.0, 1.0))
+        else:
+            sampled = {ref: median_by_ref[ref] for ref in refs}
+        q_s = {bb: sampled[ref] for bb, ref in ref_of.items()}
+        contribs: dict[str, list] = {}
+        for c, expr in seq_pairs:
+            contribs.setdefault(c, []).append(fsum(
+                sampled[lam_ref[init]] * exact_probability(m, m.apply_and(e_bdd, expr), q_s)
+                for init, _, e_bdd in initiators))
+        for c in _CLASSES:
+            series[c][i] = fsum(contribs.get(c, ()))
+    point = quantify_event_tree_integrated(model, et_name, ie_ft_name,
+                                           house_states=house_states,
+                                           boundary_condition_set=boundary_condition_set)["consequences"]
+    bands = {c: {"p05": float(np.percentile(series[c], 5)),
+                 "p50": float(np.percentile(series[c], 50)),
+                 "p95": float(np.percentile(series[c], 95))} for c in _CLASSES}
+    return {"point": {c: float(point.get(c, 0.0)) for c in _CLASSES}, "bands": bands}
+
+
+def barrier_importance_exact_integrated(model: Model, et_name: str, ie_ft_name: str = "__init__",
+                                        *, house_states: dict | None = None,
+                                        boundary_condition_set: str | None = None) -> dict:
+    """集成模式扰动法屏障重要度:FV=(R−R|必有效)/R、RAW=R|必失效/R,R = 集成后果率。
+    强制功能事件顶 BDD(fe_bdd → 常量),与普通通道语义逐字对齐;IE 树内部事件不扰动
+    (初因贡献另有频率通道 by_initiator);R=0 记 0、良性后果 FV 可负 RAW 可 <1 照旧。"""
+    from psaengine.eta.sequence import _build_integrated
+    et, m, fe_bdd, initiators, q_s, big, params = _build_integrated(
+        model, et_name, ie_ft_name, house_states, boundary_condition_set)
+
+    def cons_with(overrides: dict | None) -> dict:
+        fb = dict(fe_bdd)
+        if overrides:
+            for fid, mode in overrides.items():
+                fb[fid] = m.one if mode == "fail" else m.zero
+        contribs: dict[str, list] = {}
+        for seq in et.sequences:
+            expr = m.one
+            for fe_id, branch in seq["path"].items():
+                g = fb[fe_id]
+                expr = m.apply_and(expr, g if branch == "failure" else m.apply_not(g))
+            rate = fsum(lam * exact_probability(m, m.apply_and(e_bdd, expr), q_s)
+                        for _, lam, e_bdd in initiators)
+            contribs.setdefault(et.consequence_of(seq["end_state"]), []).append(rate)
+        return {c: fsum(v) for c, v in contribs.items()}
+
+    base = cons_with(None)
+    pert = {}
+    for fe in et.functional_events:
+        pert[(fe.id, "work")] = cons_with({fe.id: "work"})
+        pert[(fe.id, "fail")] = cons_with({fe.id: "fail"})
+    out: dict[str, list] = {}
+    for c in _CLASSES:
+        R = base.get(c, 0.0)
+        rows = []
+        for fe in et.functional_events:
+            rw = pert[(fe.id, "work")].get(c, 0.0)
+            rf = pert[(fe.id, "fail")].get(c, 0.0)
+            rows.append({"barrier": fe.id,
+                         "fv": float((R - rw) / R) if R > 0 else 0.0,
+                         "raw": float(rf / R) if R > 0 else 0.0})
+        rows.sort(key=lambda x: -x["fv"])
+        out[c] = rows
+    return out

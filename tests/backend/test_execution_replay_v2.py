@@ -138,19 +138,31 @@ def test_G2_report_honors_house_states():
         f"报告 C5={cc.get('C5')} 应={q_on['C5']}(house 被忽略即回退 off 值 {q_off['C5']})"
 
 
-# ── G3:集成模式 uncertainty/importance 响亮拒绝(不回退普通 ETA)──────────────
+# ── G3(翻转):集成 uncertainty/importance 已落地——200 + 形状锁,防回退 422 ──────
+# banked 规格 2026-07-16-integrated-mc-uncertainty-importance §4 清单第 4 条:实现落地时
+# 本组由"拒绝锁"翻转为"通道活锁"。回退普通 ETA 的判别改由数值承担:anchor-C 标量初频
+# 故意为 0.0——普通通道回退会得全 0 带,集成 Σλ·P 锚在 2e-4 量级。
 
-def test_G3_integrated_uncertainty_rejected_not_fallback():
-    req = _anchor_c_report_req()
+def test_G3_integrated_uncertainty_live_not_fallback():
+    req = {**_anchor_c_report_req(), "samples": 400, "seed": 5}
     r = client.post("/api/event-tree/uncertainty", json=req)
-    assert r.status_code == 422, f"集成 uncertainty 应 422,得 {r.status_code}: {r.text[:200]}"
-    assert "集成" in r.text or "integrated" in r.text.lower()
+    assert r.status_code == 200, f"集成 uncertainty 应已解冻 200,得 {r.status_code}: {r.text[:200]}"
+    body = r.json()
+    assert body["point"]["C3"] == pytest.approx(2e-4, rel=1e-9)
+    b = body["bands"]["C3"]
+    assert b["p05"] < b["p95"], "真实 MC 带(非退化点值)"
+    assert 2e-4 * 0.3 <= b["p50"] <= 2e-4 * 3.0
 
 
-def test_G3_integrated_importance_rejected_not_fallback():
+def test_G3_integrated_importance_live_not_fallback():
     req = _anchor_c_report_req()
     r = client.post("/api/event-tree/importance", json=req)
-    assert r.status_code == 422, f"集成 importance 应 422,得 {r.status_code}: {r.text[:200]}"
+    assert r.status_code == 200, f"集成 importance 应已解冻 200,得 {r.status_code}"
+    rows = r.json()["importance"]["C3"]
+    fe = next(x for x in rows if x["barrier"] == "FE_B")
+    # anchor-C 共享 S:base = λ·P(S) = 强制失效值 → RAW=1(合并 BDD 扰动;独立近似给不出)
+    assert fe["raw"] == pytest.approx(1.0, rel=1e-9)
+    assert fe["fv"] == pytest.approx(1.0, abs=1e-12)
 
 
 # ── G9:single scope 零扰动(回归锁)──────────────────────────────────────────

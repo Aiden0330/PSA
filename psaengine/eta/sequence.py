@@ -208,13 +208,15 @@ def _build_integrated(model: Model, et_name: str, ie_ft_name: str,
     q = {bb: params.get(big.nodes[bb].param_ref).unavailability()
          for bb in all_basics
          if params.get(big.nodes[bb].param_ref).kind != "frequency"}
-    return et, m, fe_bdd, initiators, q
+    # 集成 MC(banked 规格 S1-S3)需要 ref 映射与参数库:big/params 一并返回
+    # (内部函数,唯一既有调用方 _integrated_rows 同步解包)。
+    return et, m, fe_bdd, initiators, q, big, params
 
 
 def _integrated_rows(model: Model, et_name: str, ie_ft_name: str,
                      house_states: dict[str, bool] | None,
                      boundary_condition_set: str | None) -> tuple[list[dict], float]:
-    et, m, fe_bdd, initiators, q = _build_integrated(
+    et, m, fe_bdd, initiators, q, _big, _params = _build_integrated(
         model, et_name, ie_ft_name, house_states, boundary_condition_set)
     rows: list[dict] = []
     for seq in et.sequences:

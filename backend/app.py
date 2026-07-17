@@ -502,16 +502,22 @@ def api_event_tree_uncertainty(req: schemas.EtUncertaintyRequest, _=Depends(requ
                                                   "seed": req.seed, "error_factor": req.error_factor})
             res = {**res, "case": pinned}
         return res
-    # F3 阶段 1(EB-01/G3):集成 LFT 模式无 MC 不确定性变体 → 响亮 422,绝不回退普通 ETA
-    # (回退=对集成模型报错误的不确定性带)。v2 候选见 LFT 规格 §6。
-    if req.ie_fault_tree:
-        raise HTTPException(422, "集成 LFT 模式(ie_fault_tree)的 MC 不确定性为 v2 候选,尚未实现;"
-                                 "不回退普通 ETA。点估计频率请用 /api/event-tree/quantify 或报告。")
     dumped = req.model_dump()
     model = build_model_from_request(dumped)
-    res = event_tree_uncertainty(model, "TR", samples=req.samples, seed=req.seed, error_factor=req.error_factor,
-                                 house_states=req.house_states or None,
-                                 boundary_condition_set=req.boundary_condition_set)
+    # banked 集成 MC 落地(A8):ie_fault_tree ⇒ 集成通道(按 ref 联合抽样、λ 入带、
+    # 量纲分流),与普通通道同输出形;此前 422(F3 阶段 1 止血)。
+    from backend.execution import resolve_ie_ft_name
+    ie_ft = resolve_ie_ft_name(dumped.get("ie_fault_tree"))
+    if ie_ft is not None:
+        from psaengine.eta.uncertainty import event_tree_uncertainty_integrated
+        res = event_tree_uncertainty_integrated(
+            model, "TR", ie_ft, samples=req.samples, seed=req.seed,
+            error_factor=req.error_factor, house_states=req.house_states or None,
+            boundary_condition_set=req.boundary_condition_set)
+    else:
+        res = event_tree_uncertainty(model, "TR", samples=req.samples, seed=req.seed, error_factor=req.error_factor,
+                                     house_states=req.house_states or None,
+                                     boundary_condition_set=req.boundary_condition_set)
     if req.project_uuid and req.project_payload is not None:   # 4a4:不确定性运行钉扎为案例
         from backend.execution import request_hash
         pinned = _pin_case(req.project_uuid, req.project_payload, "uncertainty", req.scenario_name,
@@ -528,15 +534,20 @@ def api_event_tree_uncertainty(req: schemas.EtUncertaintyRequest, _=Depends(requ
 def api_event_tree_importance(req: schemas.EtQuantifyRequest, _=Depends(require_role(*ANALYST))):
     """扰动法屏障级 FV/RAW 重要度(按后果)。"""
     from backend.et_builder import build_model_from_request
-    from psaengine.eta.uncertainty import barrier_importance_exact
-    # F3 阶段 1(EB-01/G3):集成 LFT 模式无屏障重要度变体 → 响亮 422,绝不回退普通 ETA。
-    if req.ie_fault_tree:
-        raise HTTPException(422, "集成 LFT 模式(ie_fault_tree)的屏障重要度为 v2 候选,尚未实现;"
-                                 "不回退普通 ETA。")
+    from psaengine.eta.uncertainty import (barrier_importance_exact,
+                                           barrier_importance_exact_integrated)
     dumped = req.model_dump()
     model = build_model_from_request(dumped)
-    imp = barrier_importance_exact(model, "TR", house_states=req.house_states or None,
-                                   boundary_condition_set=req.boundary_condition_set)
+    # banked 集成重要度落地(A8):扰动语义与普通通道逐字对齐,R = 集成后果率;此前 422。
+    from backend.execution import resolve_ie_ft_name
+    ie_ft = resolve_ie_ft_name(dumped.get("ie_fault_tree"))
+    if ie_ft is not None:
+        imp = barrier_importance_exact_integrated(
+            model, "TR", ie_ft, house_states=req.house_states or None,
+            boundary_condition_set=req.boundary_condition_set)
+    else:
+        imp = barrier_importance_exact(model, "TR", house_states=req.house_states or None,
+                                       boundary_condition_set=req.boundary_condition_set)
     out: dict = {"importance": imp}
     if req.project_uuid and req.project_payload is not None:   # 4a4:重要度运行钉扎为案例
         from backend.execution import request_hash
