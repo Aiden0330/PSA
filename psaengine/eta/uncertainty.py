@@ -1,5 +1,5 @@
 from __future__ import annotations
-from math import isfinite, log
+from math import fsum, isfinite, log
 import numpy as np
 from psaengine.model.model import Model
 from psaengine.quantify.probability import exact_probability
@@ -22,9 +22,13 @@ def event_tree_uncertainty(model: Model, et_name: str, samples: int = 1000,
                            seed: int = 42, error_factor: float = 3.0,
                            house_states: dict | None = None,
                            boundary_condition_set: str | None = None) -> dict:
-    """对各底事件做对数正态(median=nominal, EF)采样, 建一次 BDD 只重算概率,
-    给每个后果 C1–C5 出 p05/p50/p95 + 点估计。共享底事件一次采样 → 自动相关。
-    init_frequency 视为定值。边界条件同 quantify_event_tree(4a2)。"""
+    """对数正态(median=nominal, EF)采样,建一次 BDD 只重算概率,每后果出 p05/p50/p95。
+
+    批次 F(规格 2026-07-17 S-A,SOKC 修正):抽样单位 = **参数 ref**(refs 排序、单一
+    RNG 流、每迭代一个联合向量)——同 ref 的多个底事件节点共享同一次抽样(认知同源相关,
+    与 aggregate 同法则)。修正前按节点独立抽:同参数冗余通道被当独立认知源,上分位非
+    保守收窄 ~1.9×(判别例 p95 0.047 vs 0.09)。init_frequency 视为定值(标量无分布;
+    频率参数入带属集成 MC 规格 S3)。逐样本后果 Σ 用 fsum(S-B)。"""
     _validate_mc_params(samples, error_factor)
     b = _build_event_tree(model, et_name, house_states, boundary_condition_set)
     et, big, m, all_basics, fe_bdd = b.et, b.big, b.m, b.all_basics, b.fe_bdd
@@ -35,21 +39,24 @@ def event_tree_uncertainty(model: Model, et_name: str, samples: int = 1000,
             g = fe_bdd[fe_id]
             expr = m.apply_and(expr, g if branch == "failure" else m.apply_not(g))
         seq_exprs.append((et.consequence_of(seq["end_state"]), expr))
-    medians = {bb: b.params.get(big.nodes[bb].param_ref).unavailability() for bb in all_basics}
+    ref_of = {bb: big.nodes[bb].param_ref for bb in all_basics}
+    median_by_ref = {ref: b.params.get(ref).unavailability() for ref in set(ref_of.values())}
+    refs = sorted(median_by_ref)              # 确定序 → 与 aggregate 同流,可复现
     rng = np.random.default_rng(seed)
     sigma = log(error_factor) / 1.645 if error_factor > 1 else 0.0
     series = {c: np.zeros(samples) for c in _CLASSES}
     for i in range(samples):
         if sigma > 0:
-            q = {bb: float(np.clip(np.exp(rng.normal(log(mu), sigma)), 0.0, 1.0)) if mu > 0 else 0.0
-                 for bb, mu in medians.items()}
+            sampled = {ref: (float(np.clip(np.exp(rng.normal(log(median_by_ref[ref]), sigma)), 0.0, 1.0))
+                             if median_by_ref[ref] > 0 else 0.0) for ref in refs}
         else:
-            q = dict(medians)
-        cons: dict[str, float] = {}
+            sampled = {ref: median_by_ref[ref] for ref in refs}
+        q = {bb: sampled[ref] for bb, ref in ref_of.items()}
+        contribs: dict[str, list] = {}
         for c, expr in seq_exprs:
-            cons[c] = cons.get(c, 0.0) + et.init_frequency * exact_probability(m, expr, q)
+            contribs.setdefault(c, []).append(et.init_frequency * exact_probability(m, expr, q))
         for c in _CLASSES:
-            series[c][i] = cons.get(c, 0.0)
+            series[c][i] = fsum(contribs.get(c, ()))
     point = quantify_event_tree(model, et_name, house_states=house_states,
                                 boundary_condition_set=boundary_condition_set)["consequences"]
     bands = {c: {"p05": float(np.percentile(series[c], 5)),
@@ -135,23 +142,25 @@ def aggregate_event_tree_uncertainty(specs: list, samples: int = 1000,
                              if median_by_ref[ref] > 0 else 0.0) for ref in refs}
         else:
             sampled = {ref: median_by_ref[ref] for ref in refs}
-        totals = {c: 0.0 for c in _CLASSES}
-        for t in trees:                        # 同一抽样施加到全部树,逐级相加
+        contribs: dict[str, list] = {}
+        for t in trees:                        # 同一抽样施加到全部树,逐级相加(fsum,S-B)
             q = {bb: sampled[ref] for bb, ref in t["ref_of"].items()}
             for c, expr in t["seq_exprs"]:
-                totals[c] += t["init_frequency"] * exact_probability(t["m"], expr, q)
+                contribs.setdefault(c, []).append(
+                    t["init_frequency"] * exact_probability(t["m"], expr, q))
         for c in _CLASSES:
-            series[c][i] = totals[c]
+            series[c][i] = fsum(contribs.get(c, ()))
 
-    point = {c: 0.0 for c in _CLASSES}
+    point_contrib: dict[str, list] = {c: [] for c in _CLASSES}
     per_tree: list[dict] = []
-    for model, et_name in specs:               # 点估计 = 逐树精确后果求和;per_tree 供钉扎分解
+    for model, et_name in specs:               # 点估计 = 逐树精确后果求和(fsum);per_tree 供钉扎分解
         cons = quantify_event_tree(model, et_name, house_states=house_states,
                                    boundary_condition_set=boundary_condition_set)["consequences"]
         row = {c: float(cons.get(c, 0.0)) for c in _CLASSES}
         per_tree.append(row)
         for c in _CLASSES:
-            point[c] += row[c]
+            point_contrib[c].append(row[c])
+    point = {c: fsum(point_contrib[c]) for c in _CLASSES}
     bands = {c: {"p05": float(np.percentile(series[c], 5)),
                  "p50": float(np.percentile(series[c], 50)),
                  "p95": float(np.percentile(series[c], 95))} for c in _CLASSES}

@@ -58,8 +58,11 @@ def test_mgl_m2_equals_beta_model():
 
 
 def test_group_size_cap():
+    # 批次 F(2026-07-17,P-8):上限 6 → 8——alpha/phi 到 8,MGL 词汇止 ρ₇ 上限 7
+    # 点名拒绝(锚点 tests/unit/test_mc_sokc_fsum_ccf8.py C1-C7),9 起仍响亮拒绝。
+    q_levels("mgl", {"beta": 0.1}, 7, QT)          # 不再触发护栏
     with pytest.raises(ValueError):
-        q_levels("mgl", {"beta": 0.1}, 7, QT)
+        q_levels("mgl", {"beta": 0.1}, 9, QT)
 
 
 # ── 展开结构 ──

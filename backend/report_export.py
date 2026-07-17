@@ -80,9 +80,12 @@ def build_report_data(model, et_name: str = "TR", *, ie_ft_name: str | None = No
     from backend.execution import point_sequences
     integrated = ie_ft_name is not None
     all_seqs = point_sequences(model, et_name, ie_ft_name, house_states, boundary_condition_set)
-    cons: dict[str, float] = {}
+    # 批次 F(S-B):fsum ⇒ 与 quantify 通道逐位同源(此前降序累加 vs 树序差末位 ULP,试点 P-1)
+    from math import fsum
+    _contrib: dict[str, list] = {}
     for s in all_seqs:
-        cons[s["consequence"]] = cons.get(s["consequence"], 0.0) + s["frequency"]
+        _contrib.setdefault(s["consequence"], []).append(s["frequency"])
+    cons: dict[str, float] = {c: fsum(v) for c, v in _contrib.items()}
     if integrated:
         # 集成模式:MC 不确定性/屏障重要度为 v2 候选(引擎无 integrated 变体)——
         # 带退化为点值(p05=p50=p95=点估计,非零伪 spread),报告注记说明。

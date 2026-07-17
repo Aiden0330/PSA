@@ -285,6 +285,8 @@ def _plain_model():
 
 
 def test_A7_plain_uncertainty_characterization_lock():
+    # 注记(批次 F engine-review F-5):本锁在 SOKC 改按 ref 抽样后值恰不变,系 fixture 的
+    # 节点序 == 排序 ref 序(实测验证);若未来加入错位命名参数,RNG 流将变 → 按迁移规程重冻。
     from psaengine.eta.uncertainty import event_tree_uncertainty
     u = event_tree_uncertainty(_plain_model(), "TR", samples=200, seed=42, error_factor=3.0)
     b = u["bands"]["C2"]

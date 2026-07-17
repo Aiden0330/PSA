@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from math import fsum
 from psaengine.model.model import Model
 from psaengine.model.pdag import PDAG
 from psaengine.bdd.kernel import BddManager, build_from_pdag
@@ -92,8 +93,10 @@ def quantify_event_tree(model: Model, et_name: str, fe_overrides: dict | None = 
             fe_bdd[fid] = m.one if mode == "fail" else m.zero
     q = {bb: b.params.get(big.nodes[bb].param_ref).unavailability() for bb in all_basics}
 
-    seq_freq: dict[str, float] = {}
-    cons_freq: dict[str, float] = {}
+    # 批次 F(规格 2026-07-17 S-B):ET 级 Σ 一律 math.fsum(正确舍入 ⇒ 序无关)——
+    # quantify 与报告通道从此逐位同源(试点 P-1:此前树序 vs 频率降序差末位 ULP)。
+    seq_contrib: dict[str, list] = {}
+    cons_contrib: dict[str, list] = {}
     for seq in et.sequences:
         expr = m.one
         for fe_id, branch in seq["path"].items():
@@ -101,10 +104,10 @@ def quantify_event_tree(model: Model, et_name: str, fe_overrides: dict | None = 
             expr = m.apply_and(expr, g if branch == "failure" else m.apply_not(g))
         p = exact_probability(m, expr, q)
         freq = et.init_frequency * p
-        seq_freq[seq["end_state"]] = seq_freq.get(seq["end_state"], 0.0) + freq
-        cls = et.consequence_of(seq["end_state"])
-        cons_freq[cls] = cons_freq.get(cls, 0.0) + freq
-    return {"sequences": seq_freq, "consequences": cons_freq}
+        seq_contrib.setdefault(seq["end_state"], []).append(freq)
+        cons_contrib.setdefault(et.consequence_of(seq["end_state"]), []).append(freq)
+    return {"sequences": {k: fsum(v) for k, v in seq_contrib.items()},
+            "consequences": {k: fsum(v) for k, v in cons_contrib.items()}}
 
 
 # ── 序列级完整 LFT 集成(规格 2026-07-15-sequence-lft-integration)────────────
@@ -219,13 +222,13 @@ def _integrated_rows(model: Model, et_name: str, ie_ft_name: str,
         for fe_id, branch in seq["path"].items():
             g = fe_bdd[fe_id]
             expr = m.apply_and(expr, g if branch == "failure" else m.apply_not(g))
-        rate = sum(lam * exact_probability(m, m.apply_and(e_bdd, expr), q)
-                   for _, lam, e_bdd in initiators)
+        rate = fsum(lam * exact_probability(m, m.apply_and(e_bdd, expr), q)
+                    for _, lam, e_bdd in initiators)
         rows.append({"end_state": seq["end_state"], "path": dict(seq["path"]),
                      "consequence": et.consequence_of(seq["end_state"]),
                      "frequency": rate})
-    ie_frequency = sum(lam * exact_probability(m, e_bdd, q)
-                       for _, lam, e_bdd in initiators)
+    ie_frequency = fsum(lam * exact_probability(m, e_bdd, q)
+                        for _, lam, e_bdd in initiators)
     return rows, ie_frequency
 
 
@@ -236,12 +239,13 @@ def quantify_event_tree_integrated(model: Model, et_name: str, ie_ft_name: str =
     与 quantify_event_tree 同形(additive 字段),供后端按 ie_fault_tree 存在与否分流。"""
     rows, ie_frequency = _integrated_rows(model, et_name, ie_ft_name,
                                           house_states, boundary_condition_set)
-    seq_freq: dict[str, float] = {}
-    cons_freq: dict[str, float] = {}
+    seq_contrib: dict[str, list] = {}
+    cons_contrib: dict[str, list] = {}
     for r in rows:
-        seq_freq[r["end_state"]] = seq_freq.get(r["end_state"], 0.0) + r["frequency"]
-        cons_freq[r["consequence"]] = cons_freq.get(r["consequence"], 0.0) + r["frequency"]
-    return {"sequences": seq_freq, "consequences": cons_freq,
+        seq_contrib.setdefault(r["end_state"], []).append(r["frequency"])
+        cons_contrib.setdefault(r["consequence"], []).append(r["frequency"])
+    return {"sequences": {k: fsum(v) for k, v in seq_contrib.items()},
+            "consequences": {k: fsum(v) for k, v in cons_contrib.items()},
             "method": "integrated", "ie_frequency": ie_frequency}
 
 

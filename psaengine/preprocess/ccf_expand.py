@@ -8,7 +8,7 @@ from psaengine.model.parameters import Parameter, ParameterLibrary
 
 # MGL 层级因子键:ρ_2..ρ_7(NUREG/CR-5485 记号 β,γ,δ…)
 _MGL_LEVELS = ("beta", "gamma", "delta", "epsilon", "mu", "nu")
-_MAX_GROUP = 6            # 子集事件数 2^m−m−1;BESS 冗余通道 m≤4,>6 视为误用
+_MAX_GROUP = 8   # 批次 F(P-8):对齐 RiskSpectrum 组上限 8(2^8−1=255 组合可控);>8 仍响亮拒绝
 _FACTOR_SUM_TOL = 1e-4    # Σ=1 校验容差,对齐 SCRAM(其 phi 校验容差同级)
 _HOMOG_TOL = 1e-9         # 多层展开同质性校验(成员 Q_t 相对差)
 
@@ -28,6 +28,13 @@ def q_levels(model: str, factors: dict, m: int, q_t: float, staggered: bool = Fa
     if model == "mgl":
         if staggered:
             raise ValueError("staggered testing is only supported for the alpha model")
+        # 批次 F 收口(engine-review F-1):MGL 因子词汇止于 ν(ρ₂..ρ₇)⇒ 上限 7。
+        # 不发明无出处的 ρ₈ 键名(数据溯源约束);8 组是 alpha 的地盘(α₁..α₈ 数字命名
+        # 天然可扩,NUREG/CR-5485 大组惯例)。修前 m=8 越界 IndexError → 500 无因由。
+        if m > len(_MGL_LEVELS) + 1:
+            raise ValueError(
+                f"MGL group size {m} > {len(_MGL_LEVELS) + 1} (factor vocabulary "
+                f"β..ν = ρ₂..ρ₇); use the alpha model (alpha1..alpha{m}) for larger groups")
         # rho[0]=ρ1=1 … rho[m-1]=ρ_m, rho[m]=ρ_{m+1}=0
         rho = [1.0] + [float(factors.get(_MGL_LEVELS[i], 0.0)) for i in range(m - 1)] + [0.0]
         out = []

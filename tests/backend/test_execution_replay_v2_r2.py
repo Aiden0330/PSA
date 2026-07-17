@@ -407,9 +407,9 @@ def test_D5_house_overlay_replay_bitwise(tmp_path, monkeypatch):
 # ══ D-2/D-6:绑定强度与 git 状态在页脚可见 ═══════════════════════════════════════
 
 def _ev(pin_binding=None, dirty=False):
-    ev = {"case_id": 7, "version_hash": "abcd1234ffff", "engine_version": "0.2.0",
+    ev = {"case_id": 7, "version_hash": "abcd1234ffff", "engine_version": "0.3.0",
           "created_at": "2026-07-16T00:00:00+00:00",
-          "engine_fingerprint": {"semver": "0.2.0", "git_sha": "abc1234", "dirty": dirty,
+          "engine_fingerprint": {"semver": "0.3.0", "git_sha": "abc1234", "dirty": dirty,
                                  "request_schema_version": "2",
                                  "benchmark_corpus_version": "deadbeef"}}
     if pin_binding is not None:

@@ -482,3 +482,13 @@ run.ps1   .claude/launch.json(预览)
 剔过充假设 0.38×(统计值被夹中,首要数据缺口 = 过充需求率 P-3)。新发现:P-1 quantify/
 报告双通道求和序 ULP 分歧(重放须通道同源)。报告:docs/reviews/2026-07-16-pilot-200mwh-
 station.md;脚本+数据:docs/reference-assets/pilot-200mwh/。
+
+## 2026-07-17 · 批次 F:SOKC 修正 + fsum 统一 + CCF 上限 8(semver 0.3.0)
+
+三个既有数值语义变更一批收口(规格 2026-07-17-mc-sokc-fsum-ccf8.md,先红锚点 10):
+单树 MC 改**按参数 ref 联合抽样**(与聚合同法则;同 ref 冗余通道共享认知抽样,修正上
+分位 ~1.9× 非保守收窄;单树 ≡ 聚合单树逐位锁);ET 级求和全面 `math.fsum`(quantify/
+报告/集成/MC/聚合序无关逐位同源,试点 P-1 死);CCF 组上限 6→8(P-8,g=8 退化闭式 +
+恒等式锁,g≥9 仍拒)。**迁移注记**:MC 带与末位数字相对 0.2.x 变化,semver 升 0.3.0
+(案例指纹可辨新旧);banked A7 特征化锁实测流不变(节点序恰=排序 ref 序)原样存活。
+基线:py 558+65skip · benchmark 24/24 零差异。
