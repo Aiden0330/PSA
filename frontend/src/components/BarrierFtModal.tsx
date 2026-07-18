@@ -11,7 +11,9 @@ import { formatEtaNumber, formatEtaRate } from '../etaNumberFormat'
 import { ftFrequency } from '../api'
 import type { FtFrequencyMethod, FtFrequencyResult } from '../api'
 
-interface Api { set: (m: ModelJson) => void; undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean }
+/** set 必须传更新函数(prev => next):值式覆写来自渲染期旧快照,同一拍两次编辑会后写冲前写
+ *  (丢改动报障 2026-07-17)。store/useModel 的 set 原生支持函数式 updater。 */
+interface Api { set: (m: ModelJson | ((prev: ModelJson) => ModelJson)) => void; undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean }
 
 /** 全屏模态:复用故障树编辑器编辑某 ETA 屏障的故障树(方案 A)。
  *  frequencyMode(初因树 __init__):调色板提供频率初因事件、检视器暴露量纲切换,
@@ -67,11 +69,11 @@ export function BarrierFtModal(
       <div style={panel} onClick={(e) => e.stopPropagation()}>
         <div style={bar}>
           <strong style={{ fontSize: 14 }}>{frequencyMode ? '编辑初因事件故障树(频率)' : `编辑故障树:${ftName}`}</strong>
-          <Palette onAddGate={(op) => api.set(addGate(model, ftName, op))} onAddBasic={() => api.set(addBasic(model, ftName))}
-            onAddFrequency={frequencyMode ? () => api.set(addBasic(model, ftName, 1e-3, 'frequency')) : undefined} />
+          <Palette onAddGate={(op) => api.set((prev) => addGate(prev, ftName, op))} onAddBasic={() => api.set((prev) => addBasic(prev, ftName))}
+            onAddFrequency={frequencyMode ? () => api.set((prev) => addBasic(prev, ftName, 1e-3, 'frequency')) : undefined} />
           {libComponents && libComponents.length > 0 && (
             <LibPicker label="＋从库加基本事件" items={libComponents.map((c: any) => ({ id: c.id, name: c.name, unit: c.unit }))}
-              onPick={(id) => { const c = libComponents.find((x: any) => x.id === id); if (c) api.set(addBasicFromLib(model, ftName, c)) }} />
+              onPick={(id) => { const c = libComponents.find((x: any) => x.id === id); if (c) api.set((prev) => addBasicFromLib(prev, ftName, c)) }} />
           )}
           <button onClick={api.undo} disabled={!api.canUndo} title="撤销" style={icon}>↶</button>
           <button onClick={api.redo} disabled={!api.canRedo} title="重做" style={icon}>↷</button>
@@ -99,21 +101,21 @@ export function BarrierFtModal(
           <div style={{ flex: 1, minWidth: 0 }}>
             <FaultTreeCanvas
               nodes={graph.nodes} edges={graph.edges} editable highlight={new Set<string>()}
-              onConnectNodes={(s, t) => api.set(connect(model, ftName, s, t))}
-              onDeleteNodes={(ids) => { let m = model; for (const id of ids) m = deleteNode(m, ftName, id); api.set(m); setSelected(null) }}
+              onConnectNodes={(s, t) => api.set((prev) => connect(prev, ftName, s, t))}
+              onDeleteNodes={(ids) => { api.set((prev) => ids.reduce((m, id) => deleteNode(m, ftName, id), prev)); setSelected(null) }}
               onSelect={setSelected}
             />
           </div>
           <div style={{ width: 360, borderLeft: '1px solid var(--psa-line)', overflowY: 'auto', background: 'var(--psa-surface)' }}>
             <Inspector
               model={model} ftName={ftName} selected={selected}
-              onUpdateNode={(id, patch) => api.set(updateNode(model, ftName, id, patch))}
-              onUpdateParam={(id, v) => api.set(updateParam(model, id, v))}
-              onSetTop={(id) => api.set(setTop(model, ftName, id))}
-              onDelete={(id) => { api.set(deleteNode(model, ftName, id)); setSelected(null) }}
-              onRenameNode={(o, n) => { api.set(renameNode(model, ftName, o, n)); setSelected(n) }}
+              onUpdateNode={(id, patch) => api.set((prev) => updateNode(prev, ftName, id, patch))}
+              onUpdateParam={(id, v) => api.set((prev) => updateParam(prev, id, v))}
+              onSetTop={(id) => api.set((prev) => setTop(prev, ftName, id))}
+              onDelete={(id) => { api.set((prev) => deleteNode(prev, ftName, id)); setSelected(null) }}
+              onRenameNode={(o, n) => { api.set((prev) => renameNode(prev, ftName, o, n)); setSelected(n) }}
               frequencyMode={frequencyMode}
-              onSetParamKind={frequencyMode ? (id, k) => api.set(setParamKind(model, id, k)) : undefined}
+              onSetParamKind={frequencyMode ? (id, k) => api.set((prev) => setParamKind(prev, id, k)) : undefined}
             />
           </div>
         </div>

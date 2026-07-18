@@ -109,6 +109,27 @@ function AppShell() {
   }
 
   return (
+    // 最外层错误边界(白屏报障 2026-07-17):外壳(MenuBar/ExplorerTree/StatusBar)此前
+    // 在 key={tab} 边界之外,任何外壳渲染抛错 = 整页白、无从定位。此层兜底:显示错误
+    // 文本(报障自带定位)+ 重试;编辑内容已由 sessionDraft 暂存,刷新可恢复。
+    <ErrorBoundary
+      fallback={(reset, err) => (
+        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--exp-bg)' }}>
+          <div className="psa-panel" style={{ padding: 24, maxWidth: 520 }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>界面出现内部错误(已拦截,未白屏)</div>
+            <div style={{ fontSize: 12, color: 'var(--psa-danger-strong)', fontFamily: 'var(--psa-font-mono)',
+              background: 'var(--psa-danger-soft)', padding: 8, borderRadius: 6, marginBottom: 10,
+              maxHeight: 120, overflow: 'auto', wordBreak: 'break-all' }}>{String(err?.message ?? err)}</div>
+            <div style={{ fontSize: 12, color: 'var(--psa-muted)', lineHeight: 1.7, marginBottom: 12 }}>
+              你的编辑已随会话草稿自动暂存,「重试」通常可继续;若反复出现,请刷新页面并把上面的错误文本发给开发者。
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="psa-btn psa-btn--primary" onClick={reset}>重试</button>
+              <button type="button" className="psa-btn" onClick={() => window.location.reload()}>刷新页面</button>
+            </div>
+          </div>
+        </div>
+      )}>
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--exp-bg)' }}>
       <MenuBar persistence={persistence} setTab={setTab} onImportFile={persistence.onImportFile} onOpenAccounts={() => setAccountsOpen(true)} />
 
@@ -191,6 +212,7 @@ function AppShell() {
       <SaveConflictDialog persistence={persistence} onGoToDiff={() => setTab('report')} />
       {accountsOpen && <AccountsPanel onClose={() => setAccountsOpen(false)} />}
     </div>
+    </ErrorBoundary>
   )
 }
 

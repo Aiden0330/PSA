@@ -104,7 +104,9 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
   const cvFtName = ftIsStandalone ? ftStandaloneName : ftIsEta ? ftEtaName : ftName
   // etaSet: 结构性 FT 编辑写入文档(单历史);派生 PFD/initFreq 用新模型即时量化回写。
   // 目标可为任意页签(单一来源,无活动页限制)。
-  const etaSet = async (m: ModelJson) => {
+  // set 必须传更新函数(prev => next):值式覆写来自渲染期旧快照,同一拍两次编辑
+  // 会后写冲前写(丢改动报障 2026-07-17)。派生量化用写后的 store 状态,不再用入参。
+  const etaSet = async (m: ModelJson | ((prev: ModelJson) => ModelJson)) => {
     if (!ftEtaKey) return
     P().setEtaFts(ftEtaKey, m)
     if (!ftEtaName) return
@@ -121,7 +123,7 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
       }
       const wid = P().workspaceId                            // F-β W1/W4:发起槽 + 代序
       const tok = deriveGuard.begin(`${wid}:${ftEtaKey}:${ftEtaName}`)
-      const d = await deriveLinkedValue(m, ftEtaName, target.model.initFreqSource)
+      const d = await deriveLinkedValue(target.fts ?? EMPTY_FTS, ftEtaName, target.model.initFreqSource)
       if (!deriveGuard.isCurrent(`${wid}:${ftEtaKey}:${ftEtaName}`, tok)) return
       if (d.kind === 'value') P().setEtaPfdFor(wid, ftEtaKey, d.key, d.value)   // W2:槽定向派生写
       else if (d.kind === 'integrated') {
@@ -132,7 +134,13 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
       setError(`挂树派生值更新失败(旧值已过期,请修正后重试):${String(e?.message ?? e)}`)
     }
   }
-  const cvSet     = ftIsStandalone ? (m: ModelJson) => P().setUserFts(m) : ftIsEta ? etaSet : set
+  // 统一显式签名:三分支(项目自建/ETA 挂载/示例)均收值或更新函数;联合函数类型的
+  // 参数在 TS 里会交集化导致调用报错,故在此处收敛为单一可调用类型。
+  const cvSet: (u: ModelJson | ((prev: ModelJson) => ModelJson)) => void | Promise<void> =
+    ftIsStandalone ? (u) => P().setUserFts(u)
+    : ftIsEta ? etaSet
+    // 示例分支:useModel 的 prev 可为 null(示例未载入),null 原样透传、非空才应用更新函数
+    : (u) => set(typeof u === 'function' ? (prev) => (prev == null ? prev : u(prev)) : u)
   const cvUndo    = (ftIsStandalone || ftIsEta) ? docUndo : undo
   const cvRedo    = (ftIsStandalone || ftIsEta) ? docRedo : redo
   const cvCanUndo = (ftIsStandalone || ftIsEta) ? docCanUndo : canUndo
@@ -273,10 +281,10 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
               )}
             </span>
           )}
-          {cvModel && <Palette onAddGate={(op) => cvSet(addGate(cvModel, cvFtName, op))} onAddBasic={() => cvSet(addBasic(cvModel, cvFtName))} />}
+          {cvModel && <Palette onAddGate={(op) => cvSet((prev: ModelJson) => addGate(prev, cvFtName, op))} onAddBasic={() => cvSet((prev: ModelJson) => addBasic(prev, cvFtName))} />}
           {cvModel && lib && (
             <LibPicker label="＋从库加基本事件" items={lib.component_failure_rates.map((c) => ({ id: c.id, name: c.name, unit: c.unit }))}
-              onPick={(id) => { const c = lib.component_failure_rates.find((x) => x.id === id); if (c && cvModel) cvSet(addBasicFromLib(cvModel, cvFtName, c)) }} />
+              onPick={(id) => { const c = lib.component_failure_rates.find((x) => x.id === id); if (c && cvModel) cvSet((prev: ModelJson) => addBasicFromLib(prev, cvFtName, c)) }} />
           )}
           <AiAppliedPill ai={ai} />
           {!ftIsEta && !ftIsStandalone && (
@@ -330,11 +338,10 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
                   zoomToolbar
                   highlight={highlight}
                   heat={heatOn && result ? buildHeat(result.importance as any) : undefined}
-                  onConnectNodes={(s, t) => cvModel && cvSet(connect(cvModel, cvFtName, s, t))}
+                  onConnectNodes={(s, t) => cvModel && cvSet((prev: ModelJson) => connect(prev, cvFtName, s, t))}
                   onDeleteNodes={(ids) => {
                     if (!cvModel) return
-                    let m = cvModel; for (const id of ids) m = deleteNode(m, cvFtName, id)
-                    cvSet(m); setSelected(null)
+                    cvSet((prev: ModelJson) => ids.reduce((acc, id) => deleteNode(acc, cvFtName, id), prev)); setSelected(null)
                   }}
                   onSelect={setSelected}
                   onNodeDragStop={(!ftIsEta && !ftIsStandalone) ? (id, x, y) => setFtPos((m) => ({ ...m, [ftName]: { ...(m[ftName] ?? {}), [id]: { x, y } } })) : undefined}
@@ -374,11 +381,11 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
         {cvModel && (
           <Inspector
             model={cvModel} ftName={cvFtName} selected={selected}
-            onUpdateNode={(id, patch) => cvSet(updateNode(cvModel, cvFtName, id, patch))}
-            onUpdateParam={(id, v) => cvSet(updateParam(cvModel, id, v))}
-            onSetTop={(id) => cvSet(setTop(cvModel, cvFtName, id))}
-            onDelete={(id) => { cvSet(deleteNode(cvModel, cvFtName, id)); setSelected(null) }}
-            onRenameNode={(o, n) => { if (cvModel) { cvSet(renameNode(cvModel, cvFtName, o, n)); setSelected(n) } }}
+            onUpdateNode={(id, patch) => cvSet((prev: ModelJson) => updateNode(prev, cvFtName, id, patch))}
+            onUpdateParam={(id, v) => cvSet((prev: ModelJson) => updateParam(prev, id, v))}
+            onSetTop={(id) => cvSet((prev: ModelJson) => setTop(prev, cvFtName, id))}
+            onDelete={(id) => { cvSet((prev: ModelJson) => deleteNode(prev, cvFtName, id)); setSelected(null) }}
+            onRenameNode={(o, n) => { if (cvModel) { cvSet((prev: ModelJson) => renameNode(prev, cvFtName, o, n)); setSelected(n) } }}
           />
         )}
       </div>
