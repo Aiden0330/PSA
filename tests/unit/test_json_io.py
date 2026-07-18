@@ -60,3 +60,32 @@ def test_rebind_and_post_rules_json_round_trip(tmp_path):
     m2 = Model.from_json(str(out))
     assert [_sig_rebind(r) for r in m2.rebind_rules] == [_sig_rebind(r) for r in rebind]
     assert [_sig_post(r) for r in m2.post_rules] == [_sig_post(r) for r in post]
+
+
+class TestLegacyKindDefault:
+    """量化 500 报障(2026-07-17):kind 字段为 IE-FT 频率功能(7-13)引入,此前的
+    存档/外部 JSON 参数没有它;_param 硬取 d["kind"] 使任何遗留模型一载入即 KeyError。
+    缺 kind = 遗留概率参数(频率参数与 kind 同时诞生,不存在无 kind 的频率参数),
+    默认 probability 方向安全;频率语义仍须显式声明,不受影响。"""
+
+    def test_param_without_kind_loads_as_probability(self):
+        from psaengine.model.json_io import load_model_from_dict
+        m = load_model_from_dict({
+            "model_data": {"parameters": [{"id": "A", "value": 0.1}]},   # 遗留形状:无 kind
+            "fault_trees": [{"name": "T", "top": "G", "nodes": [
+                {"id": "A", "basic": True, "param_ref": "A"},
+                {"id": "G", "op": "or", "args": ["A"]}]}],
+        })
+        p = m.parameters.get("A")
+        assert p.kind == "probability"
+        assert p.value == 0.1
+
+    def test_explicit_frequency_kind_still_respected(self):
+        from psaengine.model.json_io import load_model_from_dict
+        m = load_model_from_dict({
+            "model_data": {"parameters": [{"id": "F1", "kind": "frequency", "value": 2.0}]},
+            "fault_trees": [{"name": "T", "top": "G", "nodes": [
+                {"id": "F1", "basic": True, "param_ref": "F1"},
+                {"id": "G", "op": "or", "args": ["F1"]}]}],
+        })
+        assert m.parameters.get("F1").kind == "frequency"

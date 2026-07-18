@@ -128,16 +128,16 @@ _SYNTHETIC_BASELINES = {
                       _rate_ccf_dist_payload),
 }
 
-_REAL_ARCHIVE_BASELINES = {
+# 铁律语料改冻结夹具(2026-07-17):此前直读 saved/ 活文件按文件名对基线——saved/ 是
+# .gitignore 的用户数据,用户在应用里一保存(47483b20 当日 17:03 存新版本)测试即崩,
+# 崩的不是哈希函数而是"活文件永不变"这个错误假设。三份代表内容(覆盖全部 3 个不同
+# 基线;原 6 个同哈希文件同为默认场景内容)已与 F3 期基线逐位核对后冻结为提交内夹具。
+# 铁律保证不减:同字节 → 同 canonical → 同哈希,语料不再随用户使用漂移。
+_FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "fixtures", "eb08")
+_FROZEN_ARCHIVE_BASELINES = {
     "27489f5c.json": "9336823767df799b9bfe263f5a56f7404c7ab27292d04bbc160f86467c7088d9",
     "42b7c524.json": "1190fa4582c0a0a1ca56bdb96d078d71ea314e0b7bec359b62fde767ac95b677",
-    "47483b20.json": "1190fa4582c0a0a1ca56bdb96d078d71ea314e0b7bec359b62fde767ac95b677",
-    "5c41e3cf.json": "1190fa4582c0a0a1ca56bdb96d078d71ea314e0b7bec359b62fde767ac95b677",
     "5d6520ef.json": "a983322982834bbf3ae2797bd37e27e24d0bef9ebc984d55b0bb2afe07ebaa6f",
-    "9ae10469.json": "1190fa4582c0a0a1ca56bdb96d078d71ea314e0b7bec359b62fde767ac95b677",
-    "a3bc726c.json": "1190fa4582c0a0a1ca56bdb96d078d71ea314e0b7bec359b62fde767ac95b677",
-    "c9011fef.json": "1190fa4582c0a0a1ca56bdb96d078d71ea314e0b7bec359b62fde767ac95b677",
-    "d4eafba8.json": "9336823767df799b9bfe263f5a56f7404c7ab27292d04bbc160f86467c7088d9",
 }
 
 
@@ -152,24 +152,18 @@ def test_hash_stability_iron_law_synthetic(name):
 
 
 def test_hash_stability_iron_law_real_archives():
-    if not os.path.isdir(_SAVED_DIR):
-        pytest.skip("saved/ 为本机未追踪数据(.gitignore)——合成载荷已覆盖同一保证")
     checked = 0
-    for path in sorted(glob.glob(os.path.join(_SAVED_DIR, "*.json"))):
-        base = os.path.basename(path)
-        if base not in _REAL_ARCHIVE_BASELINES:
-            continue
-        with open(path, encoding="utf-8") as f:
+    for base, expected in sorted(_FROZEN_ARCHIVE_BASELINES.items()):
+        with open(os.path.join(_FIXTURE_DIR, base), encoding="utf-8") as f:
             blob = json.load(f)
         payload = blob.get("payload", blob)
-        if payload.get("v") != 2 or not isinstance(payload.get("etas"), list):
-            continue
+        assert payload.get("v") == 2 and isinstance(payload.get("etas"), list), (
+            f"夹具 {base} 不是 v2 载荷——夹具文件被误改")
         doc, _ = to_canonical(copy.deepcopy(payload), PUUID)
-        assert content_hash(doc) == _REAL_ARCHIVE_BASELINES[base], (
-            f"EB-08 broke real archive {base} 的 content_hash — 证据链铁律违反")
+        assert content_hash(doc) == expected, (
+            f"EB-08 broke frozen archive {base} 的 content_hash — 证据链铁律违反")
         checked += 1
-    if checked == 0:
-        pytest.skip("本机无匹配的真实存档")
+    assert checked == len(_FROZEN_ARCHIVE_BASELINES)
 
 
 # ── G6:beta-CCF replay = .018019(此前 .01,反构丢 CCF)────────────────────────

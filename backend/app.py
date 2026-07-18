@@ -92,9 +92,19 @@ def api_model(eid: str):
     except KeyError:
         raise HTTPException(404, f"unknown example {eid}")
 
+def _load_model_or_400(d: dict):
+    """模型 JSON 载入的统一 400 口:缺字段/类型错是客户端模型问题,响亮报文案而非裸 500
+    (量化 500 报障 2026-07-17;KeyError 转述缺的键名)。"""
+    try:
+        return load_model_from_dict(d)
+    except KeyError as e:
+        raise HTTPException(400, f"模型 JSON 缺字段:{e}")
+    except (TypeError, ValueError) as e:
+        raise HTTPException(400, f"模型 JSON 无效:{e}")
+
 @app.post("/api/quantify", response_model=schemas.QuantifyResponse)
 def api_quantify(req: schemas.QuantifyRequest, _=Depends(require_role(*ANALYST))):
-    model = load_model_from_dict(req.model)
+    model = _load_model_or_400(req.model)
     try:
         an = Analysis(model, fault_tree=req.fault_tree,
                       house_states=req.house_states or None,
@@ -129,7 +139,7 @@ def api_ft_frequency(req: schemas.FtFrequencyRequest, _=Depends(require_role(*AN
     其余为使能概率;method=sum:F = Σ 割集频率;method=exact:逐初因使能析取 BDD,
     F = Σ λ_i·P_i(≤ Σλ 物理上界;全割集口径,cutoff 只滤展示列表)。规则违规/量纲错误 → 400(响亮,绝不静默近似)。"""
     from psaengine.quantify.frequency import FrequencyRuleError, fault_tree_frequency
-    model = load_model_from_dict(req.model)
+    model = _load_model_or_400(req.model)
     try:
         r = fault_tree_frequency(model, req.fault_tree, cutoff=req.cutoff, method=req.method)
     except FrequencyRuleError as e:

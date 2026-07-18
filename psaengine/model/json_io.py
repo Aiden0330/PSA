@@ -13,7 +13,10 @@ def _param(d: dict) -> Parameter:
     dist = None
     if "distribution" in d:
         dist = Distribution(d["distribution"]["family"], d["distribution"].get("params", {}))
-    return Parameter(d["id"], d["kind"], d["value"], mttr=d.get("mttr"),
+    # kind 为 IE-FT 频率功能(2026-07-13)引入;此前的存档/外部 JSON 没有该字段。
+    # 缺失 ⟺ 遗留概率参数(频率参数与 kind 同时诞生),默认 probability 方向安全;
+    # 频率语义仍须显式 kind="frequency"(units guard 不受影响)。硬取曾使遗留模型 500。
+    return Parameter(d["id"], d.get("kind", "probability"), d["value"], mttr=d.get("mttr"),
                      test_interval=d.get("test_interval"), mission_time=d.get("mission_time"),
                      gamma=d.get("gamma"), alpha=d.get("alpha"), beta=d.get("beta"),
                      t0=d.get("t0"),   # Gap 7 精确 Q(t) 模型字段透传

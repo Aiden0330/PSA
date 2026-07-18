@@ -100,7 +100,9 @@ def test_lint_rules():
 
 def test_dry_run_catches_engine_invalid_draft():
     d = _good_fta_draft()
-    del d["fts"]["model_data"]["parameters"][0]["kind"]          # 引擎必需字段,schema 层不管
+    # 悬空 param_ref:schema 层不查跨引用,引擎载入必拒。(原构造"删 kind"已失效:
+    # 缺 kind 自 2026-07-17 起默认 probability——遗留存档兼容,见 json_io._param。)
+    d["fts"]["fault_trees"][0]["nodes"][0]["param_ref"] = "MISSING"
     errs = dry_run_draft(d)
     assert errs and "试运行失败" in errs[0]
     assert dry_run_draft(_good_fta_draft()) == []

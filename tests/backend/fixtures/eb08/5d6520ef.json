@@ -1,0 +1,1195 @@
+{
+  "id": "5d6520ef",
+  "name": "默认热失控级联",
+  "saved_at": "2026-06-24T08:16:48.661745+00:00",
+  "payload": {
+    "v": 2,
+    "etas": [
+      {
+        "key": "sc:default",
+        "name": "默认热失控级联",
+        "model": {
+          "initEvent": "IE_TR",
+          "initFreq": 0.004,
+          "functionalEvents": [
+            {
+              "id": "B_OFFGAS",
+              "label": "早期离气探测+联动",
+              "failProb": 0.01
+            },
+            {
+              "id": "B_BMS",
+              "label": "BMS 切断/隔离",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_THERMAL",
+              "label": "电芯间热障阻断蔓延",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_DEFLAG",
+              "label": "舱内泄爆/防爆",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_SPACING",
+              "label": "舱间距阻断多舱蔓延",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_RESPONSE",
+              "label": "应急响应(避免开门引气)",
+              "failProb": 0.1
+            }
+          ],
+          "root": {
+            "kind": "branch",
+            "feId": "B_OFFGAS",
+            "success": {
+              "kind": "leaf",
+              "consequence": "C1"
+            },
+            "failure": {
+              "kind": "branch",
+              "feId": "B_BMS",
+              "success": {
+                "kind": "leaf",
+                "consequence": "C2"
+              },
+              "failure": {
+                "kind": "branch",
+                "feId": "B_THERMAL",
+                "success": {
+                  "kind": "leaf",
+                  "consequence": "C3"
+                },
+                "failure": {
+                  "kind": "branch",
+                  "feId": "B_DEFLAG",
+                  "success": {
+                    "kind": "leaf",
+                    "consequence": "C4"
+                  },
+                  "failure": {
+                    "kind": "branch",
+                    "feId": "B_SPACING",
+                    "success": {
+                      "kind": "leaf",
+                      "consequence": "C5"
+                    },
+                    "failure": {
+                      "kind": "branch",
+                      "feId": "B_RESPONSE",
+                      "success": {
+                        "kind": "leaf",
+                        "consequence": "C5"
+                      },
+                      "failure": {
+                        "kind": "leaf",
+                        "consequence": "C5"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "consequenceDefs": {
+            "C1": "单体安全排气",
+            "C2": "模组内热蔓延/起火",
+            "C3": "Pack/簇级起火",
+            "C4": "箱级起火蔓延",
+            "C5": "爆炸 + 毒气释放"
+          },
+          "consequences": [
+            {
+              "id": "C1",
+              "desc": "单体安全排气",
+              "level": "C1"
+            },
+            {
+              "id": "C2",
+              "desc": "模组内热蔓延/起火",
+              "level": "C2"
+            },
+            {
+              "id": "C3",
+              "desc": "Pack/簇级起火",
+              "level": "C3"
+            },
+            {
+              "id": "C4",
+              "desc": "箱级起火蔓延",
+              "level": "C4"
+            },
+            {
+              "id": "C5",
+              "desc": "爆炸 + 毒气释放",
+              "level": "C5"
+            }
+          ],
+          "initFreqSource": "manual"
+        },
+        "fts": {
+          "model_data": {
+            "parameters": []
+          },
+          "fault_trees": []
+        },
+        "pfds": {}
+      },
+      {
+        "key": "sc:SC_ISC",
+        "name": "电芯内短 → 热失控",
+        "model": {
+          "initEvent": "IE_ISC",
+          "initFreq": 0.001,
+          "functionalEvents": [
+            {
+              "id": "B_OFFGAS",
+              "label": "早期离气探测+联动",
+              "failProb": 0.06752,
+              "linkFt": "B_OFFGAS"
+            },
+            {
+              "id": "B_BMS",
+              "label": "BMS 切断/隔离",
+              "failProb": 0.09731799999999999,
+              "linkFt": "B_BMS"
+            },
+            {
+              "id": "B_THERMAL",
+              "label": "电芯间热障阻断蔓延",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_DEFLAG",
+              "label": "舱内泄爆/防爆",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_SPACING",
+              "label": "舱间距阻断多舱蔓延",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_RESPONSE",
+              "label": "应急响应(避免开门引气)",
+              "failProb": 0.1
+            }
+          ],
+          "root": {
+            "kind": "branch",
+            "feId": "B_OFFGAS",
+            "success": {
+              "kind": "leaf",
+              "consequence": "C1"
+            },
+            "failure": {
+              "kind": "branch",
+              "feId": "B_BMS",
+              "success": {
+                "kind": "leaf",
+                "consequence": "C2"
+              },
+              "failure": {
+                "kind": "branch",
+                "feId": "B_THERMAL",
+                "success": {
+                  "kind": "leaf",
+                  "consequence": "C3"
+                },
+                "failure": {
+                  "kind": "branch",
+                  "feId": "B_DEFLAG",
+                  "success": {
+                    "kind": "leaf",
+                    "consequence": "C4"
+                  },
+                  "failure": {
+                    "kind": "branch",
+                    "feId": "B_SPACING",
+                    "success": {
+                      "kind": "leaf",
+                      "consequence": "C5"
+                    },
+                    "failure": {
+                      "kind": "branch",
+                      "feId": "B_RESPONSE",
+                      "success": {
+                        "kind": "leaf",
+                        "consequence": "C5"
+                      },
+                      "failure": {
+                        "kind": "leaf",
+                        "consequence": "C5"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "consequenceDefs": {
+            "C1": "单体安全排气",
+            "C2": "模组内热蔓延/起火",
+            "C3": "Pack/簇级起火",
+            "C4": "箱级起火蔓延",
+            "C5": "爆炸 + 毒气释放"
+          },
+          "consequences": [
+            {
+              "id": "C1",
+              "desc": "单体安全排气",
+              "level": "C1"
+            },
+            {
+              "id": "C2",
+              "desc": "模组内热蔓延/起火",
+              "level": "C2"
+            },
+            {
+              "id": "C3",
+              "desc": "Pack/簇级起火",
+              "level": "C3"
+            },
+            {
+              "id": "C4",
+              "desc": "箱级起火蔓延",
+              "level": "C4"
+            },
+            {
+              "id": "C5",
+              "desc": "爆炸 + 毒气释放",
+              "level": "C5"
+            }
+          ],
+          "initFreqSource": "manual"
+        },
+        "fts": {
+          "model_data": {
+            "parameters": [
+              {
+                "id": "OFFGAS_DET_FAIL",
+                "kind": "probability",
+                "value": 0.008,
+                "source": "Li-ion Tamer/Honeywell 离气探测"
+              },
+              {
+                "id": "BMS_CONTACTOR_FAIL",
+                "kind": "probability",
+                "value": 0.06,
+                "source": "OREDA/exida 接触器拒动"
+              },
+              {
+                "id": "BMS_SENSOR_FAIL",
+                "kind": "probability",
+                "value": 0.03,
+                "source": "DNV/Gully 2019 传感失效"
+              },
+              {
+                "id": "BMS_LOGIC_FAIL",
+                "kind": "probability",
+                "value": 0.01,
+                "source": "IEC 61508 SIL 逻辑"
+              },
+              {
+                "id": "B_THERMAL",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "DNV/Gully 2019; UL 9540A 单元级测试"
+              },
+              {
+                "id": "B_DEFLAG",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "PFD: LOPA; η: Landucci 2017; NFPA 68/69"
+              },
+              {
+                "id": "B_SPACING",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "NFPA 855 默认 ≥3ft/914mm"
+              },
+              {
+                "id": "B_RESPONSE",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "LOPA(人因); McMicken 范式"
+              }
+            ]
+          },
+          "fault_trees": [
+            {
+              "name": "B_OFFGAS",
+              "top": "B_OFFGAS",
+              "nodes": [
+                {
+                  "id": "OFFGAS_DET_FAIL",
+                  "basic": true,
+                  "param_ref": "OFFGAS_DET_FAIL"
+                },
+                {
+                  "id": "BMS_CONTACTOR_FAIL",
+                  "basic": true,
+                  "param_ref": "BMS_CONTACTOR_FAIL"
+                },
+                {
+                  "id": "B_OFFGAS",
+                  "op": "or",
+                  "args": [
+                    "OFFGAS_DET_FAIL",
+                    "BMS_CONTACTOR_FAIL"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_BMS",
+              "top": "B_BMS",
+              "nodes": [
+                {
+                  "id": "BMS_SENSOR_FAIL",
+                  "basic": true,
+                  "param_ref": "BMS_SENSOR_FAIL"
+                },
+                {
+                  "id": "BMS_LOGIC_FAIL",
+                  "basic": true,
+                  "param_ref": "BMS_LOGIC_FAIL"
+                },
+                {
+                  "id": "BMS_CONTACTOR_FAIL",
+                  "basic": true,
+                  "param_ref": "BMS_CONTACTOR_FAIL"
+                },
+                {
+                  "id": "B_BMS",
+                  "op": "or",
+                  "args": [
+                    "BMS_SENSOR_FAIL",
+                    "BMS_LOGIC_FAIL",
+                    "BMS_CONTACTOR_FAIL"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_THERMAL",
+              "top": "B_THERMAL",
+              "nodes": [
+                {
+                  "id": "B_THERMAL_E",
+                  "basic": true,
+                  "param_ref": "B_THERMAL"
+                },
+                {
+                  "id": "B_THERMAL",
+                  "op": "null",
+                  "args": [
+                    "B_THERMAL_E"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_DEFLAG",
+              "top": "B_DEFLAG",
+              "nodes": [
+                {
+                  "id": "B_DEFLAG_E",
+                  "basic": true,
+                  "param_ref": "B_DEFLAG"
+                },
+                {
+                  "id": "B_DEFLAG",
+                  "op": "null",
+                  "args": [
+                    "B_DEFLAG_E"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_SPACING",
+              "top": "B_SPACING",
+              "nodes": [
+                {
+                  "id": "B_SPACING_E",
+                  "basic": true,
+                  "param_ref": "B_SPACING"
+                },
+                {
+                  "id": "B_SPACING",
+                  "op": "null",
+                  "args": [
+                    "B_SPACING_E"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_RESPONSE",
+              "top": "B_RESPONSE",
+              "nodes": [
+                {
+                  "id": "B_RESPONSE_E",
+                  "basic": true,
+                  "param_ref": "B_RESPONSE"
+                },
+                {
+                  "id": "B_RESPONSE",
+                  "op": "null",
+                  "args": [
+                    "B_RESPONSE_E"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "pfds": {
+          "B_OFFGAS": 0.06752,
+          "B_BMS": 0.09731799999999999
+        }
+      },
+      {
+        "key": "sc:SC_COOLANT",
+        "name": "液冷泄漏 → 外短",
+        "model": {
+          "initEvent": "IE_COOLANT",
+          "initFreq": 0.001,
+          "functionalEvents": [
+            {
+              "id": "B_OFFGAS",
+              "label": "早期离气探测+联动",
+              "failProb": 0.01
+            },
+            {
+              "id": "B_BMS",
+              "label": "BMS 切断/隔离",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_THERMAL",
+              "label": "电芯间热障阻断蔓延",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_DEFLAG",
+              "label": "舱内泄爆/防爆",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_SPACING",
+              "label": "舱间距阻断多舱蔓延",
+              "failProb": 0.1
+            }
+          ],
+          "root": {
+            "kind": "branch",
+            "feId": "B_OFFGAS",
+            "success": {
+              "kind": "leaf",
+              "consequence": "C1"
+            },
+            "failure": {
+              "kind": "branch",
+              "feId": "B_BMS",
+              "success": {
+                "kind": "leaf",
+                "consequence": "C2"
+              },
+              "failure": {
+                "kind": "branch",
+                "feId": "B_THERMAL",
+                "success": {
+                  "kind": "leaf",
+                  "consequence": "C3"
+                },
+                "failure": {
+                  "kind": "branch",
+                  "feId": "B_DEFLAG",
+                  "success": {
+                    "kind": "leaf",
+                    "consequence": "C4"
+                  },
+                  "failure": {
+                    "kind": "branch",
+                    "feId": "B_SPACING",
+                    "success": {
+                      "kind": "leaf",
+                      "consequence": "C5"
+                    },
+                    "failure": {
+                      "kind": "leaf",
+                      "consequence": "C5"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "consequenceDefs": {
+            "C1": "单体安全排气",
+            "C2": "模组内热蔓延/起火",
+            "C3": "Pack/簇级起火",
+            "C4": "箱级起火蔓延",
+            "C5": "爆炸 + 毒气释放"
+          },
+          "consequences": [
+            {
+              "id": "C1",
+              "desc": "单体安全排气",
+              "level": "C1"
+            },
+            {
+              "id": "C2",
+              "desc": "模组内热蔓延/起火",
+              "level": "C2"
+            },
+            {
+              "id": "C3",
+              "desc": "Pack/簇级起火",
+              "level": "C3"
+            },
+            {
+              "id": "C4",
+              "desc": "箱级起火蔓延",
+              "level": "C4"
+            },
+            {
+              "id": "C5",
+              "desc": "爆炸 + 毒气释放",
+              "level": "C5"
+            }
+          ],
+          "initFreqSource": "manual"
+        },
+        "fts": {
+          "model_data": {
+            "parameters": [
+              {
+                "id": "B_OFFGAS",
+                "kind": "probability",
+                "value": 0.01,
+                "source": "IEEE/CCPS LOPA; UL 9540A 排气特性研究"
+              },
+              {
+                "id": "B_BMS",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "DNV/Gully 2019; IEC 61508 SIL 能力类比(PFD 1e-1–1e-2)"
+              },
+              {
+                "id": "B_THERMAL",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "DNV/Gully 2019; UL 9540A 单元级测试"
+              },
+              {
+                "id": "B_DEFLAG",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "PFD: LOPA; η: Landucci 2017; NFPA 68/69"
+              },
+              {
+                "id": "B_SPACING",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "NFPA 855 默认 ≥3ft/914mm"
+              }
+            ]
+          },
+          "fault_trees": [
+            {
+              "name": "B_OFFGAS",
+              "top": "B_OFFGAS",
+              "nodes": [
+                {
+                  "id": "B_OFFGAS_E",
+                  "basic": true,
+                  "param_ref": "B_OFFGAS"
+                },
+                {
+                  "id": "B_OFFGAS",
+                  "op": "null",
+                  "args": [
+                    "B_OFFGAS_E"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_BMS",
+              "top": "B_BMS",
+              "nodes": [
+                {
+                  "id": "B_BMS_E",
+                  "basic": true,
+                  "param_ref": "B_BMS"
+                },
+                {
+                  "id": "B_BMS",
+                  "op": "null",
+                  "args": [
+                    "B_BMS_E"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_THERMAL",
+              "top": "B_THERMAL",
+              "nodes": [
+                {
+                  "id": "B_THERMAL_E",
+                  "basic": true,
+                  "param_ref": "B_THERMAL"
+                },
+                {
+                  "id": "B_THERMAL",
+                  "op": "null",
+                  "args": [
+                    "B_THERMAL_E"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_DEFLAG",
+              "top": "B_DEFLAG",
+              "nodes": [
+                {
+                  "id": "B_DEFLAG_E",
+                  "basic": true,
+                  "param_ref": "B_DEFLAG"
+                },
+                {
+                  "id": "B_DEFLAG",
+                  "op": "null",
+                  "args": [
+                    "B_DEFLAG_E"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_SPACING",
+              "top": "B_SPACING",
+              "nodes": [
+                {
+                  "id": "B_SPACING_E",
+                  "basic": true,
+                  "param_ref": "B_SPACING"
+                },
+                {
+                  "id": "B_SPACING",
+                  "op": "null",
+                  "args": [
+                    "B_SPACING_E"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "pfds": {}
+      },
+      {
+        "key": "sc:SC_MECH_WATER",
+        "name": "机械损伤 / 进水",
+        "model": {
+          "initEvent": "IE_MECH_WATER",
+          "initFreq": 0.0005,
+          "functionalEvents": [
+            {
+              "id": "B_OFFGAS",
+              "label": "早期离气探测+联动",
+              "failProb": 0.01
+            },
+            {
+              "id": "B_BMS",
+              "label": "BMS 切断/隔离",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_THERMAL",
+              "label": "电芯间热障阻断蔓延",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_DEFLAG",
+              "label": "舱内泄爆/防爆",
+              "failProb": 0.1
+            }
+          ],
+          "root": {
+            "kind": "branch",
+            "feId": "B_OFFGAS",
+            "success": {
+              "kind": "leaf",
+              "consequence": "C1"
+            },
+            "failure": {
+              "kind": "branch",
+              "feId": "B_BMS",
+              "success": {
+                "kind": "leaf",
+                "consequence": "C2"
+              },
+              "failure": {
+                "kind": "branch",
+                "feId": "B_THERMAL",
+                "success": {
+                  "kind": "leaf",
+                  "consequence": "C3"
+                },
+                "failure": {
+                  "kind": "branch",
+                  "feId": "B_DEFLAG",
+                  "success": {
+                    "kind": "leaf",
+                    "consequence": "C4"
+                  },
+                  "failure": {
+                    "kind": "leaf",
+                    "consequence": "C5"
+                  }
+                }
+              }
+            }
+          },
+          "consequenceDefs": {
+            "C1": "单体安全排气",
+            "C2": "模组内热蔓延/起火",
+            "C3": "Pack/簇级起火",
+            "C4": "箱级起火蔓延",
+            "C5": "爆炸 + 毒气释放"
+          },
+          "consequences": [
+            {
+              "id": "C1",
+              "desc": "单体安全排气",
+              "level": "C1"
+            },
+            {
+              "id": "C2",
+              "desc": "模组内热蔓延/起火",
+              "level": "C2"
+            },
+            {
+              "id": "C3",
+              "desc": "Pack/簇级起火",
+              "level": "C3"
+            },
+            {
+              "id": "C4",
+              "desc": "箱级起火蔓延",
+              "level": "C4"
+            },
+            {
+              "id": "C5",
+              "desc": "爆炸 + 毒气释放",
+              "level": "C5"
+            }
+          ],
+          "initFreqSource": "manual"
+        },
+        "fts": {
+          "model_data": {
+            "parameters": [
+              {
+                "id": "B_OFFGAS",
+                "kind": "probability",
+                "value": 0.01,
+                "source": "IEEE/CCPS LOPA; UL 9540A 排气特性研究"
+              },
+              {
+                "id": "B_BMS",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "DNV/Gully 2019; IEC 61508 SIL 能力类比(PFD 1e-1–1e-2)"
+              },
+              {
+                "id": "B_THERMAL",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "DNV/Gully 2019; UL 9540A 单元级测试"
+              },
+              {
+                "id": "B_DEFLAG",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "PFD: LOPA; η: Landucci 2017; NFPA 68/69"
+              }
+            ]
+          },
+          "fault_trees": [
+            {
+              "name": "B_OFFGAS",
+              "top": "B_OFFGAS",
+              "nodes": [
+                {
+                  "id": "B_OFFGAS_E",
+                  "basic": true,
+                  "param_ref": "B_OFFGAS"
+                },
+                {
+                  "id": "B_OFFGAS",
+                  "op": "null",
+                  "args": [
+                    "B_OFFGAS_E"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_BMS",
+              "top": "B_BMS",
+              "nodes": [
+                {
+                  "id": "B_BMS_E",
+                  "basic": true,
+                  "param_ref": "B_BMS"
+                },
+                {
+                  "id": "B_BMS",
+                  "op": "null",
+                  "args": [
+                    "B_BMS_E"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_THERMAL",
+              "top": "B_THERMAL",
+              "nodes": [
+                {
+                  "id": "B_THERMAL_E",
+                  "basic": true,
+                  "param_ref": "B_THERMAL"
+                },
+                {
+                  "id": "B_THERMAL",
+                  "op": "null",
+                  "args": [
+                    "B_THERMAL_E"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_DEFLAG",
+              "top": "B_DEFLAG",
+              "nodes": [
+                {
+                  "id": "B_DEFLAG_E",
+                  "basic": true,
+                  "param_ref": "B_DEFLAG"
+                },
+                {
+                  "id": "B_DEFLAG",
+                  "op": "null",
+                  "args": [
+                    "B_DEFLAG_E"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "pfds": {}
+      },
+      {
+        "key": "sc:SC_OVERCHARGE",
+        "name": "过充 / BMS 失效",
+        "model": {
+          "initEvent": "IE_OVERCHARGE",
+          "initFreq": 0.001,
+          "functionalEvents": [
+            {
+              "id": "B_BMS",
+              "label": "BMS 切断/隔离",
+              "failProb": 0.09731799999999999,
+              "linkFt": "B_BMS"
+            },
+            {
+              "id": "B_OFFGAS",
+              "label": "早期离气探测+联动",
+              "failProb": 0.11791,
+              "linkFt": "B_OFFGAS"
+            },
+            {
+              "id": "B_THERMAL",
+              "label": "电芯间热障阻断蔓延",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_DEFLAG",
+              "label": "舱内泄爆/防爆",
+              "failProb": 0.1
+            }
+          ],
+          "root": {
+            "kind": "branch",
+            "feId": "B_BMS",
+            "success": {
+              "kind": "leaf",
+              "consequence": "C1"
+            },
+            "failure": {
+              "kind": "branch",
+              "feId": "B_OFFGAS",
+              "success": {
+                "kind": "leaf",
+                "consequence": "C2"
+              },
+              "failure": {
+                "kind": "branch",
+                "feId": "B_THERMAL",
+                "success": {
+                  "kind": "leaf",
+                  "consequence": "C3"
+                },
+                "failure": {
+                  "kind": "branch",
+                  "feId": "B_DEFLAG",
+                  "success": {
+                    "kind": "leaf",
+                    "consequence": "C4"
+                  },
+                  "failure": {
+                    "kind": "leaf",
+                    "consequence": "C5"
+                  }
+                }
+              }
+            }
+          },
+          "consequences": [
+            {
+              "id": "C1",
+              "desc": "单体安全排气",
+              "level": "C1"
+            },
+            {
+              "id": "C2",
+              "desc": "模组内热蔓延/起火",
+              "level": "C2"
+            },
+            {
+              "id": "C3",
+              "desc": "Pack/簇级起火",
+              "level": "C3"
+            },
+            {
+              "id": "C4",
+              "desc": "箱级起火蔓延",
+              "level": "C4"
+            },
+            {
+              "id": "C5",
+              "desc": "爆炸 + 毒气释放",
+              "level": "C5"
+            },
+            {
+              "id": "K1",
+              "desc": "新后果",
+              "level": "C3"
+            }
+          ],
+          "initFreqSource": "manual"
+        },
+        "fts": {
+          "model_data": {
+            "parameters": [
+              {
+                "id": "BMS_SENSOR_FAIL",
+                "kind": "probability",
+                "value": 0.03,
+                "source": "DNV/Gully 2019 传感失效"
+              },
+              {
+                "id": "BMS_LOGIC_FAIL",
+                "kind": "probability",
+                "value": 0.01,
+                "source": "IEC 61508 SIL 逻辑"
+              },
+              {
+                "id": "BMS_CONTACTOR_FAIL",
+                "kind": "probability",
+                "value": 0.06,
+                "source": "OREDA/exida 接触器拒动"
+              },
+              {
+                "id": "B_OFFGAS",
+                "kind": "probability",
+                "value": 0.01,
+                "source": "IEEE/CCPS LOPA; UL 9540A 排气特性研究"
+              },
+              {
+                "id": "B_THERMAL",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "DNV/Gully 2019; UL 9540A 单元级测试"
+              },
+              {
+                "id": "B_DEFLAG",
+                "kind": "probability",
+                "value": 0.1,
+                "source": "PFD: LOPA; η: Landucci 2017; NFPA 68/69"
+              },
+              {
+                "id": "B_OFFGAS_BE",
+                "kind": "probability",
+                "value": 0.01
+              },
+              {
+                "id": "BE_mqrst2sy0",
+                "kind": "probability",
+                "value": 0.1
+              },
+              {
+                "id": "BE_mqrsucn23",
+                "kind": "probability",
+                "value": 0.1
+              },
+              {
+                "id": "BE_mqrsud494",
+                "kind": "probability",
+                "value": 0.1
+              }
+            ]
+          },
+          "fault_trees": [
+            {
+              "name": "B_BMS",
+              "top": "B_BMS",
+              "nodes": [
+                {
+                  "id": "BMS_SENSOR_FAIL",
+                  "basic": true,
+                  "param_ref": "BMS_SENSOR_FAIL"
+                },
+                {
+                  "id": "BMS_LOGIC_FAIL",
+                  "basic": true,
+                  "param_ref": "BMS_LOGIC_FAIL"
+                },
+                {
+                  "id": "BMS_CONTACTOR_FAIL",
+                  "basic": true,
+                  "param_ref": "BMS_CONTACTOR_FAIL"
+                },
+                {
+                  "id": "B_BMS",
+                  "op": "or",
+                  "args": [
+                    "BMS_SENSOR_FAIL",
+                    "BMS_LOGIC_FAIL",
+                    "BMS_CONTACTOR_FAIL"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_THERMAL",
+              "top": "B_THERMAL",
+              "nodes": [
+                {
+                  "id": "B_THERMAL_E",
+                  "basic": true,
+                  "param_ref": "B_THERMAL"
+                },
+                {
+                  "id": "B_THERMAL",
+                  "op": "null",
+                  "args": [
+                    "B_THERMAL_E"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_DEFLAG",
+              "top": "B_DEFLAG",
+              "nodes": [
+                {
+                  "id": "B_DEFLAG_E",
+                  "basic": true,
+                  "param_ref": "B_DEFLAG"
+                },
+                {
+                  "id": "B_DEFLAG",
+                  "op": "null",
+                  "args": [
+                    "B_DEFLAG_E"
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "B_OFFGAS",
+              "top": "B_OFFGAS",
+              "nodes": [
+                {
+                  "id": "B_OFFGAS_BE",
+                  "basic": true,
+                  "param_ref": "B_OFFGAS_BE"
+                },
+                {
+                  "id": "B_OFFGAS",
+                  "op": "or",
+                  "args": [
+                    "B_OFFGAS_BE",
+                    "BE_mqrst2sy0",
+                    "G_mqrsu2by2"
+                  ]
+                },
+                {
+                  "id": "BE_mqrst2sy0",
+                  "basic": true,
+                  "param_ref": "BE_mqrst2sy0"
+                },
+                {
+                  "id": "G_mqrsu2by2",
+                  "op": "and",
+                  "args": [
+                    "BE_mqrsucn23",
+                    "BE_mqrsud494"
+                  ],
+                  "label": "中间事件"
+                },
+                {
+                  "id": "BE_mqrsucn23",
+                  "basic": true,
+                  "param_ref": "BE_mqrsucn23"
+                },
+                {
+                  "id": "BE_mqrsud494",
+                  "basic": true,
+                  "param_ref": "BE_mqrsud494"
+                }
+              ]
+            }
+          ]
+        },
+        "pfds": {
+          "B_BMS": 0.09731799999999999,
+          "B_OFFGAS": 0.11791
+        }
+      }
+    ],
+    "activeKey": "sc:SC_OVERCHARGE",
+    "checkedKeys": {
+      "sc:default": true,
+      "sc:SC_ISC": true,
+      "sc:SC_COOLANT": true,
+      "sc:SC_MECH_WATER": true,
+      "sc:SC_OVERCHARGE": true
+    }
+  }
+}

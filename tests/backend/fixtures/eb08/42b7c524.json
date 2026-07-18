@@ -1,0 +1,187 @@
+{
+  "id": "42b7c524",
+  "name": "test2",
+  "saved_at": "2026-07-10T14:13:27.252624+00:00",
+  "payload": {
+    "v": 2,
+    "etas": [
+      {
+        "key": "sc:default",
+        "name": "默认热失控级联",
+        "renamed": false,
+        "model": {
+          "initEvent": "IE_TR",
+          "initFreq": 0.004,
+          "functionalEvents": [
+            {
+              "id": "B_OFFGAS",
+              "label": "早期离气探测+联动",
+              "failProb": 0.01
+            },
+            {
+              "id": "B_BMS",
+              "label": "BMS 切断/隔离",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_THERMAL",
+              "label": "电芯间热障阻断蔓延",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_DEFLAG",
+              "label": "舱内泄爆/防爆",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_SPACING",
+              "label": "舱间距阻断多舱蔓延",
+              "failProb": 0.1
+            },
+            {
+              "id": "B_RESPONSE",
+              "label": "应急响应(避免开门引气)",
+              "failProb": 0.1
+            }
+          ],
+          "root": {
+            "kind": "branch",
+            "feId": "B_OFFGAS",
+            "success": {
+              "kind": "leaf",
+              "consequence": "C1"
+            },
+            "failure": {
+              "kind": "branch",
+              "feId": "B_BMS",
+              "success": {
+                "kind": "leaf",
+                "consequence": "C2"
+              },
+              "failure": {
+                "kind": "branch",
+                "feId": "B_THERMAL",
+                "success": {
+                  "kind": "leaf",
+                  "consequence": "C3"
+                },
+                "failure": {
+                  "kind": "branch",
+                  "feId": "B_DEFLAG",
+                  "success": {
+                    "kind": "leaf",
+                    "consequence": "C4"
+                  },
+                  "failure": {
+                    "kind": "branch",
+                    "feId": "B_SPACING",
+                    "success": {
+                      "kind": "leaf",
+                      "consequence": "C5"
+                    },
+                    "failure": {
+                      "kind": "branch",
+                      "feId": "B_RESPONSE",
+                      "success": {
+                        "kind": "leaf",
+                        "consequence": "C5"
+                      },
+                      "failure": {
+                        "kind": "leaf",
+                        "consequence": "C5"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "fts": {
+          "model_data": {
+            "parameters": []
+          },
+          "fault_trees": []
+        },
+        "pfds": {}
+      }
+    ],
+    "activeKey": "sc:default",
+    "checkedKeys": {
+      "sc:default": true
+    },
+    "userFts": {
+      "model_data": {
+        "parameters": []
+      },
+      "fault_trees": []
+    },
+    "fmeaRows": [
+      {
+        "id": "ex1",
+        "object": "动力电芯",
+        "mode": "内短路热失控",
+        "S": 9,
+        "O": 3,
+        "D": 6,
+        "source": "参考库"
+      },
+      {
+        "id": "ex2",
+        "object": "BMS 过充保护",
+        "mode": "逻辑误判",
+        "S": 6,
+        "O": 4,
+        "D": 4,
+        "source": "参考库"
+      }
+    ],
+    "fmeaMapping": {
+      "consequenceToS": {
+        "C1": 2,
+        "C2": 4,
+        "C3": 6,
+        "C4": 8,
+        "C5": 10
+      },
+      "freqToO": [
+        {
+          "th": 0.1,
+          "o": 9
+        },
+        {
+          "th": 0.01,
+          "o": 7
+        },
+        {
+          "th": 0.001,
+          "o": 5
+        },
+        {
+          "th": 0.0001,
+          "o": 4
+        },
+        {
+          "th": 1e-05,
+          "o": 3
+        }
+      ],
+      "freqFloorO": 2,
+      "detectionToD": {
+        "1": 2,
+        "2": 4,
+        "3": 6,
+        "4": 8,
+        "5": 10
+      },
+      "detectionDefaultD": 6,
+      "barrierCategoryToS": {
+        "warning": 6,
+        "active": 8,
+        "passive": 9
+      },
+      "barrierDefaultS": 7,
+      "componentDefaultS": 6
+    }
+  }
+}
