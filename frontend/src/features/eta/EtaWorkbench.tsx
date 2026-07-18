@@ -21,6 +21,7 @@ import { EMPTY_FTS } from '../../stores/projectStore'
 import { AiAppliedPill } from '../ai-draft/AiAppliedPill'
 import type { AiDraftState } from '../ai-draft/useAiDraft'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
+import { ErrorBoundary } from '../shell/ErrorBoundary'
 
 const BarrierFtModal = lazy(() => import('../../components/BarrierFtModal').then((m) => ({ default: m.BarrierFtModal })))
 
@@ -342,19 +343,36 @@ export function EtaWorkbench(
         )}
       </div>
 
-      {/* 初始事件 FTA 模态 */}
+      {/* 初始事件 FTA 模态 —— 与 EventTreeEditor 的屏障模态同款防御(白屏报障 2026-07-17):
+          懒模态包 ErrorBoundary(渲染抛错兜底为可安全关闭的对话框,不再整页白)+ 可见加载态 */}
       {initFtOpen && activeEta && (
-        <Suspense fallback={null}>
-          <BarrierFtModal
-            model={etFtsModel}
-            ftName="__init__"
-            api={{ set: (m) => P().setEtaFts(activeKey, m), undo: docUndo, redo: docRedo, canUndo: docCanUndo, canRedo: docCanRedo }}
-            pfd={etModel?.initFreq}
-            libComponents={lib?.component_failure_rates ?? []}
-            onClose={onInitFtClose}
-            frequencyMode
-          />
-        </Suspense>
+        <ErrorBoundary
+          fallback={(reset) => (
+            <div role="alertdialog" aria-label="故障树编辑器出错" style={{ position: 'fixed', inset: 0, zIndex: 60,
+              background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onClick={() => { reset(); onInitFtClose() }}>
+              <div className="psa-panel" style={{ padding: 20, maxWidth: 380, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>故障树编辑器打开失败</div>
+                <div style={{ fontSize: 12, color: 'var(--psa-muted)', lineHeight: 1.6, marginBottom: 12 }}>
+                  初因事件故障树无法渲染(可能是空树或数据不一致)。已安全关闭编辑器,你的事件树未受影响。
+                </div>
+                <button type="button" className="psa-btn" onClick={() => { reset(); onInitFtClose() }}>关闭</button>
+              </div>
+            </div>
+          )}>
+          <Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13 }}>载入故障树编辑器…</div>}>
+            <BarrierFtModal
+              model={etFtsModel}
+              ftName="__init__"
+              api={{ set: (m) => P().setEtaFts(activeKey, m), undo: docUndo, redo: docRedo, canUndo: docCanUndo, canRedo: docCanRedo }}
+              pfd={etModel?.initFreq}
+              libComponents={lib?.component_failure_rates ?? []}
+              onClose={onInitFtClose}
+              frequencyMode
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
     </div>
   )

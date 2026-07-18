@@ -42,6 +42,25 @@ export function BarrierFtModal(
       setFreqBusy(false)
     }
   }
+  // 防御(白屏报障 2026-07-17):命名树缺失时(典型:模态开着时 ↶ 撤销把「挂载」本身
+  // 撤掉了,或树被并发删除)不进画布——此态下若继续渲染/编辑,layoutFaultTree 曾直接抛
+  // (白屏),且 addGate/addBasic 会经 getFt 的 fault_trees[0] 回退**改错别的树**。
+  // 给可见说明 + 关闭,绝不留白、绝不误写。
+  if (!model.fault_trees.some((f) => f.name === ftName)) {
+    return (
+      <div style={overlay} onClick={onClose}>
+        <div style={{ margin: 'auto', maxWidth: 400, background: 'var(--psa-surface)', borderRadius: 10, padding: 20, textAlign: 'center' }}
+          onClick={(e) => e.stopPropagation()} role="alertdialog" aria-label="故障树不存在">
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>该故障树已不存在</div>
+          <div style={{ fontSize: 12, color: 'var(--psa-muted)', lineHeight: 1.6, marginBottom: 12 }}>
+            屏障「{ftName}」的故障树在模型中找不到——通常是撤销操作把「挂载 FTA」一并撤掉了,
+            或树已被删除。请关闭后重新挂载(重做 ↷ 可恢复刚才的撤销)。
+          </div>
+          <button type="button" className="psa-btn" onClick={onClose}>关闭</button>
+        </div>
+      </div>
+    )
+  }
   const graph = layoutFaultTree(model, ftName, undefined, true)
   return (
     <div style={overlay} onClick={onClose}>
