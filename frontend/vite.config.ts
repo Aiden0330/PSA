@@ -9,6 +9,8 @@ import react from '@vitejs/plugin-react'
 //   常规 build(dist,:8000 托管)保留 React.lazy 产生的按需分块 —— ETA 关键路径不再
 //   解析 reactflow/ag-grid/echarts。
 export default defineConfig(({ mode }) => ({
+  // 构建戳:状态栏可读,一眼判定标签页是否在跑旧代码(报障定位反复被"陈旧标签页"污染)
+  define: { __BUILD_TS__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')) },
   plugins: [react()],
   base: './',
   server: {

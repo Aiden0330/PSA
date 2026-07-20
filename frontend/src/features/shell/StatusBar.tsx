@@ -21,7 +21,7 @@ export function StatusBar({ tab, persistence }: { tab: MainTab; persistence: Pro
       {persistence.projectUuid && <span>项目 <span className="num">{persistence.projectUuid.slice(0, 8)}</span></span>}
       {hash && <span>版本 <span className="num">{hash.slice(0, 8)}</span></span>}
       {persistence.archiveLocal && <span style={{ color: 'var(--exp-acc)' }}>离线存档</span>}
-      <span style={{ marginLeft: 'auto' }} className="num">v2.0</span>
+      <span style={{ marginLeft: 'auto' }} className="num" title="构建时刻——与开发服务器启动时间一致;若明显偏旧,说明标签页在跑旧代码,请硬刷新">v2.0 · {__BUILD_TS__}</span>
     </footer>
   )
 }
