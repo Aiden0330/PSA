@@ -14,7 +14,7 @@ const C_TOKEN: Record<string, string> = {
 
 export function ConsequencesTab({ model, onChange }: {
   model: EventTreeModel
-  onChange: (m: EventTreeModel) => void
+  onChange: (m: EventTreeModel | ((prev: EventTreeModel) => EventTreeModel)) => void
 }) {
   const entries = [...consEntries(model)].sort(
     (a, b) => CONSEQUENCES.indexOf(a.level) - CONSEQUENCES.indexOf(b.level),
@@ -44,7 +44,7 @@ export function ConsequencesTab({ model, onChange }: {
                   value={e.level}
                   disabled={isDefault(e.id)}
                   style={{ fontSize: 11.5, fontWeight: 600, border: 'none', background: 'transparent', cursor: isDefault(e.id) ? 'default' : 'pointer', color: C_TOKEN[e.level] ?? 'var(--psa-ink)', padding: 0 }}
-                  onChange={(ev) => onChange(updateConsequence(model, e.id, { level: ev.target.value as ConsLevel }))}
+                  onChange={(ev) => { const lv = ev.target.value as ConsLevel; onChange((prev) => updateConsequence(prev, e.id, { level: lv })) }}
                 >
                   {CONSEQUENCES.map((c) => <option key={c} value={c}>{gradeLabel(c)}</option>)}
                 </select>
@@ -56,13 +56,13 @@ export function ConsequencesTab({ model, onChange }: {
                 value={e.desc}
                 onFocus={(ev) => (ev.currentTarget.style.borderColor = 'var(--psa-primary)')}
                 onBlur={(ev) => (ev.currentTarget.style.borderColor = 'transparent')}
-                onChange={(ev) => onChange(updateConsequence(model, e.id, { desc: ev.target.value }))}
+                onChange={(ev) => { const d = ev.target.value; onChange((prev) => updateConsequence(prev, e.id, { desc: d })) }}
               />
 
               {/* Delete — only for non-defaults */}
               {!isDefault(e.id) ? (
                 <button className="psa-btn psa-btn--danger" style={{ height: 26, padding: '0 9px', fontSize: 11.5, flexShrink: 0 }}
-                  onClick={() => onChange(delConsequence(model, e.id))}>
+                  onClick={() => onChange((prev) => delConsequence(prev, e.id))}>
                   <Icon name="trash" size={13} />
                 </button>
               ) : (
@@ -75,7 +75,7 @@ export function ConsequencesTab({ model, onChange }: {
 
         {/* Add button */}
         <div style={{ padding: '0 10px 12px' }}>
-          <button className="psa-btn psa-btn--primary" onClick={() => onChange(addConsequence(model, '新后果', 'C3'))}>
+          <button className="psa-btn psa-btn--primary" onClick={() => onChange((prev) => addConsequence(prev, '新后果', 'C3'))}>
             <Icon name="plus" size={13} /> 新增后果
           </button>
         </div>

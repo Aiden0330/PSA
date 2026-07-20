@@ -27,10 +27,13 @@ export function useActiveEta() {
   const etModel = activeEta ? composeModel(activeEta.model, pfds) : null
   const etFtsModel: ModelJson = activeEta?.fts ?? EMPTY_FTS
 
-  const writeEtModel = (next: EventTreeModel) => {
+  // 收值或更新函数:值式覆写来自渲染期旧快照,同拍两次编辑后写冲前写(丢改动
+  // 报障 2026-07-17,与 FT 编辑同病)。函数式按**调用时**store 状态应用,同步序贯自然复合。
+  const writeEtModel = (next: EventTreeModel | ((prev: EventTreeModel) => EventTreeModel)) => {
     const prev = P().present.etas.find((e) => e.key === P().activeKey)?.model
     if (!prev) return
-    const stripped = stripDerived(next, prev)
+    const nextVal = typeof next === 'function' ? next(prev) : next
+    const stripped = stripDerived(nextVal, prev)
     if (JSON.stringify(stripped) === JSON.stringify(prev)) return   // 纯派生差异 → 不产生历史条目
     P().setEtaModel(P().activeKey, stripped)
   }

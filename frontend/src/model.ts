@@ -32,7 +32,13 @@ export function getFt(m: ModelJson, name: string): FaultTreeJson {
   return m.fault_trees.find((f) => f.name === name) ?? m.fault_trees[0]
 }
 
+/** mutator 严格守卫(白屏/误写审查 2026-07-17):命名树不存在 ⇒ 不可变更。
+ *  此前 mutator 经 getFt 回退拿到 fault_trees[0],会把编辑**写进别的树**(数据损坏),
+ *  空 fault_trees 时则直接抛(白屏)。缺树 = no-op,由调用方 UI 层负责呈现缺树态。 */
+const hasFt = (m: ModelJson, name: string) => m.fault_trees.some((f) => f.name === name)
+
 export function addBasic(m: ModelJson, ftName: string, value = 0.1, kind: 'probability' | 'frequency' = 'probability'): ModelJson {
+  if (!hasFt(m, ftName)) return m
   const nm = clone(m), ft = getFt(nm, ftName), id = uid(kind === 'frequency' ? 'F' : 'BE')
   ft.nodes.push({ id, basic: true, param_ref: id })
   nm.model_data.parameters.push({ id, kind, value })
@@ -61,11 +67,13 @@ export function sharedIeBarrierEvents(m: ModelJson, ieName = '__init__'): string
   return [...shared].sort()
 }
 export function addGate(m: ModelJson, ftName: string, op: string, k = 2): ModelJson {
+  if (!hasFt(m, ftName)) return m
   const nm = clone(m), ft = getFt(nm, ftName), id = uid('G')
   ft.nodes.push({ id, op, args: [], label: '中间事件', ...(op === 'atleast' ? { k } : {}) })
   return nm
 }
 export function connect(m: ModelJson, ftName: string, source: string, target: string): ModelJson {
+  if (!hasFt(m, ftName)) return m
   const nm = clone(m), ft = getFt(nm, ftName)
   const g = ft.nodes.find((n) => n.id === source)
   if (g && g.op && !(g.args ?? []).includes(target) && source !== target) {
@@ -74,6 +82,7 @@ export function connect(m: ModelJson, ftName: string, source: string, target: st
   return nm
 }
 export function deleteNode(m: ModelJson, ftName: string, id: string): ModelJson {
+  if (!hasFt(m, ftName)) return m
   const nm = clone(m), ft = getFt(nm, ftName)
   ft.nodes = ft.nodes.filter((n) => n.id !== id)
   for (const n of ft.nodes) if (n.args) n.args = n.args.filter((a) => a !== id)
@@ -82,17 +91,20 @@ export function deleteNode(m: ModelJson, ftName: string, id: string): ModelJson 
   return nm
 }
 export function updateNode(m: ModelJson, ftName: string, id: string, patch: Partial<FtNodeJson>): ModelJson {
+  if (!hasFt(m, ftName)) return m
   const nm = clone(m), n = getFt(nm, ftName).nodes.find((x) => x.id === id)
   if (n) Object.assign(n, patch)
   return nm
 }
 export function setTop(m: ModelJson, ftName: string, id: string): ModelJson {
+  if (!hasFt(m, ftName)) return m
   const nm = clone(m); getFt(nm, ftName).top = id; return nm
 }
 
 /** 重命名节点(事件名),级联更新所有引用:父门 args、自身 param_ref、ft.top、
  *  以及(自命名基本事件的)参数 id。newId 空/与现有节点重名/(自命名时)与现有参数重名 → 不改。 */
 export function renameNode(m: ModelJson, ftName: string, oldId: string, newId: string): ModelJson {
+  if (!hasFt(m, ftName)) return m
   newId = (newId ?? '').trim()
   const src = getFt(m, ftName)
   const node0 = src.nodes.find((n) => n.id === oldId)
@@ -144,6 +156,7 @@ export function attachStarterFt(fts: ModelJson, feId: string, failProb: number,
 export interface LibComponent { id: string; name: string; failure_mode?: string; rate: number; unit: string; source: { citation: string } }
 /** 从器件失效率库追加基本事件(值=rate, 不做单位换算; 来源含名称/失效模式/单位标注)。 */
 export function addBasicFromLib(m: ModelJson, ftName: string, c: LibComponent): ModelJson {
+  if (!hasFt(m, ftName)) return m
   const nm = clone(m), ft = getFt(nm, ftName)
   const taken = ft.nodes.map((n) => n.id).concat(nm.model_data.parameters.map((p) => p.id))
   let id = c.id, i = 2

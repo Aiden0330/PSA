@@ -49,6 +49,7 @@ export function Inspector({ model, ftName, selected, onUpdateNode, onUpdateParam
     )
   }
   const ft = getFt(model, ftName)
+  if (!ft) return <div style={{ padding: 14, color: 'var(--psa-faint)', fontSize: 12 }}>—</div>
   const node = ft.nodes.find((n) => n.id === selected)
   if (!node) return <div style={{ padding: 14, color: 'var(--psa-faint)', fontSize: 12 }}>—</div>
   const param = node.basic ? model.model_data.parameters.find((p) => p.id === node.param_ref) : null

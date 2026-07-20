@@ -31,7 +31,7 @@ export function EtInspector(
     qBusy, deepBusy, expBusy, qErr, onEngineQuantify, onDeepen, onExport, onExportImage,
     pfds, canEditFt, onEditFt, onAttachFt, onDetachFt, libBarriers, onAddBarrier, onMoveFe, onEditInitFt }: {
     model: EventTreeModel
-    onChange: (m: EventTreeModel) => void
+    onChange: (m: EventTreeModel | ((prev: EventTreeModel) => EventTreeModel)) => void
     sel: string[] | null
     onSelect: (path: string[] | null) => void
     seqRows: SeqRow[]
@@ -108,7 +108,7 @@ export function EtInspector(
             <h4 style={h4s}>初始事件</h4>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
               <span style={{ width: 48, fontSize: 11, color: 'var(--psa-muted)' }}>名称</span>
-              <input value={model.initEvent} onChange={(e) => onChange(setInitEvent(model, e.target.value))} style={{ flex: 1, fontSize: 12 }} />
+              <input value={model.initEvent} onChange={(e) => { const v = e.target.value; onChange((prev) => setInitEvent(prev, v)) }} style={{ flex: 1, fontSize: 12 }} />
             </div>
             {/* 初因溯源(模板/库带入;证据链首环)*/}
             {(model.initSource || model.initGrade) && (
@@ -126,7 +126,7 @@ export function EtInspector(
                   <label key={src} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
                     <input type="radio" name="initFreqSource" value={src}
                       checked={(model.initFreqSource ?? 'manual') === src}
-                      onChange={() => onChange(setInitFreqSource(model, src))} />
+                      onChange={() => onChange((prev) => setInitFreqSource(prev, src))} />
                     {label}
                   </label>
                 ))}
@@ -137,7 +137,7 @@ export function EtInspector(
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ width: 48, fontSize: 11, color: 'var(--psa-muted)' }}>频率/yr</span>
                 <input key={'freq' + model.initFreq} defaultValue={formatEtaNumber(model.initFreq)}
-                  onBlur={(e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v) && v >= 0) onChange(setInitFreq(model, v)) }}
+                  onBlur={(e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v) && v >= 0) onChange((prev) => setInitFreq(prev, v)) }}
                   onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                   title="支持科学计数,如 1e-3;回车或失焦生效" style={{ flex: 1, fontSize: 12 }} />
               </div>
@@ -146,8 +146,7 @@ export function EtInspector(
             {(model.initFreqSource ?? 'manual') === 'product' && (() => {
               const prod = { cellsPerPack: 100, packsPerSystem: 20, cellFailureRate: 1e-7, ...model.product }
               const onProdChange = (patch: Partial<typeof prod>) => {
-                const m2 = setProduct(model, patch)
-                onChange(setInitFreq(m2, computeProductFreq(m2)))
+                onChange((prev) => { const m2 = setProduct(prev, patch); return setInitFreq(m2, computeProductFreq(m2)) })
               }
               return (
                 <div style={{ marginBottom: 4 }}>
@@ -192,20 +191,20 @@ export function EtInspector(
             {libBarriers && libBarriers.length > 0 && (
               <div style={{ marginBottom: 6 }}>
                 <LibPicker label="＋从库加屏障" items={libBarriers.map((b) => ({ id: b.id, name: b.name }))}
-                  onPick={(id) => { const b = libBarriers.find((x) => x.id === id); if (b) onChange(addBarrierFromLib(model, b)) }} />
+                  onPick={(id) => { const b = libBarriers.find((x) => x.id === id); if (b) onChange((prev) => addBarrierFromLib(prev, b)) }} />
               </div>
             )}
             {model.functionalEvents.map((fe, d) => (
               <div key={fe.id} style={{ display: 'flex', gap: 5, alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ width: 30, fontSize: 10, color: 'var(--psa-faint)', fontFamily: mono, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fe.id}>{fe.id}</span>
-                <input value={fe.label} onChange={(e) => onChange(renameFe(model, d, e.target.value))} style={{ width: 96, fontSize: 12 }} />
+                <input value={fe.label} onChange={(e) => { const v = e.target.value; onChange((prev) => renameFe(prev, d, v)) }} style={{ width: 96, fontSize: 12 }} />
                 <input type="number" step="0.01" min={0} max={1} value={fe.failProb}
-                  onChange={(e) => onChange(setFailProb(model, d, +e.target.value))} style={{ width: 54, fontSize: 12 }} />
+                  onChange={(e) => { const v = +e.target.value; onChange((prev) => setFailProb(prev, d, v)) }} style={{ width: 54, fontSize: 12 }} />
                 <button title="上移" disabled={d === 0} onClick={() => onMoveFe(d, -1)} style={{ ...moveBtn, opacity: d === 0 ? 0.4 : 1 }}>↑</button>
                 <button title="下移" disabled={d === model.functionalEvents.length - 1} onClick={() => onMoveFe(d, 1)} style={{ ...moveBtn, opacity: d === model.functionalEvents.length - 1 ? 0.4 : 1 }}>↓</button>
                 <button title="删除屏障" onClick={() => {
                   const used = branchesUsingFe(model, fe.id)
-                  if (used === 0 || window.confirm(`将折叠 ${used} 个引用「${fe.label}」的分支为末态,继续?`)) onChange(delFe(model, d))
+                  if (used === 0 || window.confirm(`将折叠 ${used} 个引用「${fe.label}」的分支为末态,继续?`)) onChange((prev) => delFe(prev, d))
                 }} style={{ color: 'var(--psa-danger)', border: 0, background: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, flexShrink: 0 }}>✕</button>
               </div>
             ))}
@@ -218,7 +217,7 @@ export function EtInspector(
               <div style={{ fontSize: 12 }}>
                 <div style={{ marginBottom: 8 }}>
                   末态后果:&nbsp;
-                  <select value={selNode.consequence} onChange={(e) => onChange(setConsequence(model, sel!, e.target.value))}>
+                  <select value={selNode.consequence} onChange={(e) => { const v = e.target.value; onChange((prev) => setConsequence(prev, sel!, v)) }}>
                     {consEntries(model).map((e) => <option key={e.id} value={e.id}>{gradeLabel(e.level)} — {e.desc}</option>)}
                   </select>
                 </div>
@@ -229,7 +228,7 @@ export function EtInspector(
                   ) : (
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <span>继续到屏障:</span>
-                      <select value="" onChange={(e) => { if (e.target.value) onChange(branchLeaf(model, sel!, e.target.value)) }}>
+                      <select value="" onChange={(e) => { const v = e.target.value; if (v) onChange((prev) => branchLeaf(prev, sel!, v)) }}>
                         <option value="" disabled>选择后续屏障…</option>
                         {subs.map((f) => <option key={f.id} value={f.id}>{f.label || f.id}</option>)}
                       </select>
@@ -251,7 +250,7 @@ export function EtInspector(
                     <span style={{ width: 42, fontSize: 11, color: 'var(--psa-muted)' }}>名称</span>
                     <input
                       value={model.functionalEvents[selIdx].label}
-                      onChange={(e) => onChange(renameFe(model, selIdx, e.target.value))}
+                      onChange={(e) => { const v = e.target.value; onChange((prev) => renameFe(prev, selIdx, v)) }}
                       style={{ flex: 1, fontSize: 12 }}
                     />
                   </div>
@@ -274,7 +273,7 @@ export function EtInspector(
                       <input
                         type="number" step="0.01" min={0} max={1}
                         value={model.functionalEvents[selIdx].failProb}
-                        onChange={(e) => onChange(setFailProb(model, selIdx, Number(e.target.value)))}
+                        onChange={(e) => { const v = Number(e.target.value); onChange((prev) => setFailProb(prev, selIdx, v)) }}
                         style={{ flex: 1, fontSize: 12 }}
                       />
                     </div>
@@ -306,7 +305,7 @@ export function EtInspector(
                         `现场更新 N=${bayesIn.N}、k=${bayesIn.k}、先验=${bayesIn.prior === 'jeffreys' ? 'Jeffreys' : '当前PFD(n0=' + bayesIn.n0 + ')'}、采用=${which === 'mean' ? '后验均值' : '95%上限'}、后验均值=${formatEtaNumber(res.mean)}、95%上限=${formatEtaNumber(res.p95)}(${date})`
                       const adopt = (which: 'mean' | 'p95') => {
                         const pfdVal = which === 'mean' ? res.mean : res.p95
-                        onChange(applyFieldUpdate(model, selIdx, { failProb: pfdVal, grade: 'A', evidence: mkEvidence(which) }))
+                        onChange((prev) => applyFieldUpdate(prev, selIdx, { failProb: pfdVal, grade: 'A', evidence: mkEvidence(which) }))
                         setBayesOpen(false)
                       }
                       return (
@@ -374,7 +373,7 @@ export function EtInspector(
                       <span style={{ width: 54, fontSize: 11, color: 'var(--psa-muted)' }}>判定屏障</span>
                       <select
                         value={currentFeId}
-                        onChange={(e) => onChange(setBranchFe(model, sel!, e.target.value))}
+                        onChange={(e) => { const v = e.target.value; onChange((prev) => setBranchFe(prev, sel!, v)) }}
                         style={{ flex: 1, fontSize: 12 }}
                       >
                         {opts.map((f) => <option key={f.id} value={f.id}>{f.id} — {f.label}</option>)}
@@ -389,7 +388,7 @@ export function EtInspector(
                     const feId = model.functionalEvents[selIdx].id
                     const used = branchesUsingFe(model, feId)
                     if (used === 0 || window.confirm(`将折叠 ${used} 个引用「${model.functionalEvents[selIdx].label}」的分支为末态,继续?`)) {
-                      onChange(delFe(model, selIdx))
+                      onChange((prev) => delFe(prev, selIdx))
                       onSelect(null)
                     }
                   }} style={{ color: 'var(--psa-danger)', border: '1px solid #fca5a5', background: 'var(--psa-danger-soft)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12, marginBottom: 6 }}>
@@ -399,7 +398,7 @@ export function EtInspector(
 
                 {/* 折叠当前分支节点为末态 */}
                 <div>
-                  <button onClick={() => onChange(collapseNode(model, sel!))} style={{ color: 'var(--psa-danger)', border: 0, background: 'none', cursor: 'pointer', fontSize: 12 }}>折叠为末态</button>
+                  <button onClick={() => onChange((prev) => collapseNode(prev, sel!))} style={{ color: 'var(--psa-danger)', border: 0, background: 'none', cursor: 'pointer', fontSize: 12 }}>折叠为末态</button>
                 </div>
               </div>
             )}

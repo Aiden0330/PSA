@@ -309,7 +309,7 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
                 <div className="exp-popover">
                   <AnalysisSettingsPanel houses={houses} basicEvents={cvBasics} settings={settings} onChange={setSettings}
                     bcSets={cvModel?.boundary_condition_sets ?? []}
-                    onBcSetsChange={(sets) => { if (cvModel) cvSet(setBcSets(cvModel, sets)) }} />
+                    onBcSetsChange={(sets) => { if (cvModel) cvSet((prev: ModelJson) => setBcSets(prev, sets)) }} />
                 </div>
               )}
             </div>

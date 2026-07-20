@@ -173,8 +173,8 @@ function AppShell() {
             {example.model && (
               <ParamLibrary
                 model={example.model}
-                onUpdateParam={(id, v) => example.set(updateParam(example.model!, id, v))}
-                onSetCcf={(groups) => example.set(setCcf(example.model!, groups))}
+                onUpdateParam={(id, v) => example.set((prev) => (prev == null ? prev : updateParam(prev, id, v)))}
+                onSetCcf={(groups) => example.set((prev) => (prev == null ? prev : setCcf(prev, groups)))}
               />
             )}
           </div>

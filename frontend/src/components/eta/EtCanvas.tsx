@@ -31,7 +31,7 @@ export function EtCanvas(
     seqRows: SeqRow[]
     sel: string[] | null
     onSelect: (path: string[] | null) => void
-    onChange: (m: EventTreeModel) => void
+    onChange: (m: EventTreeModel | ((prev: EventTreeModel) => EventTreeModel)) => void
     svgRef: RefObject<SVGSVGElement>
   },
 ) {
@@ -180,7 +180,7 @@ export function EtCanvas(
                 <rect x={mx} y={lf.y - 14} width={mw} height={18 + subs.length * ih} rx={6} fill="var(--psa-surface)" stroke="#f59e0b" strokeWidth={1} />
                 <text x={mx + 8} y={lf.y - 1} fontSize={9} fontWeight={700} fill="var(--psa-warn)">＋继续到屏障:</text>
                 {subs.map((f, k) => {
-                  const extend = () => { onChange(branchLeaf(model, lf.path, f.id)); onSelect(null) }
+                  const extend = () => { onChange((prev) => branchLeaf(prev, lf.path, f.id)); onSelect(null) }
                   return (
                   <g key={f.id} className="psa-svg-focus" role="button" tabIndex={0}
                     aria-label={`继续到屏障 ${f.label || f.id}`} style={{ cursor: 'pointer' }}

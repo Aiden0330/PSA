@@ -26,3 +26,26 @@ describe('layoutFaultTree — 缺树容错(白屏回归)', () => {
     expect(g.nodes.length).toBe(2)
   })
 })
+
+describe('mutator 严格守卫 — 缺树 no-op(误写回归)', () => {
+  it('全部 8 个 mutator 对缺树返回原模型,不写 fault_trees[0]、不抛', async () => {
+    const { addBasic, addGate, connect, deleteNode, updateNode, setTop, renameNode, addBasicFromLib } = await import('./model')
+    const m: ModelJson = { model_data: { parameters: [] }, fault_trees: [
+      { name: 'OTHER', top: 'T', nodes: [{ id: 'T', op: 'or', args: [] }] }] } as unknown as ModelJson
+    const before = JSON.stringify(m)
+    const results = [
+      addBasic(m, 'MISSING'), addGate(m, 'MISSING', 'or'), connect(m, 'MISSING', 'a', 'b'),
+      deleteNode(m, 'MISSING', 'T'), updateNode(m, 'MISSING', 'T', { label: 'x' }),
+      setTop(m, 'MISSING', 'T'), renameNode(m, 'MISSING', 'T', 'U'),
+      addBasicFromLib(m, 'MISSING', { id: 'c1', name: 'n', rate: 0.1 } as never),
+    ]
+    for (const r of results) expect(JSON.stringify(r)).toBe(before)   // 全 no-op,OTHER 树零扰动
+  })
+
+  it('空 fault_trees 也不抛(此前 getFt 回退 undefined 即崩)', async () => {
+    const { addBasic } = await import('./model')
+    const empty: ModelJson = { model_data: { parameters: [] }, fault_trees: [] }
+    expect(() => addBasic(empty, 'ANY')).not.toThrow()
+    expect(addBasic(empty, 'ANY').fault_trees.length).toBe(0)
+  })
+})

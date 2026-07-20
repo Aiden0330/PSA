@@ -50,7 +50,7 @@ function prepareCanvasForExport(svg: SVGSVGElement): SVGSVGElement {
 export function EventTreeEditor(
   { model, onChange, linked, fts, ftsApi, pfds, onAttachFt, onDetachFt, onFtEdited, libBarriers, libComponents,
     etaSummaries = [], aggregateTotals, onSelectEta, onToggleEta, onAddBarrier, onEditInitFt, getReportContext, etEngineOptions }: {
-    model: EventTreeModel; onChange: (m: EventTreeModel) => void; linked?: Linked
+    model: EventTreeModel; onChange: (m: EventTreeModel | ((prev: EventTreeModel) => EventTreeModel)) => void; linked?: Linked
     fts?: any; ftsApi?: Api; pfds?: Record<string, number>
     onAttachFt?: (idx: number) => void; onDetachFt?: (idx: number) => void; onFtEdited?: (feId: string) => void
     libBarriers?: { id: string; name: string; pfd: number; source?: { citation?: string } }[]
@@ -205,12 +205,12 @@ export function EventTreeEditor(
     if (fmt === 'svg') setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
-  const addBarrier = onAddBarrier ?? (() => onChange(addFe(model)))
+  const addBarrier = onAddBarrier ?? (() => onChange((prev) => addFe(prev)))
   const moveFe = (d: number, dir: -1 | 1) => {
     const t = d + dir
     if (t < 0 || t >= model.functionalEvents.length) return
     if (!isCascade(model) && !window.confirm('该 ETA 含自定义分支结构,调整屏障次序将重建为标准级联,继续?')) return
-    onChange(reorderFe(model, d, t))
+    onChange((prev) => reorderFe(prev, d, t))
   }
 
   // ── 末态序列（叶按 DFS 成功优先 = 引擎 L0..Ln 同序）──
