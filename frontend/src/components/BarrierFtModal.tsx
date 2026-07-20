@@ -63,7 +63,9 @@ export function BarrierFtModal(
       </div>
     )
   }
-  const graph = layoutFaultTree(model, ftName, undefined, true)
+  // 布局与 FTA 页统一为层级式(报障 2026-07-20):此前 bandLeaves=true 把全部叶子拉到
+  // 底部一行,多层树连线交叉、视觉杂乱,被用户读作"没有自动布局"。
+  const graph = layoutFaultTree(model, ftName)
   return (
     <div style={overlay} onClick={onClose}>
       <div style={panel} onClick={(e) => e.stopPropagation()}>

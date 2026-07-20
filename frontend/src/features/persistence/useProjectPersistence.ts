@@ -330,9 +330,12 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     const wid = useProjectStore.getState().workspaceId   // 槽钉定(F1)
     const delId = savedId
     const name = saved.find((s) => s.id === delId)?.name ?? delId
-    if (!window.confirm(`删除项目存档「${name}」?存档删除不可撤销(版本库中的历史版本仍保留)。`)) return
+    if (!window.confirm(`删除项目存档「${name}」?存档删除不可撤销(版本库中的历史版本仍保留),其打开的工作区也将关闭。`)) return
     await deleteSaved(delId)
     setIdentityFor(wid, { savedId: '', projectUuid: '', lastVersionHash: undefined })
+    // 幽灵槽修复(报障 2026-07-20):此前只清身份,已打开的工作区以「草稿」名残留在项目树,
+    // 用户视为"删了还在"。删除 = 明确弃用,槽一并关闭。
+    useProjectStore.getState().closeProject(wid)
     await refreshList()
   }
 

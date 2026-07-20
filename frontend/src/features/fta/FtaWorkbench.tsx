@@ -325,7 +325,9 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
           <button onClick={cvUndo} disabled={!cvCanUndo} title="撤销" className="psa-btn" style={{ width: 30, padding: 0, justifyContent: 'center' }}><Icon name="undo" size={15} /></button>
           <button onClick={cvRedo} disabled={!cvCanRedo} title="重做" className="psa-btn" style={{ width: 30, padding: 0, justifyContent: 'center' }}><Icon name="redo" size={15} /></button>
           <button onClick={onQuantify} disabled={busy || !cvTreeExists} className="psa-btn psa-btn--dark"><Icon name="bolt" size={14} />{busy ? '计算中…' : '量化'}</button>
-          <label style={{ fontSize: 12 }} title="按基本事件 FV 着色"><input type="checkbox" checked={heatOn} onChange={(e) => setHeatOn(e.target.checked)} disabled={!result} /> 重要度热力</label>
+          <label style={{ fontSize: 12, opacity: result ? 1 : 0.55, cursor: result ? 'pointer' : 'not-allowed' }}
+            title={result ? '按基本事件 FV 着色' : '先点「量化」运行分析,得到重要度后才能着色(热力=FV 重要度)'}>
+            <input type="checkbox" checked={heatOn} onChange={(e) => setHeatOn(e.target.checked)} disabled={!result} /> 重要度热力</label>
           {!ftIsEta && !ftIsStandalone && (
             <button onClick={() => setFtPos((m) => ({ ...m, [ftName]: {} }))} className="psa-btn" title="重置自动布局"><Icon name="arrow-up" size={13} />重置布局</button>
           )}
