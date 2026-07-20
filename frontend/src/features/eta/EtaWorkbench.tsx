@@ -140,7 +140,11 @@ export function EtaWorkbench(
     } catch (e: any) { onError(String(e?.message ?? e)) }
   }
   // ── 初始事件 FTA (`__init__`) ──
-  const [initFtOpen, setInitFtOpen] = useState(false)
+  // 跨项目污染修复(报障 2026-07-20):打开态携带「打开时的槽+ETA」令牌;删除/切换项目后
+  // 令牌失配,模态自动隐藏——绝不跟随新活动项目的同名树(否则继续编辑会改到别的项目)。
+  const [initFtToken, setInitFtToken] = useState<string | null>(null)
+  const initFtOpen = initFtToken === `${wsId}:${activeKey}`
+  const setInitFtOpen = (v: boolean) => setInitFtToken(v ? `${wsId}:${activeKey}` : null)
   const onEditInitFt = () => {
     if (!etModel) return
     const hasFt = (etFtsModel.fault_trees ?? []).some((f: any) => f.name === '__init__')
@@ -337,7 +341,7 @@ export function EtaWorkbench(
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: 12, display: 'flex' }}>
         {/* P4-A ⑧:key=activeKey —— 切 ETA 页签即重挂,局部态(选中路径/在途结果)不跨树残留 */}
         {!etModel ? <p style={{ padding: 12 }}>加载中…</p> : (
-          <EventTreeEditor key={activeKey} model={etModel} onChange={writeEtModel}
+          <EventTreeEditor key={`${wsId}:${activeKey}`} model={etModel} onChange={writeEtModel}
             linked={linked}
             fts={etFtsModel} ftsApi={{ set: (m) => P().setEtaFts(activeKey, m), undo: docUndo, redo: docRedo, canUndo: docCanUndo, canRedo: docCanRedo }}
             pfds={pfds} onAttachFt={onAttachFt} onDetachFt={onDetachFt} onFtEdited={onFtEdited}
