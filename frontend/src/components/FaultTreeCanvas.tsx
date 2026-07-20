@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import ReactFlow, { Background, Controls, MiniMap, useNodesState, useEdgesState, useReactFlow, useStore, useViewport } from 'reactflow'
+import ReactFlow, { Background, Controls, MiniMap, useNodesInitialized, useNodesState, useEdgesState, useReactFlow, useStore, useViewport } from 'reactflow'
 import type { ReactFlowState } from 'reactflow'
 import type { Node, Edge, Connection } from 'reactflow'
 import 'reactflow/dist/style.css'
@@ -47,13 +47,16 @@ function AutoFit({ nodeCount, fitKey }: { nodeCount: number; fitKey: string }) {
   const { fitView } = useReactFlow()
   const width = useStore((st: ReactFlowState) => st.width)
   const height = useStore((st: ReactFlowState) => st.height)
+  // 第三道门(报障 2026-07-20 二轮):真实浏览器里节点**晚一帧才完成测量**,
+  // nodesInitialized 为 false 时 fitView 等于适配空集——视口定格在空处,画布"空白"。
+  const nodesReady = useNodesInitialized()
   const doneFor = useRef<string | null>(null)
   useEffect(() => {
     if (doneFor.current === fitKey) return
-    if (!nodeCount || !width || !height) return
+    if (!nodeCount || !width || !height || !nodesReady) return
     const id = requestAnimationFrame(() => { fitView({ padding: 0.15, maxZoom: 1.25 }); doneFor.current = fitKey })
     return () => cancelAnimationFrame(id)
-  }, [nodeCount, width, height, fitKey, fitView])
+  }, [nodeCount, width, height, nodesReady, fitKey, fitView])
   return null
 }
 

@@ -118,12 +118,17 @@ export function ExplorerTree({ persistence, tab, setTab }: {
         )
       })}
 
-      {archived.map((a) => (
-        <TreeItem key={a.id} className="it prj" onActivate={() => persistence.loadProject(a.id)} title="打开该存档项目"
-          style={{ opacity: persistence.loading ? 0.6 : 1 }}>
-          ▸ {a.name}<span className="st arch">存档</span>
-        </TreeItem>
-      ))}
+      {archived.map((a) => {
+        // 同名存档去歧义(报障 2026-07-20:两份 test1 让用户在双胞胎间横跳丢改动)——
+        // 名字撞车时缀短 id,肉眼可辨"打开的是哪一份"
+        const dup = archived.filter((x) => x.name === a.name).length > 1
+        return (
+          <TreeItem key={a.id} className="it prj" onActivate={() => persistence.loadProject(a.id)} title={`打开该存档项目(id ${a.id})`}
+            style={{ opacity: persistence.loading ? 0.6 : 1 }}>
+            ▸ {a.name}{dup && <span style={{ color: 'var(--psa-faint)', fontFamily: 'var(--psa-font-mono)', fontSize: 10 }}> #{a.id.slice(0, 4)}</span>}<span className="st arch">存档</span>
+          </TreeItem>
+        )
+      })}
 
       <div className="grp" role="presentation">全局</div>
       <TreeItem className={'it' + (tab === 'portfolio' ? ' on' : '')} selected={tab === 'portfolio'} onActivate={() => onPage('portfolio')}>多项目组合总览</TreeItem>

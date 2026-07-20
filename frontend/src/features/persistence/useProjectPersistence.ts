@@ -15,6 +15,9 @@ import { loadRows, saveRows } from '../../fmeaStore'
 import { loadMapping, saveMapping } from '../../mappingStore'
 import type { FmeaRow, MappingConfig } from '../../fmea'
 
+// 刷新找回:记住上次打开的存档 id(localStorage;消费方为 loadProject 与 auto-reopen effect)
+const LAST_KEY = 'psa.lastProject'
+
 /**
  * 项目持久化(存档/另存/读档/文件导入导出/删除)+ FMEA 工作台内容 + 证据链上下文。
  * 单实例挂在 App 壳,两个工作台与报告页共用;projectUuid 由 ADR-2 双写响应带回,
@@ -53,7 +56,6 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   }, [])
 
   useEffect(() => { listSaved().then((s) => { setSaved(s); setArchiveLocal(wasSavedOffline()) }).catch(() => {}) }, [])
-
   // R2-审 F6:localStorage 镜像只服务"未存档草稿的跨会话续接"。已存档项目的 FMEA 随
   // payload 进版本库;若也写镜像,启动种子会把存档内容渗入下一次会话的全新草稿(跨会话串染)。
   const persistFmeaRows = (next: FmeaRow[] | ((prev: FmeaRow[]) => FmeaRow[])) => {
@@ -144,6 +146,10 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     const base = saved.find((s) => s.id === savedId)?.name || (at ? etaDisplayName(at, etModel) : '') || 'ETA 项目'
     const name = window.prompt('另存为新项目名称', base + ' 副本')
     if (!name) return
+    // 同名存档确认(报障 2026-07-20):同名双胞胎让用户在两份档案间无感横跳,
+    // 编辑落错份 = "改动丢了"。允许但必须知情。
+    if (saved.some((s2) => s2.name === name) &&
+        !window.confirm(`已存在同名存档「${name}」。另存将创建**第二份**同名档案(树中以 #id 区分)。确定继续?建议改用不同名称。`)) return
     if (savingRef.current.has(wid)) return               // FE-08:重入守卫
     const payload = buildPayload()
     savingRef.current.add(wid)
@@ -249,6 +255,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   // 读取项目存档(R2):已打开(活动/停放)→ 仅聚焦切换,绝不重载(保护未保存编辑);
   // 未打开 → fetch 后作为新槽打开(停放当前项目)。pendingId 保证受控下拉在 await 期间不回弹。
   const loadProject = async (id: string) => {
+    try { localStorage.setItem(LAST_KEY, id) } catch { /* 隐私模式等:降级为不记忆 */ }
     const st = useProjectStore.getState()
     const isOpen = st.identity.savedId === id || Object.values(st.parked).some((sl) => sl.identity.savedId === id)
     if (isOpen) {
@@ -274,6 +281,25 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
       onError(`读取存档失败:${String(e?.message ?? e)}`)
     } finally { setLoading(false); setPendingId('') }
   }
+
+  // 刷新找回(报障 2026-07-20):本应用无本地项目持久化,刷新后活动项目重置为空白草稿——
+  // 用户以为"树全丢了"(其实档案完好,只是活动项目变了)。挂载后自动重开上次打开的存档;
+  // 仅在"干净启动态"(无存档身份、无停放槽)时执行一次,绝不覆盖用户已在操作的内容。
+  const autoReopened = useRef(false)
+  useEffect(() => {
+    if (autoReopened.current) return
+    let last = ''
+    try { last = localStorage.getItem(LAST_KEY) ?? '' } catch { /* 隐私模式:不记忆 */ }
+    if (!last) { autoReopened.current = true; return }
+    const st = useProjectStore.getState()
+    if (st.identity.savedId !== '' || Object.keys(st.parked).length > 0) { autoReopened.current = true; return }
+    listSaved().then((list) => {
+      if (autoReopened.current) return
+      autoReopened.current = true
+      if (list.some((s2) => s2.id === last)) void loadProject(last)
+    }).catch(() => { autoReopened.current = true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // 导出项目为文件(含参考库覆盖层, 离线可用)
   const onExportFile = () => {
     if (!etModel) return
