@@ -520,3 +520,14 @@ F-4 when 短路,2 HIGH 均风险低估向)→ Fable 全修(三通道未接则响
 ETA/频率/MC 经 effective_parameters 接线 + 请求 post_rules 量化接线(现响亮拒绝止血)。
 banked 库 4 份规格全部兑现(集成 MC / 向量化 / periodic-test Complete / regime-A);CCF-SOKC
 第 5 份待实现。基线:py 640+3skip · benchmark 24/24。
+
+## 2026-07-19 — 前端系统性审查 P1–P4(报障闭环)
+
+连续三日真实使用报障(白屏/丢改动/量化500)后,裁决不回滚、做系统性审查。
+P1 模式扫描:45 处值式写函数式化 + 8 mutator 缺树严格化(误写/白屏双堵);
+P2 状态层冷读(全 setter);P3 真机走查(同拍连击/撤穿挂载/断后端全过);
+P4 Opus×3 页面冷读 30 条 → 15 采纳修复(最重:删后果静默降级 C1 拒删、
+冲突对话丢存档、FMEA 值式链、在途量化跨树落地)。台账:
+docs/reviews/2026-07-19-frontend-systematic-review.md。fe 455/455 · lint 231 ·
+根边界含错误文本(以后报障自带定位)。遗留:no-stale-model-set 自定义 lint 规则、
+参考库两处留观、模态内树内撤销(UX)。
