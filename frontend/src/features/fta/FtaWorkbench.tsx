@@ -343,6 +343,7 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
                   nodes={cvGraph.nodes}
                   edges={cvGraph.edges}
                   editable
+                  fitKey={`${ftIsEta ? ftEtaKey + ':' : ''}${cvFtName}`}
                   zoomToolbar
                   highlight={highlight}
                   heat={heatOn && result ? buildHeat(result.importance as any) : undefined}

@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
-import ReactFlow, { Background, Controls, MiniMap, useNodesState, useEdgesState, useReactFlow, useViewport } from 'reactflow'
+import { useEffect, useRef } from 'react'
+import ReactFlow, { Background, Controls, MiniMap, useNodesState, useEdgesState, useReactFlow, useStore, useViewport } from 'reactflow'
+import type { ReactFlowState } from 'reactflow'
 import type { Node, Edge, Connection } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { nodeTypes } from './nodes'
@@ -18,6 +19,8 @@ interface Props {
    *  与 ETA 画布(EtCanvas)视觉统一。未传时保持原行为(默认 Controls,无自定义工具条)——
    *  BarrierFtModal 复用本组件但不传此 prop,行为逐位不变。 */
   zoomToolbar?: boolean
+  /** 适配键:换树(名变)即重新自动适配一次;缺省 'ft' */
+  fitKey?: string
 }
 
 /** 悬浮缩放工具条(reactflow 自带缩放/平移,这里只是换皮成 .exp-zoom 视觉 + 复用其 zoomIn/zoomOut/fitView)。
@@ -35,7 +38,26 @@ function FtaZoomToolbar() {
   )
 }
 
-export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highlight, heat, onConnectNodes, onDeleteNodes, onSelect, onNodeDragStop, zoomToolbar }: Props) {
+/** 空白画布修复(报障 2026-07-20,截图实证:200% 缩放 + 空小地图 + 树存在):
+ *  reactflow 的 fitView 只在初始化一帧执行。懒加载页/模态首帧容器 0×0、或节点晚一拍注入时,
+ *  fitView 在错误状态上定格视口,之后**永不重适配** —— 节点全在视口外,画布看似空白。
+ *  本组件等到「面板有真实尺寸 && 节点已注入」才 fit,一棵树只 fit 一次(换树重置),
+ *  绝不覆盖用户随后的手动平移/缩放。maxZoom 限 1.25:两节点小树不再被顶到 200%。 */
+function AutoFit({ nodeCount, fitKey }: { nodeCount: number; fitKey: string }) {
+  const { fitView } = useReactFlow()
+  const width = useStore((st: ReactFlowState) => st.width)
+  const height = useStore((st: ReactFlowState) => st.height)
+  const doneFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (doneFor.current === fitKey) return
+    if (!nodeCount || !width || !height) return
+    const id = requestAnimationFrame(() => { fitView({ padding: 0.15, maxZoom: 1.25 }); doneFor.current = fitKey })
+    return () => cancelAnimationFrame(id)
+  }, [nodeCount, width, height, fitKey, fitView])
+  return null
+}
+
+export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highlight, heat, onConnectNodes, onDeleteNodes, onSelect, onNodeDragStop, zoomToolbar, fitKey }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState(pNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(pEdges)
   // 结构变化或高亮变化时同步(割集回溯把割集路径节点/边着色)
@@ -56,6 +78,7 @@ export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highli
       onEdgesChange={onEdgesChange}
       nodeTypes={nodeTypes}
       fitView
+      fitViewOptions={{ padding: 0.15, maxZoom: 1.25 }}
       minZoom={0.2}
       nodesConnectable={!!editable}
       deleteKeyCode={editable ? ['Backspace', 'Delete'] : null}
@@ -66,6 +89,7 @@ export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highli
       onPaneClick={() => onSelect?.(null)}
       proOptions={{ hideAttribution: true }}
     >
+      <AutoFit nodeCount={pNodes.length} fitKey={fitKey ?? 'ft'} />
       <Background color="var(--psa-line)" gap={18} />
       {zoomToolbar ? <FtaZoomToolbar /> : <Controls />}
       <MiniMap pannable zoomable nodeStrokeWidth={2} />
