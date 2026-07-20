@@ -100,6 +100,7 @@ export function BarrierFtModal(
         <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <FaultTreeCanvas
+              key={ftName}
               nodes={graph.nodes} edges={graph.edges} editable highlight={new Set<string>()} fitKey={ftName}
               onConnectNodes={(s, t) => api.set((prev) => connect(prev, ftName, s, t))}
               onDeleteNodes={(ids) => { api.set((prev) => ids.reduce((m, id) => deleteNode(m, ftName, id), prev)); setSelected(null) }}

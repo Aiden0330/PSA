@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import ReactFlow, { Background, Controls, MiniMap, useNodesInitialized, useNodesState, useEdgesState, useReactFlow, useStore, useViewport } from 'reactflow'
 import type { ReactFlowState } from 'reactflow'
 import type { Node, Edge, Connection } from 'reactflow'
@@ -73,6 +73,17 @@ export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highli
     }))
   }, [pNodes, pEdges, highlight, heat, setNodes, setEdges])
 
+  // 确定性初始视口(报障 2026-07-20 三轮):节点坐标/尺寸皆为本方 dagre 布局的已知量,
+  // 初始变换用纯数学同步给出——把树的左上角放进视野(100%)。不依赖 fitView/rAF/节点测量,
+  // 任何异步路径失灵节点也必然可见。挂载期一次性(父层以 key=fitKey 换树即重挂重算);
+  // AutoFit 保留为增强:条件齐备时再优化为整树适配。
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initialViewport = useMemo(() => {
+    if (!pNodes.length) return { x: 24, y: 24, zoom: 1 }
+    const minX = Math.min(...pNodes.map((n) => n.position.x))
+    const minY = Math.min(...pNodes.map((n) => n.position.y))
+    return { x: 24 - minX, y: 24 - minY, zoom: 1 }
+  }, [])
   return (
     <ReactFlow
       nodes={nodes}
@@ -80,8 +91,7 @@ export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highli
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       nodeTypes={nodeTypes}
-      fitView
-      fitViewOptions={{ padding: 0.15, maxZoom: 1.25 }}
+      defaultViewport={initialViewport}
       minZoom={0.2}
       nodesConnectable={!!editable}
       deleteKeyCode={editable ? ['Backspace', 'Delete'] : null}

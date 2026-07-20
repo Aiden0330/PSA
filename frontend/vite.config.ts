@@ -16,6 +16,12 @@ export default defineConfig(({ mode }) => ({
   server: {
     proxy: { '/api': 'http://localhost:8000' },
   },
+  // 生产预览(make app):构建产物 + 同款代理——日常使用毫秒级加载,
+  // 无 dev 依赖预打包(dev 服务器每次重启后的首次访问都要重打包,20-30s 由此而来)
+  preview: {
+    port: 4173,
+    proxy: { '/api': 'http://localhost:8000' },
+  },
   optimizeDeps: {
     include: ['react', 'react-dom', 'zustand', 'dagre', 'reactflow',
               'ag-grid-community', 'ag-grid-react', 'echarts'],

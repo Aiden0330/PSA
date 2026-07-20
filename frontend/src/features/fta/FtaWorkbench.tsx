@@ -340,6 +340,7 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
             <div style={{ flex: 1, minHeight: 0 }}>
               {cvTreeExists ? (
                 <FaultTreeCanvas
+                  key={`${ftIsEta ? ftEtaKey + ':' : ''}${cvFtName}`}
                   nodes={cvGraph.nodes}
                   edges={cvGraph.edges}
                   editable
