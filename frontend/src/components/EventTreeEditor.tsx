@@ -83,7 +83,11 @@ export function EventTreeEditor(
 
   // F-β R-1(FE-05):结果随完整分析上下文失效——挂树/CCF/边界设置任一变化即清空
   // (linked/etEngineOptions 由父组件 useMemo 稳定化,契约见 props 注释)。
-  useEffect(() => { setEngineSeq(null); setEngineMeta(null); setQErr(null); setImp(null) }, [model, linked, etEngineOptions])
+  useEffect(() => {
+    setEngineSeq(null); setEngineMeta(null); setQErr(null); setImp(null)
+    quantGuard.begin(); impGuard.begin()   // P4-A ③:作废在途量化/重要度——上下文已变,晚响应不得落地
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model, linked, etEngineOptions])
 
   // 竖向分隔条:拖拽改变事件树画布高度,底部坞(事故序列/风险矩阵等)相应变矮;双击复位为自适应
   const treeRef = useRef<HTMLElement>(null)

@@ -18,7 +18,7 @@ export async function buildScenarioTab(sid: string, name: string): Promise<Proje
   const d = await getBessEventTree(sid || undefined)
   const fts: ModelJson = { model_data: { parameters: (d.parameters ?? []) as any }, fault_trees: Object.values(d.fault_trees ?? {}) as any }
   const fes = d.functional_events.map((id) => ({
-    id, label: d.labels[id] ?? id, failProb: d.fe_prob[id] ?? 0.1,
+    id, label: d.labels?.[id] ?? id, failProb: d.fe_prob?.[id] ?? 0.1,   // P4-C ⑫:场景响应缺表不抛
     linkFt: ((d.fault_trees?.[id]?.nodes?.length ?? 0) > 2) ? id : undefined,
   }))
   const base: EventTreeModel = { initEvent: d.init_event, initFreq: d.init_frequency, functionalEvents: fes, root: buildCascade(fes, CONSEQUENCE_AT_DEPTH) }

@@ -56,10 +56,11 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
 
   // R2-审 F6:localStorage 镜像只服务"未存档草稿的跨会话续接"。已存档项目的 FMEA 随
   // payload 进版本库;若也写镜像,启动种子会把存档内容渗入下一次会话的全新草稿(跨会话串染)。
-  const persistFmeaRows = (next: FmeaRow[]) => {
+  const persistFmeaRows = (next: FmeaRow[] | ((prev: FmeaRow[]) => FmeaRow[])) => {
     P().setFmea(next, undefined)
     if (useProjectStore.getState().identity.savedId !== '') return
-    try { saveRows(next) } catch (e: any) { onError(String(e?.message ?? e)) }
+    // 镜像取写后 store 值(函数式入参没有"值"可存;store 已同步应用)
+    try { saveRows(useProjectStore.getState().fmeaRows) } catch (e: any) { onError(String(e?.message ?? e)) }
   }
   const persistFmeaMapping = (next: MappingConfig) => {
     P().setFmea(undefined, next)
@@ -168,22 +169,34 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   // ── D-P5-4 冲突对话三路径:查看 diff(调用方负责切页)/ 另存副本 / 确认覆盖 ──
   // R2-审 F2:一律使用 conflict 携带的发起槽/发起存档 —— 409 到达时用户可能已切到别的项目,
   // 用"当前 savedId"会把发起项目的内容强写进当前项目的存档(跨项目覆盖)。
+  // P4-C ①②:两路径包 try/catch——覆盖/另存再撞 401/网络错时,此前 promise 未捕获:
+  // 覆盖路窗滞留无文案、另存路窗已关用户以为已存实则丢。失败必须可见 + 冲突条重现。
   const resolveConflictOverwrite = async () => {
     if (!conflict) return
-    captureUuidFor(conflict.wid, await saveWorkspace(conflict.name, conflict.payload, conflict.savedId))   // 不带 base → 强制覆盖(现行为)
-    setConflict(null)
-    await refreshList()
+    try {
+      captureUuidFor(conflict.wid, await saveWorkspace(conflict.name, conflict.payload, conflict.savedId))   // 不带 base → 强制覆盖(现行为)
+      setConflict(null)
+      await refreshList()
+    } catch (e) {
+      onError(`覆盖保存失败(冲突未解决,可重试):${e instanceof Error ? e.message : String(e)}`)
+    }
   }
   const resolveConflictSaveAsCopy = async () => {
     if (!conflict) return
     const name = window.prompt('另存为新项目名称(避免覆盖冲突)', (conflict.name || 'ETA 项目') + ' 副本')
-    setConflict(null)
     if (!name) return
-    const rec = await saveWorkspace(name, conflict.payload)
-    setIdentityFor(conflict.wid, { savedId: rec.id, displayName: name })
-    captureUuidFor(conflict.wid, rec)
-    rekeyWorkspace(conflict.wid, rec.id)
-    await refreshList()
+    const keep = conflict
+    setConflict(null)
+    try {
+      const rec = await saveWorkspace(name, keep.payload)
+      setIdentityFor(keep.wid, { savedId: rec.id, displayName: name })
+      captureUuidFor(keep.wid, rec)
+      rekeyWorkspace(keep.wid, rec.id)
+      await refreshList()
+    } catch (e) {
+      setConflict(keep)   // 副本没存上:冲突条重现,绝不让用户以为已存
+      onError(`另存副本失败(冲突未解决):${e instanceof Error ? e.message : String(e)}`)
+    }
   }
   const dismissConflict = () => setConflict(null)
 
@@ -196,7 +209,14 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     const d = listSessionDrafts()[0]
     if (!d) { setSessionDraft(null); return }
     const dkey = sessionDraftKey(d)
-    const proj = deserializeProject(d.payload, d.name)
+    let proj: ReturnType<typeof deserializeProject>
+    try {
+      proj = deserializeProject(d.payload, d.name)
+    } catch (e) {
+      // P4-C ⑪:畸形/跨版本草稿反序列化抛错 → 可见报错并保留草稿(不销毁证据),按钮不再静默
+      onError(`草稿无法恢复(已保留原始数据):${e instanceof Error ? e.message : String(e)}`)
+      return
+    }
     const tabs = projectToTabs(proj)
     const restoredActiveKey = tabs.some((t) => t.key === proj.activeKey) ? proj.activeKey : (tabs[0]?.key ?? '')
     if (!tabs.length) { onError('暂存草稿不含任何 ETA,已丢弃。'); clearSessionDraft(dkey); setSessionDraft(null); return }
@@ -267,7 +287,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     const importName = file.name.replace(/\.[^.]+$/, '')
     try {
       const proj = importProjectText(await file.text(), importName)
-      if (!proj.tabs.length) return
+      if (!proj.tabs.length) { onError('导入文件不含任何 ETA(payload 为空或退化格式),未应用。'); return }
       if (useProjectStore.getState().workspaceId !== wid) {
         onError('导入期间已切换项目,本次导入未应用 —— 请在目标项目处于活动状态时重新导入。')
         return

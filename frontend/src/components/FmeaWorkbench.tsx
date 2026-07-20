@@ -278,7 +278,7 @@ interface Props {
   etModel: EventTreeModel | null
   lib: LibraryData | null
   rows?: FmeaRow[]
-  onRowsChange?: (rows: FmeaRow[]) => void
+  onRowsChange?: (rows: FmeaRow[] | ((prev: FmeaRow[]) => FmeaRow[])) => void
   mapping?: MappingConfig
   onMappingChange?: (mapping: MappingConfig) => void
 }
@@ -290,9 +290,11 @@ export function FmeaWorkbench({ etModel, lib, rows: controlledRows, onRowsChange
   const rows = controlledRows ?? localRows
   const cfg = mapping ?? localCfg
 
-  const persist = useCallback((next: FmeaRow[]) => {
-    if (onRowsChange) onRowsChange(next)
-    else { setLocalRows(next); saveRows(next) }
+  // P4-A ⑦:persist 收更新函数——同帧连点「从参考库导入」+「从当前 ETA 取」时,
+  // 两处理器读同一旧 rows 快照,值式后写会丢掉首次导入行。受控/本地两路都按 prev 应用。
+  const persist = useCallback((up: (prev: FmeaRow[]) => FmeaRow[]) => {
+    if (onRowsChange) onRowsChange(up)
+    else setLocalRows((prev) => { const v = up(prev); try { saveRows(v) } catch { /* 镜像失败不阻断编辑 */ } return v })
   }, [onRowsChange])
 
   const persistCfg = useCallback((next: MappingConfig) => {
@@ -308,27 +310,29 @@ export function FmeaWorkbench({ etModel, lib, rows: controlledRows, onRowsChange
   // ── 编辑单元格 ──
   function updateCell(id: string, field: 'S' | 'O' | 'D', val: number) {
     const v = clamp10(val)
-    persist(rows.map((r) => r.id === id ? { ...r, [field]: v } : r))
+    persist((prev) => prev.map((r) => r.id === id ? { ...r, [field]: v } : r))
   }
 
   function deleteRow(id: string) {
-    persist(rows.filter((r) => r.id !== id))
+    persist((prev) => prev.filter((r) => r.id !== id))
   }
 
   // ── 从参考库导入(跳过已有 id)──
   function importFromLib() {
     if (!lib) return
-    const existIds = new Set(rows.map((r) => r.id))
-    const add = deriveLibRows(cfg, lib).filter((r) => !existIds.has(r.id))
-    persist([...rows, ...add])
+    persist((prev) => {
+      const existIds = new Set(prev.map((r) => r.id))
+      return [...prev, ...deriveLibRows(cfg, lib).filter((r) => !existIds.has(r.id))]
+    })
   }
 
   // ── 从当前 ETA 取(跳过已有 id)──
   function importFromEta() {
     if (!etModel) return
-    const existIds = new Set(rows.map((r) => r.id))
-    const add = deriveEtaRows(cfg, etModel, lib).filter((r) => !existIds.has(r.id))
-    persist([...rows, ...add])
+    persist((prev) => {
+      const existIds = new Set(prev.map((r) => r.id))
+      return [...prev, ...deriveEtaRows(cfg, etModel, lib).filter((r) => !existIds.has(r.id))]
+    })
   }
 
   // ── 按当前映射重算所有"导入行"的 S/O/D(保留手动行与名称)──
@@ -336,18 +340,17 @@ export function FmeaWorkbench({ etModel, lib, rows: controlledRows, onRowsChange
     const derived = new Map<string, FmeaRow>()
     if (lib) for (const r of deriveLibRows(cfg, lib)) derived.set(r.id, r)
     if (etModel) for (const r of deriveEtaRows(cfg, etModel, lib)) derived.set(r.id, r)
-    let n = 0
-    const next = rows.map((r) => {
+    // 预检计数用当前渲染 rows(仅提示文案);实际重算在 persist 内按 prev 应用
+    const n = rows.reduce((acc, r) => {
       const d = derived.get(r.id)
-      if (d && (r.S !== d.S || r.O !== d.O || r.D !== d.D)) { n++; return { ...r, S: d.S, O: d.O, D: d.D } }
-      return r
-    })
+      return acc + (d && (r.S !== d.S || r.O !== d.O || r.D !== d.D) ? 1 : 0)
+    }, 0)
     if (n === 0) {
       window.alert('没有可重算的导入行(或 S/O/D 已与当前映射一致)。')
       return
     }
     if (window.confirm(`将按当前映射重算 ${n} 行导入数据的 S/O/D(覆盖这些行的手动调整,手动新增行不受影响)。继续?`)) {
-      persist(next)
+      persist((prev) => prev.map((r) => { const d = derived.get(r.id); return d ? { ...r, S: d.S, O: d.O, D: d.D } : r }))
     }
   }
 
@@ -374,7 +377,7 @@ export function FmeaWorkbench({ etModel, lib, rows: controlledRows, onRowsChange
   // ── 添加空行 ──
   function addRow() {
     const newRow: FmeaRow = { id: uid(), object: '新对象', mode: '失效模式', S: 5, O: 3, D: 6 }
-    persist([...rows, newRow])
+    persist((prev) => [...prev, newRow])
   }
 
   // ── 映射编辑器 setters ──

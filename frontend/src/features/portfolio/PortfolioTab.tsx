@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { getPortfolio } from '../../api'
+import { StatusError, getPortfolio } from '../../api'
 import type { PortfolioRow, ReviewState } from '../../api'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
 import type { MainTab } from '../../stores/viewStore'
+import { useAuthStore } from '../../stores/authStore'
 import { bgLevel, cGE3, worseCell, SEV_RANK } from './portfolioMath'
 import { fmtE } from './portfolioFmt'
 
@@ -37,7 +38,11 @@ export function PortfolioTab({ persistence, setTab }: { persistence: ProjectPers
 
   useEffect(() => {
     getPortfolio().then((r) => { setRows(r); setLoading(false) })
-      .catch((e) => { setErr(String(e?.message ?? e)); setLoading(false) })
+      .catch((e) => {
+        // P4-C ⑧:401 与全 app 同口径进重认证,而非裸「→ 401」死胡同
+        if (e instanceof StatusError && e.status === 401) useAuthStore.setState({ identity: null, needsLogin: true })
+        setErr(String(e?.message ?? e)); setLoading(false)
+      })
   }, [])
 
   // 稳定的项目→标记符映射(按 uuid 排序,避免每渲染漂移)
@@ -68,7 +73,7 @@ export function PortfolioTab({ persistence, setTab }: { persistence: ProjectPers
   const worstOverall = useMemo(() => {
     let w: { severity: string; level: 'low' | 'medium' | 'high' | 'extreme'; row: PortfolioRow } | null = null
     for (const r of quantified) {
-      const cw = r.latest_case!.risk.worst
+      const cw = r.latest_case?.risk?.worst   // P4-C ⑩:旧/部分案例可缺 risk,不抛
       if (cw) w = worseCell(w, { severity: cw.severity, level: cw.level, row: r })
     }
     return w
@@ -260,7 +265,7 @@ function RiskMatrix({ quantified, markerOf }: { quantified: PortfolioRow[]; mark
   // 落格标记:cell[band][severity] = [{marker, level}]。level 取后端给定(载荷),非前端计算。
   const placed: Record<string, { marker: string; level: string }[]> = {}
   for (const r of quantified) {
-    for (const cell of r.latest_case!.risk.cells) {
+    for (const cell of r.latest_case?.risk?.cells ?? []) {
       const key = `${cell.freq_band}:${cell.severity}`
       ;(placed[key] ??= []).push({ marker: markerOf[r.uuid], level: cell.level })
     }

@@ -94,7 +94,22 @@ export function updateConsequence(
 }
 export function delConsequence(m: EventTreeModel, id: string): EventTreeModel {
   if (CONSEQUENCES.includes(id)) return m
+  // P4-A ①:被分支叶引用的后果不可删——此前直接 filter,引用叶经 consEntry 回退
+  // **静默降级为 C1(最轻)**,安全工具不允许静默下调风险。拒删 = no-op,
+  // UI 层负责提示「先改指派再删」(见 branchesUsingConsequence)。
+  if (branchesUsingConsequence(m, id) > 0) return m
   return { ...m, consequences: consEntries(m).filter((e) => e.id !== id) }
+}
+
+/** 引用某后果 id 的叶(末态)计数——删除守卫与 UI 提示共用。 */
+export function branchesUsingConsequence(m: EventTreeModel, id: string): number {
+  let n = 0
+  const walk = (node: EtNode): void => {
+    if (node.kind === 'leaf') { if (node.consequence === id) n++; return }
+    for (const c of [node.success, node.failure]) if (c) walk(c)
+  }
+  walk(m.root)
+  return n
 }
 
 /** 取某后果在本 ETA 的文字内涵;模型未定义时回退到默认。 */

@@ -63,7 +63,10 @@ describe('staleGuard — 乱序 last-write-wins(W4)', () => {
 describe('失效依赖源码级锁(R1/R2)', () => {
   it('R-1 EventTreeEditor 结果失效依赖含 linked 与 etEngineOptions', () => {
     const src = readFileSync('src/components/EventTreeEditor.tsx', 'utf-8')
-    expect(src).toMatch(/setEngineSeq\(null\).*\n?.*\[model, linked, etEngineOptions\]/)
+    // P4-A ③后形状:失效 effect 含结果清空 + 在途作废两段,锁改为两事实独立断言
+    // (依赖数组含完整分析上下文;effect 体内既清结果也 begin 作废在途)。
+    expect(src).toMatch(/setEngineSeq\(null\)[\s\S]{0,200}\[model, linked, etEngineOptions\]/)
+    expect(src).toMatch(/quantGuard\.begin\(\); impGuard\.begin\(\)/)
   })
 
   it('R-2 EtaWorkbench 设置重置依赖含 workspaceId', () => {

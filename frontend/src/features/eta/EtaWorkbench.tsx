@@ -101,18 +101,22 @@ export function EtaWorkbench(
     P().removeTab(key)
   }
   // 添加屏障 = 延长级联:追加功能事件,把"全失败"末态分支到它(成功维持原后果、失败升一级);画布即刻变化
+  // P4-A ④:三步复合(addFe→branchLeaf→setConsequence)整体走函数式——此前从渲染
+  // 快照 etModel 起算再值式覆写,双击「添加屏障」第二击在旧树上重算,净少一个屏障。
   const onAddBarrier = () => {
     if (!etModel) return
-    const m2 = addFe(etModel)
-    const newId = m2.functionalEvents[m2.functionalEvents.length - 1].id
-    const path: string[] = []
-    let n: any = m2.root
-    while (n && n.kind === 'branch') { path.push('failure'); n = n.failure }
-    const oldCons: string = n && n.kind === 'leaf' ? n.consequence : 'C4'
-    let m3 = branchLeaf(m2, path, newId)
-    const worse = CONSEQUENCES[Math.min(CONSEQUENCES.indexOf(consLevel(m2, oldCons)) + 1, CONSEQUENCES.length - 1)]
-    m3 = setConsequence(m3, [...path, 'failure'], worse)
-    writeEtModel(m3)
+    writeEtModel((prev) => {
+      const m2 = addFe(prev)
+      const newId = m2.functionalEvents[m2.functionalEvents.length - 1].id
+      const path: string[] = []
+      let n: any = m2.root
+      while (n && n.kind === 'branch') { path.push('failure'); n = n.failure }
+      const oldCons: string = n && n.kind === 'leaf' ? n.consequence : 'C4'
+      let m3 = branchLeaf(m2, path, newId)
+      const worse = CONSEQUENCES[Math.min(CONSEQUENCES.indexOf(consLevel(m2, oldCons)) + 1, CONSEQUENCES.length - 1)]
+      m3 = setConsequence(m3, [...path, 'failure'], worse)
+      return m3
+    })
   }
   // 从预置模板新建 ETA 页签(4c2:前身模板迁移;模板是可编辑起点,量化前应按项目实测替换)
   const openTemplate = (id: string) => {
@@ -331,8 +335,9 @@ export function EtaWorkbench(
 
       {/* ETA 主体 */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: 12, display: 'flex' }}>
+        {/* P4-A ⑧:key=activeKey —— 切 ETA 页签即重挂,局部态(选中路径/在途结果)不跨树残留 */}
         {!etModel ? <p style={{ padding: 12 }}>加载中…</p> : (
-          <EventTreeEditor model={etModel} onChange={writeEtModel}
+          <EventTreeEditor key={activeKey} model={etModel} onChange={writeEtModel}
             linked={linked}
             fts={etFtsModel} ftsApi={{ set: (m) => P().setEtaFts(activeKey, m), undo: docUndo, redo: docRedo, canUndo: docCanUndo, canRedo: docCanRedo }}
             pfds={pfds} onAttachFt={onAttachFt} onDetachFt={onDetachFt} onFtEdited={onFtEdited}

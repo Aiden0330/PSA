@@ -79,6 +79,12 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
     if (e instanceof StatusError && e.status === 401) {
       useAuthStore.setState({ identity: null, needsLogin: true })
       setErr('登录已过期,请重新登录。')
+    } else if (e instanceof StatusError && e.status === 409) {
+      // P4-C ⑥:并发签发/退回后本地台账已过期——刷新同步状态机,过期动作按钮随之消失
+      setErr(`操作与当前评审状态冲突(可能已被他人处理),台账已刷新:${e.message}`)
+      void refresh()
+    } else if (e instanceof StatusError && e.status === 403) {
+      setErr('当前角色无权执行该操作(需评审人/管理员)。')
     } else setErr(e instanceof Error ? e.message : String(e))
   }
 
@@ -108,7 +114,7 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
     setBusy(true); setErr(null)
     try {
       // FE-01(F-α):单树导出与屏幕量化同一构造(集成块随行);此前还漏带 ccf_groups
-      const linked = { fault_trees: etFtsModel.fault_trees ?? [], parameters: etFtsModel.model_data.parameters ?? [],
+      const linked = { fault_trees: etFtsModel.fault_trees ?? [], parameters: etFtsModel.model_data?.parameters ?? [],
                        ccf_groups: etFtsModel.ccf_groups ?? [] }
       const req = buildAnalysisRequest(etModel, linked)
       const useAgg = aggScope && checkedTabs.length >= 1

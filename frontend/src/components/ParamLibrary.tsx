@@ -82,7 +82,9 @@ export function ParamLibrary({ model, onUpdateParam, onSetCcf }: Props) {
     if (members.length < 2) return
     const fac = Object.fromEntries(keys.map((k) => [k, factors[k] ?? 0]))
     onSetCcf([...groups, {
-      id: `G${groups.length + 1}`, members, model: ccfModel, factors: fac,
+      // P4-B ⑧:按最大现存序号+1(此前按长度:加 G1/G2/G3→删 G2→再加生成重复 G3,
+      // 而删除按 id 过滤会一次删两组)
+      id: `G${Math.max(0, ...groups.map((g) => Number(/^G(\d+)$/.exec(g.id)?.[1] ?? 0))) + 1}`, members, model: ccfModel, factors: fac,
       ...(ccfModel === 'alpha' && staggered ? { staggered: true } : {}),
     }])
     setMembers([])

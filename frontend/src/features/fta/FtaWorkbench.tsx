@@ -163,6 +163,14 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ftIsEta, ftEtaKey, ftEtaName, etaFtRows.map((r) => r.etaKey + ':' + r.name).join(',')])
+  // P4-B ④:standalone 目标同样会悬空(切项目后 userFts 换人/树被删)——同口径重置,
+  // 否则编辑入口经失效树名走 mutator(现为 no-op)= 按钮点了没反应的哑态。
+  useEffect(() => {
+    if (ftIsStandalone && !(userFtsModel?.fault_trees ?? []).some((f: { name: string }) => f.name === ftStandaloneName)) {
+      setFtEditTarget({ src: 'model' }); setSelected(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ftIsStandalone, ftStandaloneName, (userFtsModel?.fault_trees ?? []).map((f: { name: string }) => f.name).join(',')])
   // M1:安全计算画布图形——目标故障树不存在时返回空图(避免 layoutFaultTree 在 ft.nodes 上抛出)
   const cvTreeExists = (ftIsEta || ftIsStandalone) ? !!(cvModel?.fault_trees?.some((f: any) => f.name === cvFtName)) : !!cvModel
   const cvGraph = cvTreeExists
@@ -281,8 +289,8 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
               )}
             </span>
           )}
-          {cvModel && <Palette onAddGate={(op) => cvSet((prev: ModelJson) => addGate(prev, cvFtName, op))} onAddBasic={() => cvSet((prev: ModelJson) => addBasic(prev, cvFtName))} />}
-          {cvModel && lib && (
+          {cvModel && cvTreeExists && <Palette onAddGate={(op) => cvSet((prev: ModelJson) => addGate(prev, cvFtName, op))} onAddBasic={() => cvSet((prev: ModelJson) => addBasic(prev, cvFtName))} />}
+          {cvModel && cvTreeExists && lib && (
             <LibPicker label="＋从库加基本事件" items={lib.component_failure_rates.map((c) => ({ id: c.id, name: c.name, unit: c.unit }))}
               onPick={(id) => { const c = lib.component_failure_rates.find((x) => x.id === id); if (c && cvModel) cvSet((prev: ModelJson) => addBasicFromLib(prev, cvFtName, c)) }} />
           )}

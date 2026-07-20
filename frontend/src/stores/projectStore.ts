@@ -78,7 +78,7 @@ export interface ProjectStore {
    *  否则旧存档 id 的 wid 残留会让 openProject 的 wid 去重把重开旧存档吞成静默 no-op。 */
   rekeyWorkspace: (oldWid: string, newWid: string) => void
   /** FMEA 行/映射更新(活动槽;不进 undo 历史——与今天的 hook 行为一致)。 */
-  setFmea: (rows?: FmeaRow[], mapping?: MappingConfig) => void
+  setFmea: (rows?: Updater<FmeaRow[]>, mapping?: Updater<MappingConfig>) => void
   /** 打开项目:目标(按 wid 或 identity.savedId)已在打开集 → 仅聚焦(绝不重载,
    *  保护未保存编辑);否则停放当前、载入新槽。 */
   openProject: (wid: string, init: { etas: ProjectEta[]; activeKey: string; checkedKeys: Record<string, boolean>; userFts?: ModelJson; identity: ProjectIdentity; fmeaRows?: FmeaRow[]; fmeaMapping?: MappingConfig }) => void
@@ -179,9 +179,10 @@ export const useProjectStore = create<ProjectStore>()((set) => {
         parked[newWid] = slot
         return { parked, openOrder: s.openOrder.map((w) => (w === oldWid ? newWid : w)) }
       }),
-    setFmea: (rows, mapping) => set(() => ({
-      ...(rows !== undefined ? { fmeaRows: rows } : {}),
-      ...(mapping !== undefined ? { fmeaMapping: mapping } : {}),
+    // P4-A/C:收 Updater —— 值式覆写(渲染快照)同拍连续导入/编辑会后写冲前写
+    setFmea: (rows, mapping) => set((s) => ({
+      ...(rows !== undefined ? { fmeaRows: apply(rows, s.fmeaRows) } : {}),
+      ...(mapping !== undefined ? { fmeaMapping: apply(mapping, s.fmeaMapping) } : {}),
     })),
 
     openProject: (wid, init) =>

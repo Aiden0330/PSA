@@ -45,6 +45,16 @@ function TabFallback() {
  * local 模式未登录时,AppShell 及其数据获取 effects 一律不挂载,避免任何预登录网络噪音。
  */
 export default function App() {
+  // P4-C ⑤:三分支(loading / LoginWall / AppShell)统一包进最外层边界——此前根边界在
+  // AppShell 内部,LoginWall/loading 渲染抛错仍是无兜底白屏。默认 fallback 可见可重试。
+  return (
+    <ErrorBoundary>
+      <AppGate />
+    </ErrorBoundary>
+  )
+}
+
+function AppGate() {
   const status = useAuthStore((s) => s.status)
   const needsLogin = useAuthStore((s) => s.needsLogin)
   useEffect(() => { void useAuthStore.getState().refresh() }, [])

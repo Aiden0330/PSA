@@ -1,5 +1,5 @@
 import type { EventTreeModel, ConsLevel } from '../eventtree'
-import { consEntries, addConsequence, updateConsequence, delConsequence, CONSEQUENCES, gradeLabel } from '../eventtree'
+import { consEntries, addConsequence, updateConsequence, delConsequence, CONSEQUENCES, gradeLabel, branchesUsingConsequence } from '../eventtree'
 import { Icon } from './icons'
 
 const isDefault = (id: string) => (CONSEQUENCES as string[]).includes(id)
@@ -62,7 +62,11 @@ export function ConsequencesTab({ model, onChange }: {
               {/* Delete — only for non-defaults */}
               {!isDefault(e.id) ? (
                 <button className="psa-btn psa-btn--danger" style={{ height: 26, padding: '0 9px', fontSize: 11.5, flexShrink: 0 }}
-                  onClick={() => onChange((prev) => delConsequence(prev, e.id))}>
+                  onClick={() => onChange((prev) => {
+                    const used = branchesUsingConsequence(prev, e.id)
+                    if (used > 0) { window.alert(`「${e.id}」被 ${used} 个分支末态引用,不能删除——请先在 ETA 检视器改指派(避免风险静默降级)。`); return prev }
+                    return delConsequence(prev, e.id)
+                  })}>
                   <Icon name="trash" size={13} />
                 </button>
               ) : (
