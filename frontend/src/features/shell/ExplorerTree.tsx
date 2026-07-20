@@ -65,7 +65,10 @@ export function ExplorerTree({ persistence, tab, setTab }: {
   const { etaTabs, activeKey, etModel, userFtsModel, P } = useActiveEta()
 
   const openSavedIds = new Set(openProjects.map((o) => o.identity.savedId).filter(Boolean))
+  // 稳定序(报障 2026-07-20):后端列表按"最近保存"排序,每次保存都重排 + 刷新后
+  // 自动重开又置顶,树观感乱跳。改为名称字典序(中文拼音感知)+ id 决胜,永远可预测。
   const archived = persistence.saved.filter((s) => !openSavedIds.has(s.id))
+    .slice().sort((x, y) => x.name.localeCompare(y.name, 'zh') || x.id.localeCompare(y.id))
   const etaCount = etaTabs.length
   const ftCount = (userFtsModel?.fault_trees?.length ?? 0)
 
