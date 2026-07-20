@@ -66,7 +66,15 @@ export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highli
   // 结构变化或高亮变化时同步(割集回溯把割集路径节点/边着色)
   useEffect(() => {
     const hot = highlight ?? new Set<string>()
-    setNodes(pNodes.map((n) => ({ ...n, data: { ...n.data, highlighted: hot.has(n.id), heat: heat ? heat[n.id] : undefined } })))
+    // 保留已测尺寸(空白画布终修 2026-07-20):此前整批换成**未测量**的新对象,把
+    // reactflow 刚经 ResizeObserver 测得的 width/height 踩掉——测量被每次父渲染归零,
+    // 节点长期停留在 visibility:hidden(v11 未测量即隐藏)。合并旧节点的测量结果,
+    // 测量只需成功一次,之后任何重渲染都不再打回隐藏态。
+    setNodes((prev) => pNodes.map((n) => {
+      const old = prev.find((p) => p.id === n.id)
+      return { ...n, ...(old?.width != null ? { width: old.width, height: old.height } : {}),
+               data: { ...n.data, highlighted: hot.has(n.id), heat: heat ? heat[n.id] : undefined } }
+    }))
     setEdges(pEdges.map((e) => {
       const on = hot.has(e.source) && hot.has(e.target)
       return { ...e, animated: on, style: on ? { stroke: '#f59e0b', strokeWidth: 2.5 } : undefined }

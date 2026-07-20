@@ -220,3 +220,8 @@
 .psa-focus-row:focus-visible { outline:2px solid var(--psa-primary); outline-offset:-2px; border-radius:4px; }
 .psa-svg-focus:focus { outline:none; }
 .psa-svg-focus:focus-visible { outline:2px solid var(--psa-primary); outline-offset:1px; }
+
+/* 空白画布兜底(2026-07-20):reactflow v11 节点在测量握手完成前 visibility:hidden;
+   握手在部分环境停摆时画布整片"空白"。本应用节点几何为自有 dagre 布局(固定 150×72),
+   不依赖"先测量再显示"——强制可见,最坏情况也只是小地图/边线晚一拍就位。 */
+.react-flow__node { visibility: visible !important; }
