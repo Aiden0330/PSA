@@ -43,14 +43,16 @@ const IE_RECT: CSSProperties = {
   maxWidth: 150,
 }
 
-export function GateNode({ data }: { data: any }) {
+/** 自接点击层(2026-07-21):选择回调直接挂在节点根元素——reactflow 内部事件管线在
+ *  测量停摆环境里会整体失灵("所有节点点不中"),自接层只依赖 DOM,永不失效。 */
+export function GateNode({ id, data }: { id: string; data: any }) {
   const op = (data.op ?? 'and') as string
   const color = COLOR[op] ?? '#475569'
   const text = op === 'atleast' ? `≥${data.k}/${(data.args ?? []).length}` : op.toUpperCase()
   // nodeLabel is the user-editable description; label is the node id (fallback)
   const ieLabel: string = data.nodeLabel ?? data.label
   return (
-    <div style={box(150, data.highlighted)}>
+    <div style={box(150, data.highlighted)} onClick={(e) => { e.stopPropagation(); data.onNodeSelect?.(id) }}>
       <Handle type="target" position={Position.Top} style={{ background: color }} />
       <div style={IE_RECT}>{ieLabel}{data.isTop ? ' ★' : ''}</div>
       <svg width="150" height="46" viewBox="0 0 150 46">
@@ -70,9 +72,9 @@ export function GateNode({ data }: { data: any }) {
   )
 }
 
-export function BasicEventNode({ data }: { data: any }) {
+export function BasicEventNode({ id, data }: { id: string; data: any }) {
   return (
-    <div style={box(130, data.highlighted)}>
+    <div style={box(130, data.highlighted)} onClick={(e) => { e.stopPropagation(); data.onNodeSelect?.(id) }}>
       <Handle type="target" position={Position.Top} style={{ background: '#d97706' }} />
       <svg width="130" height="40" viewBox="0 0 130 40">
         <circle cx="65" cy="20" r="17" fill={data.heat != null ? heatColor(data.heat) : '#fef3c7'} stroke="#d97706" strokeWidth="2" />
@@ -82,9 +84,9 @@ export function BasicEventNode({ data }: { data: any }) {
   )
 }
 
-export function HouseNode({ data }: { data: any }) {
+export function HouseNode({ id, data }: { id: string; data: any }) {
   return (
-    <div style={box(130, data.highlighted)}>
+    <div style={box(130, data.highlighted)} onClick={(e) => { e.stopPropagation(); data.onNodeSelect?.(id) }}>
       <Handle type="target" position={Position.Top} style={{ background: 'var(--psa-primary)' }} />
       <svg width="130" height="40" viewBox="0 0 130 40">
         <polygon points="50,38 50,16 65,4 80,16 80,38" fill="var(--psa-primary-soft)" stroke="var(--psa-primary)" strokeWidth="2" />

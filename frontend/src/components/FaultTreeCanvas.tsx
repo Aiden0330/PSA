@@ -73,13 +73,13 @@ export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highli
     setNodes((prev) => pNodes.map((n) => {
       const old = prev.find((p) => p.id === n.id)
       return { ...n, ...(old?.width != null ? { width: old.width, height: old.height } : {}),
-               data: { ...n.data, highlighted: hot.has(n.id), heat: heat ? heat[n.id] : undefined } }
+               data: { ...n.data, highlighted: hot.has(n.id), heat: heat ? heat[n.id] : undefined, onNodeSelect: onSelect } }
     }))
     setEdges(pEdges.map((e) => {
       const on = hot.has(e.source) && hot.has(e.target)
       return { ...e, animated: on, style: on ? { stroke: '#f59e0b', strokeWidth: 2.5 } : undefined }
     }))
-  }, [pNodes, pEdges, highlight, heat, setNodes, setEdges])
+  }, [pNodes, pEdges, highlight, heat, onSelect, setNodes, setEdges])
 
   // 确定性初始视口(报障 2026-07-20 三轮):节点坐标/尺寸皆为本方 dagre 布局的已知量,
   // 初始变换用纯数学同步给出——把树的左上角放进视野(100%)。不依赖 fitView/rAF/节点测量,
