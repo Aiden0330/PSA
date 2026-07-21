@@ -21,6 +21,9 @@ interface Props {
   zoomToolbar?: boolean
   /** 适配键:换树(名变)即重新自动适配一次;缺省 'ft' */
   fitKey?: string
+  /** 布局纪元:父层「重置布局」时自增——画布据此清空拖拽粘滞记忆,回到自动布局
+   *  (重置失效报障 2026-07-21:粘滞若不让位,重置按钮永远无效)。 */
+  layoutEpoch?: number
 }
 
 /** 悬浮缩放工具条(reactflow 自带缩放/平移,这里只是换皮成 .exp-zoom 视觉 + 复用其 zoomIn/zoomOut/fitView)。
@@ -60,13 +63,15 @@ function AutoFit({ nodeCount, fitKey }: { nodeCount: number; fitKey: string }) {
   return null
 }
 
-export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highlight, heat, onConnectNodes, onDeleteNodes, onSelect, onNodeDragStop, zoomToolbar, fitKey }: Props) {
+export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highlight, heat, onConnectNodes, onDeleteNodes, onSelect, onNodeDragStop, zoomToolbar, fitKey, layoutEpoch }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState(pNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(pEdges)
   // 结构变化或高亮变化时同步(割集回溯把割集路径节点/边着色)
   // 拖拽位置本会话粘滞(报障 2026-07-21:选中/编辑引发的同步把拖过的节点弹回 dagre 布局,
   // 观感=「拖不动」)。记录本画布挂载期内被拖过的节点,同步时保留其现位;换树(key 重挂)自然清零。
   const draggedIds = useRef<Set<string>>(new Set())
+  // 布局纪元变更 → 清粘滞(声明序在同步 effect 之前,保证同一轮先清后同步)
+  useEffect(() => { draggedIds.current.clear() }, [layoutEpoch])
   useEffect(() => {
     const hot = highlight ?? new Set<string>()
     // 保留已测尺寸(空白画布终修 2026-07-20):此前整批换成**未测量**的新对象,把
@@ -84,7 +89,7 @@ export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highli
       const on = hot.has(e.source) && hot.has(e.target)
       return { ...e, animated: on, style: on ? { stroke: '#f59e0b', strokeWidth: 2.5 } : undefined }
     }))
-  }, [pNodes, pEdges, highlight, heat, onSelect, onNodeDragStop, setNodes, setEdges])
+  }, [pNodes, pEdges, highlight, heat, onSelect, onNodeDragStop, layoutEpoch, setNodes, setEdges])
 
   // 确定性初始视口(报障 2026-07-20 三轮):节点坐标/尺寸皆为本方 dagre 布局的已知量,
   // 初始变换用纯数学同步给出——把树的左上角放进视野(100%)。不依赖 fitView/rAF/节点测量,

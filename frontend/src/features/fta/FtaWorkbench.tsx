@@ -59,6 +59,8 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
   // R4b:「⚙ 分析设置」ribbon 弹出面板的展开态——纯展示态,不影响 settings 本身的读写路径
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsPopRef = useRef<HTMLDivElement>(null)
+  // 重置布局纪元:自增即让画布放弃拖拽粘滞、回自动布局(所有分支通用;model 分支另清持久位置)
+  const [layoutEpoch, setLayoutEpoch] = useState(0)
 
   // 示例切换 → 清选中与结果(与旧行为一致)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -328,9 +330,8 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
           <label style={{ fontSize: 12, opacity: result ? 1 : 0.55, cursor: result ? 'pointer' : 'not-allowed' }}
             title={result ? '按基本事件 FV 着色' : '先点「量化」运行分析,得到重要度后才能着色(热力=FV 重要度)'}>
             <input type="checkbox" checked={heatOn} onChange={(e) => setHeatOn(e.target.checked)} disabled={!result} /> 重要度热力</label>
-          {!ftIsEta && !ftIsStandalone && (
-            <button onClick={() => setFtPos((m) => ({ ...m, [ftName]: {} }))} className="psa-btn" title="重置自动布局"><Icon name="arrow-up" size={13} />重置布局</button>
-          )}
+          <button onClick={() => { setLayoutEpoch((e) => e + 1); if (!ftIsEta && !ftIsStandalone) setFtPos((m) => ({ ...m, [ftName]: {} })) }}
+            className="psa-btn" title="重置自动布局(清除本会话拖拽位置)"><Icon name="arrow-up" size={13} />重置布局</button>
           <div style={{ width: 1, height: 20, background: 'var(--psa-line)', margin: '0 4px' }} />
           <button onClick={persistence.onSaveWorkspace} disabled={!etModel} className="psa-btn psa-btn--dark" title={persistence.savedId ? '更新当前项目存档（原地保存，含自建 FTA 工作区）' : '保存为新项目存档（含自建 FTA 工作区）'}><Icon name="save" size={14} />保存项目</button>
           <button onClick={persistence.onExportFile} disabled={!etModel} className="psa-btn" title="导出项目为文件（.psaproj.json，离线可用）"><Icon name="download" size={14} />导出文件</button>
@@ -347,6 +348,7 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
                   edges={cvGraph.edges}
                   editable
                   fitKey={`${ftIsEta ? ftEtaKey + ':' : ''}${cvFtName}`}
+                  layoutEpoch={layoutEpoch}
                   zoomToolbar
                   highlight={highlight}
                   heat={heatOn && result ? buildHeat(result.importance as any) : undefined}
