@@ -51,6 +51,12 @@ export function layoutFaultTree(model: ModelJson, ftName: string, positions?: Re
       id: n.id,
       type,
       position: saved ?? { x: center.x - NODE_W / 2, y: center.y - NODE_H / 2 },
+      // 预置宽高(拖拽报障 2026-07-21):reactflow v11 把"无宽高 = 未测量"的节点排除在
+      // 可拖名单与初始化判定之外;测量握手停摆的环境里新节点因此永远拖不动、fitView 不跑。
+      // 几何本就是我们的常量(实测 basic/house 130×57、gate 150×77),预置即视作已测量——
+      // 拖拽/nodesInitialized/原生可见性一次解锁;真实测量到达后由画布同步逻辑保留其值。
+      width: type === 'gate' ? 150 : 130,
+      height: type === 'gate' ? 77 : 57,
       data: { label: n.id, nodeLabel: n.label, op: n.op, k: n.k, args: n.args, isTop: n.id === ft.top },
       sourcePosition: Position.Bottom,
       targetPosition: Position.Top,
