@@ -49,3 +49,26 @@ describe('mutator 严格守卫 — 缺树 no-op(误写回归)', () => {
     expect(addBasic(empty, 'ANY').fault_trees.length).toBe(0)
   })
 })
+
+describe('libKindForUnit — 库单位→量纲推断(初因树导入)', () => {
+  it('速率单位(·yr / /yr 结尾)→ frequency;/demand 与未知 → probability', async () => {
+    const { libKindForUnit } = await import('./model')
+    expect(libKindForUnit('/unit·yr')).toBe('frequency')
+    expect(libKindForUnit('/cell·yr')).toBe('frequency')
+    expect(libKindForUnit('/yr')).toBe('frequency')
+    expect(libKindForUnit('/demand')).toBe('probability')
+    expect(libKindForUnit('PFD')).toBe('probability')
+    expect(libKindForUnit(undefined)).toBe('probability')
+  })
+
+  it('addBasicFromLib 缺省仍 probability(屏障树零扰动);显式 frequency 生效', async () => {
+    const { addBasicFromLib } = await import('./model')
+    const m = { model_data: { parameters: [] }, fault_trees: [
+      { name: 'T', top: 'G', nodes: [{ id: 'G', op: 'or', args: [] }] }] }
+    const c = { id: 'CFR_PCS', name: 'PCS', rate: 1e-2, unit: '/unit·yr', source: { citation: 'test' } }
+    const m1 = addBasicFromLib(m as never, 'T', c as never)
+    expect((m1 as never as { model_data: { parameters: { kind: string }[] } }).model_data.parameters[0].kind).toBe('probability')
+    const m2 = addBasicFromLib(m as never, 'T', c as never, 'frequency')
+    expect((m2 as never as { model_data: { parameters: { kind: string }[] } }).model_data.parameters[0].kind).toBe('frequency')
+  })
+})

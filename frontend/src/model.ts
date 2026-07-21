@@ -155,7 +155,13 @@ export function attachStarterFt(fts: ModelJson, feId: string, failProb: number,
 
 export interface LibComponent { id: string; name: string; failure_mode?: string; rate: number; unit: string; source: { citation: string } }
 /** 从器件失效率库追加基本事件(值=rate, 不做单位换算; 来源含名称/失效模式/单位标注)。 */
-export function addBasicFromLib(m: ModelJson, ftName: string, c: LibComponent): ModelJson {
+/** 库条目单位 → 参数量纲(初因树导入用):`·yr`/`/yr` 结尾的速率单位 = 频率初因;
+ *  /demand、PFD 等 = 使能概率。仅做标注推断,数值绝不转换(单位承重铁律)。 */
+export function libKindForUnit(unit?: string): 'probability' | 'frequency' {
+  return /(·|\/)yr\)?\s*$/.test((unit ?? '').trim()) ? 'frequency' : 'probability'
+}
+
+export function addBasicFromLib(m: ModelJson, ftName: string, c: LibComponent, kind: 'probability' | 'frequency' = 'probability'): ModelJson {
   if (!hasFt(m, ftName)) return m
   const nm = clone(m), ft = getFt(nm, ftName)
   const taken = ft.nodes.map((n) => n.id).concat(nm.model_data.parameters.map((p) => p.id))
@@ -163,7 +169,7 @@ export function addBasicFromLib(m: ModelJson, ftName: string, c: LibComponent): 
   while (taken.includes(id)) { id = `${c.id}_${i}`; i++ }
   ft.nodes.push({ id, basic: true, param_ref: id })
   const src = `${c.name}${c.failure_mode ? '/' + c.failure_mode : ''} — ${c.source.citation}(${c.unit})`
-  nm.model_data.parameters.push({ id, kind: 'probability', value: c.rate, source: src })
+  nm.model_data.parameters.push({ id, kind, value: c.rate, source: src })
   return nm
 }
 

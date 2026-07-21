@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { ModelJson } from '../model'
-import { addGate, addBasic, connect, deleteNode, updateNode, updateParam, setParamKind, setTop, addBasicFromLib, renameNode } from '../model'
+import { addGate, addBasic, connect, deleteNode, updateNode, updateParam, setParamKind, setTop, addBasicFromLib, libKindForUnit, renameNode } from '../model'
 import { layoutFaultTree } from '../layout'
 import { FaultTreeCanvas } from './FaultTreeCanvas'
 import { Palette } from './Palette'
@@ -75,7 +75,8 @@ export function BarrierFtModal(
             onAddFrequency={frequencyMode ? () => api.set((prev) => addBasic(prev, ftName, 1e-3, 'frequency')) : undefined} />
           {libComponents && libComponents.length > 0 && (
             <LibPicker label="＋从库加基本事件" items={libComponents.map((c: any) => ({ id: c.id, name: c.name, unit: c.unit }))}
-              onPick={(id) => { const c = libComponents.find((x: any) => x.id === id); if (c) api.set((prev) => addBasicFromLib(prev, ftName, c)) }} />
+              onPick={(id) => { const c = libComponents.find((x: any) => x.id === id)
+                if (c) api.set((prev) => addBasicFromLib(prev, ftName, c, frequencyMode ? libKindForUnit(c.unit) : 'probability')) }} />
           )}
           <button onClick={api.undo} disabled={!api.canUndo} title="撤销" style={icon}>↶</button>
           <button onClick={api.redo} disabled={!api.canRedo} title="重做" style={icon}>↷</button>
