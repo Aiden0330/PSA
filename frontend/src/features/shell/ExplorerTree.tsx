@@ -64,6 +64,11 @@ export function ExplorerTree({ persistence, tab, setTab }: {
   )
   const { etaTabs, activeKey, etModel, userFtsModel, P } = useActiveEta()
 
+  // 打开区同样名称稳定序(报障 2026-07-21:openOrder 是使用序,开/关/切都会跳)。
+  // openOrder 仅保留给切换语义,呈现按显示名排序;同名(如两份 IE_TR)加 #id 短码可辨。
+  const openSorted = openProjects.slice().sort((x, y) =>
+    (x.identity.displayName || '未命名项目').localeCompare(y.identity.displayName || '未命名项目', 'zh')
+    || x.workspaceId.localeCompare(y.workspaceId))
   const openSavedIds = new Set(openProjects.map((o) => o.identity.savedId).filter(Boolean))
   // 稳定序(报障 2026-07-20):后端列表按"最近保存"排序,每次保存都重排 + 刷新后
   // 自动重开又置顶,树观感乱跳。改为名称字典序(中文拼音感知)+ id 决胜,永远可预测。
@@ -79,19 +84,21 @@ export function ExplorerTree({ persistence, tab, setTab }: {
     <nav className="exp-tree" role="tree" aria-label="项目与页面导航">
       <div className="grp" role="presentation">项目({openProjects.length + archived.length})</div>
 
-      {openProjects.map((o) => {
+      {openSorted.map((o) => {
         const active = o.workspaceId === activeWid
         const name = o.identity.displayName || '未命名项目'
+        const dupOpen = openSorted.filter((x) => (x.identity.displayName || '未命名项目') === name).length > 1
+        const tag = dupOpen ? <span style={{ color: 'var(--psa-faint)', fontFamily: 'var(--psa-font-mono)', fontSize: 10 }}> #{(o.identity.savedId || o.workspaceId).slice(0, 4)}</span> : null
         if (!active) {
           return (
             <TreeItem key={o.workspaceId} className="it prj" onActivate={() => switchProject(o.workspaceId)} title="切换到该项目">
-              ▸ {name}{!o.identity.savedId && <span className="st dft">草稿</span>}
+              ▸ {name}{tag}{!o.identity.savedId && <span className="st dft">草稿</span>}
             </TreeItem>
           )
         }
         return (
           <div key={o.workspaceId} role="group" aria-label={name}>
-            <TreeItem className="it prj on" selected onActivate={() => onPage('home')}>▾ {name}{!o.identity.savedId && <span className="st dft">草稿</span>}</TreeItem>
+            <TreeItem className="it prj on" selected onActivate={() => onPage('home')}>▾ {name}{tag}{!o.identity.savedId && <span className="st dft">草稿</span>}</TreeItem>
             {PAGE_NODES.map((p) => {
               if (p.tab === 'bess') {
                 return (

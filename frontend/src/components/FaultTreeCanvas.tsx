@@ -64,6 +64,9 @@ export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highli
   const [nodes, setNodes, onNodesChange] = useNodesState(pNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(pEdges)
   // 结构变化或高亮变化时同步(割集回溯把割集路径节点/边着色)
+  // 拖拽位置本会话粘滞(报障 2026-07-21:选中/编辑引发的同步把拖过的节点弹回 dagre 布局,
+  // 观感=「拖不动」)。记录本画布挂载期内被拖过的节点,同步时保留其现位;换树(key 重挂)自然清零。
+  const draggedIds = useRef<Set<string>>(new Set())
   useEffect(() => {
     const hot = highlight ?? new Set<string>()
     // 保留已测尺寸(空白画布终修 2026-07-20):此前整批换成**未测量**的新对象,把
@@ -73,7 +76,9 @@ export function FaultTreeCanvas({ nodes: pNodes, edges: pEdges, editable, highli
     setNodes((prev) => pNodes.map((n) => {
       const old = prev.find((p) => p.id === n.id)
       return { ...n, ...(old?.width != null ? { width: old.width, height: old.height } : {}),
-               data: { ...n.data, highlighted: hot.has(n.id), heat: heat ? heat[n.id] : undefined, onNodeSelect: onSelect, onNodeDragStop } }
+               ...(old && draggedIds.current.has(n.id) ? { position: old.position } : {}),
+               data: { ...n.data, highlighted: hot.has(n.id), heat: heat ? heat[n.id] : undefined, onNodeSelect: onSelect,
+                       onNodeDragStop: (id: string, x: number, y: number) => { draggedIds.current.add(id); onNodeDragStop?.(id, x, y) } } }
     }))
     setEdges(pEdges.map((e) => {
       const on = hot.has(e.source) && hot.has(e.target)
