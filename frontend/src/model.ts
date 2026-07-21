@@ -81,6 +81,34 @@ export function connect(m: ModelJson, ftName: string, source: string, target: st
   }
   return nm
 }
+/** 检视器「添加子节点」下拉的候选集:排除 gateId 自身、已是其 args 的子节点、
+ *  以及 gateId 的祖先(从候选节点出发沿 args 向下可达 gateId ⇒ 连上会成环)。
+ *  共享子树/多父合法,不因候选节点已有别的父而排除。命名树不存在 → []。 */
+export function connectableChildren(m: ModelJson, ftName: string, gateId: string): string[] {
+  const ft = m.fault_trees.find((f) => f.name === ftName)
+  if (!ft) return []
+  const gate = ft.nodes.find((n) => n.id === gateId)
+  if (!gate) return []
+  const existing = new Set(gate.args ?? [])
+  const byId = new Map(ft.nodes.map((n) => [n.id, n]))
+  // 从 startId 出发沿 args 向下 DFS,命中 gateId ⇒ startId 是 gateId 的祖先(成环)。
+  const leadsToGate = (startId: string): boolean => {
+    const seen = new Set<string>()
+    const stack = [startId]
+    while (stack.length) {
+      const cur = stack.pop()!
+      if (cur === gateId) return true
+      if (seen.has(cur)) continue
+      seen.add(cur)
+      for (const a of byId.get(cur)?.args ?? []) stack.push(a)
+    }
+    return false
+  }
+  return ft.nodes
+    .filter((n) => n.id !== gateId && !existing.has(n.id) && !leadsToGate(n.id))
+    .map((n) => n.id)
+}
+
 export function deleteNode(m: ModelJson, ftName: string, id: string): ModelJson {
   if (!hasFt(m, ftName)) return m
   const nm = clone(m), ft = getFt(nm, ftName)

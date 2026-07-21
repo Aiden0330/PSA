@@ -72,3 +72,59 @@ describe('libKindForUnit — 库单位→量纲推断(初因树导入)', () => {
     expect((m2 as never as { model_data: { parameters: { kind: string }[] } }).model_data.parameters[0].kind).toBe('frequency')
   })
 })
+
+describe('connectableChildren — 「添加子节点」下拉候选集(特性 1)', () => {
+  it('排除自身、已是其 args 的子节点、以及祖先(两层环);允许共享(同一 BE 连两个门)', async () => {
+    const { connectableChildren } = await import('./model')
+    // 树形:TOP(or) -> [G1, BE1]; G1(and) -> [BE2]; BE3 孤立(可连任意门)
+    const m: ModelJson = { model_data: { parameters: [] }, fault_trees: [
+      { name: 'T', top: 'TOP', nodes: [
+        { id: 'TOP', op: 'or', args: ['G1', 'BE1'] },
+        { id: 'G1', op: 'and', args: ['BE2'] },
+        { id: 'BE1', basic: true, param_ref: 'BE1' },
+        { id: 'BE2', basic: true, param_ref: 'BE2' },
+        { id: 'BE3', basic: true, param_ref: 'BE3' },
+      ] }] }
+    // 给 G1 添加子节点:候选应排除 G1 自身、已是其子的 BE2、以及祖先 TOP(两层:TOP->G1 成环)
+    const forG1 = connectableChildren(m, 'T', 'G1')
+    expect(forG1).not.toContain('G1')
+    expect(forG1).not.toContain('BE2')
+    expect(forG1).not.toContain('TOP')
+    expect(forG1).toContain('BE1')
+    expect(forG1).toContain('BE3')
+    // 共享子树合法:BE1 已是 TOP 的子节点,仍可再连到 G1(不因已有父而被排除)
+    expect(connectableChildren(m, 'T', 'G1')).toContain('BE1')
+    // 给 TOP 添加子节点:候选排除 TOP 自身、已是其子的 G1/BE1;BE2/BE3 仍可连(共享合法)
+    const forTop = connectableChildren(m, 'T', 'TOP')
+    expect(forTop).not.toContain('TOP')
+    expect(forTop).not.toContain('G1')
+    expect(forTop).not.toContain('BE1')
+    expect(forTop).toContain('BE2')
+    expect(forTop).toContain('BE3')
+  })
+
+  it('两层祖先环:候选出发沿 args 两跳可达 gateId 同样排除', async () => {
+    const { connectableChildren } = await import('./model')
+    // A(or)->[B]; B(or)->[C]; C(or)->[] —— 给 C 添加子节点时,A 和 B 都是祖先,须排除
+    const m: ModelJson = { model_data: { parameters: [] }, fault_trees: [
+      { name: 'T', top: 'A', nodes: [
+        { id: 'A', op: 'or', args: ['B'] },
+        { id: 'B', op: 'or', args: ['C'] },
+        { id: 'C', op: 'or', args: [] },
+      ] }] }
+    const forC = connectableChildren(m, 'T', 'C')
+    expect(forC).not.toContain('A')
+    expect(forC).not.toContain('B')
+    expect(forC).not.toContain('C')
+  })
+
+  it('命名树不存在,或 gateId 不存在 → []', async () => {
+    const { connectableChildren } = await import('./model')
+    const m: ModelJson = { model_data: { parameters: [] }, fault_trees: [
+      { name: 'T', top: 'G', nodes: [{ id: 'G', op: 'or', args: [] }] }] }
+    expect(connectableChildren(m, 'MISSING', 'G')).toEqual([])
+    expect(connectableChildren(m, 'T', 'NOPE')).toEqual([])
+    const empty: ModelJson = { model_data: { parameters: [] }, fault_trees: [] }
+    expect(connectableChildren(empty, 'T', 'G')).toEqual([])
+  })
+})

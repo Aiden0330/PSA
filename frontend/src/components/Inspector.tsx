@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { ModelJson, FtNodeJson } from '../model'
-import { getFt } from '../model'
+import type { ModelJson, FtNodeJson, FaultTreeJson } from '../model'
+import { getFt, connectableChildren } from '../model'
 import { Icon } from './icons'
 
 interface Props {
@@ -15,6 +15,8 @@ interface Props {
   /** 初因频率树模式:暴露参数量纲切换(频率初因 /yr ↔ 使能概率);频率值不钳位到 ≤1。 */
   frequencyMode?: boolean
   onSetParamKind?: (id: string, kind: 'probability' | 'frequency') => void
+  /** 门节点「添加子节点」下拉(选择式连接,绕开拖线);未传入时不渲染该控件。 */
+  onConnectChild?: (gateId: string, childId: string) => void
 }
 
 const GATE_OPS = ['and', 'or', 'atleast', 'not', 'xor']
@@ -40,7 +42,26 @@ function NameField({ id, onRename }: { id: string; onRename: (oldId: string, new
   )
 }
 
-export function Inspector({ model, ftName, selected, onUpdateNode, onUpdateParam, onSetTop, onDelete, onRenameNode, frequencyMode, onSetParamKind }: Props) {
+/** 门节点「添加子节点」选择式连接下拉:占位项 + 候选项(id,附短括注 label)。
+ *  key={gateId}(调用方传)确保切换选中节点时草稿重置回占位。 */
+function AddChildSelect({ ft, gateId, candidates, onConnectChild }:
+  { ft: FaultTreeJson; gateId: string; candidates: string[]; onConnectChild: (gateId: string, childId: string) => void }) {
+  const [v, setV] = useState('')
+  const labelFor = (id: string) => {
+    const label = ft.nodes.find((n) => n.id === id)?.label
+    return label ? `${id}(${label})` : id
+  }
+  return (
+    <select value={v} style={{ flex: 1, fontSize: 12 }} aria-label="添加子节点"
+      title="选择一个节点连为当前门的子节点(等价于拖线连接)"
+      onChange={(e) => { const childId = e.target.value; if (childId) onConnectChild(gateId, childId); setV('') }}>
+      <option value="">＋添加子节点…</option>
+      {candidates.map((id) => <option key={id} value={id}>{labelFor(id)}</option>)}
+    </select>
+  )
+}
+
+export function Inspector({ model, ftName, selected, onUpdateNode, onUpdateParam, onSetTop, onDelete, onRenameNode, frequencyMode, onSetParamKind, onConnectChild }: Props) {
   if (!selected) {
     return (
       <div style={{ padding: 14, color: 'var(--psa-muted)', fontSize: 12, lineHeight: 1.6 }}>
@@ -92,6 +113,16 @@ export function Inspector({ model, ftName, selected, onUpdateNode, onUpdateParam
               <input type="number" min={1} max={(node.args ?? []).length} value={node.k ?? 2} style={{ width: 56 }}
                 onChange={(e) => onUpdateNode(node.id, { k: Math.max(1, +e.target.value) })} />
               <span style={{ fontSize: 11.5, color: 'var(--psa-faint)' }}>/ {(node.args ?? []).length}</span>
+            </div>
+          )}
+          {onConnectChild && (
+            <div style={fieldRow}>
+              {(() => {
+                const candidates = connectableChildren(model, ftName, node.id)
+                return candidates.length > 0
+                  ? <AddChildSelect key={node.id} ft={ft} gateId={node.id} candidates={candidates} onConnectChild={onConnectChild} />
+                  : <span style={{ fontSize: 11.5, color: 'var(--psa-faint)' }}>(无可连接节点——先添加基本事件/门)</span>
+              })()}
             </div>
           )}
           <div style={{ fontSize: 11.5, color: 'var(--psa-muted)', padding: '2px 0', marginBottom: 4 }}>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { ModelJson } from '../model'
 import { addGate, addBasic, connect, deleteNode, updateNode, updateParam, setParamKind, setTop, addBasicFromLib, libKindForUnit, renameNode } from '../model'
@@ -23,6 +23,36 @@ export function BarrierFtModal(
   { model: ModelJson; ftName: string; api: Api; pfd?: number; onClose: () => void; libComponents?: any[]; frequencyMode?: boolean },
 ) {
   const [selected, setSelected] = useState<string | null>(null)
+  // 树内本地撤销栈(撤销限定树内边界,报障 2026-07-17 白屏的根因修复):模态每次打开都是
+  // 全新挂载,栈天然清零 —— 本模态的 ↶/↷ 永远碰不到「挂载 FTA」那次项目级写入。
+  // 本地撤销通过**新的正向写**实现(api.set 仍前进项目文档历史,证据链只增不回写);
+  // 关闭模态后主界面的 ↶ 走的是项目级撤销历史,与本栈无关、互不干扰。
+  const stack = useRef<{ past: ModelJson[]; future: ModelJson[] }>({ past: [], future: [] })
+  // 栈本体存 ref 里(不触发渲染);disabled 态派生自这两个 state,不在渲染期读 ref.current
+  // (react-hooks/refs 禁渲染期读 ref——踩过会拉高 lint 基线,改走 setState 镜像栈空/非空)。
+  const [canUndoLocal, setCanUndoLocal] = useState(false)
+  const [canRedoLocal, setCanRedoLocal] = useState(false)
+  const syncLocalFlags = () => {
+    setCanUndoLocal(stack.current.past.length > 0)
+    setCanRedoLocal(stack.current.future.length > 0)
+  }
+  // api.set(project store 动作)同步执行 updater(Zustand set 非 React useState 的延迟队列
+  // 语义)——updater 内对 stack.current 的写在 api.set 调用返回时已落地,故 syncLocalFlags()
+  // 紧跟其后读取即是最新值。
+  const localSet = (up: (prev: ModelJson) => ModelJson) => {
+    api.set((prev) => { stack.current.past.push(prev); stack.current.future = []; return up(prev) })
+    syncLocalFlags()
+  }
+  const undoLocal = () => {
+    if (stack.current.past.length === 0) return
+    api.set((cur) => { stack.current.future.push(cur); return stack.current.past.pop()! })
+    syncLocalFlags()
+  }
+  const redoLocal = () => {
+    if (stack.current.future.length === 0) return
+    api.set((cur) => { stack.current.past.push(cur); return stack.current.future.pop()! })
+    syncLocalFlags()
+  }
   // 初因频率口径开关 + 结果:纯本模态局部态,不写 store(store 仍由 onClose 走 sum 默认)。
   const [freqMethod, setFreqMethod] = useState<FtFrequencyMethod>('sum')
   const [freqResult, setFreqResult] = useState<FtFrequencyResult | null>(null)
@@ -71,15 +101,15 @@ export function BarrierFtModal(
       <div style={panel} onClick={(e) => e.stopPropagation()}>
         <div style={bar}>
           <strong style={{ fontSize: 14 }}>{frequencyMode ? '编辑初因事件故障树(频率)' : `编辑故障树:${ftName}`}</strong>
-          <Palette onAddGate={(op) => api.set((prev) => addGate(prev, ftName, op))} onAddBasic={() => api.set((prev) => addBasic(prev, ftName))}
-            onAddFrequency={frequencyMode ? () => api.set((prev) => addBasic(prev, ftName, 1e-3, 'frequency')) : undefined} />
+          <Palette onAddGate={(op) => localSet((prev) => addGate(prev, ftName, op))} onAddBasic={() => localSet((prev) => addBasic(prev, ftName))}
+            onAddFrequency={frequencyMode ? () => localSet((prev) => addBasic(prev, ftName, 1e-3, 'frequency')) : undefined} />
           {libComponents && libComponents.length > 0 && (
             <LibPicker label="＋从库加基本事件" items={libComponents.map((c: any) => ({ id: c.id, name: c.name, unit: c.unit }))}
               onPick={(id) => { const c = libComponents.find((x: any) => x.id === id)
-                if (c) api.set((prev) => addBasicFromLib(prev, ftName, c, frequencyMode ? libKindForUnit(c.unit) : 'probability')) }} />
+                if (c) localSet((prev) => addBasicFromLib(prev, ftName, c, frequencyMode ? libKindForUnit(c.unit) : 'probability')) }} />
           )}
-          <button onClick={api.undo} disabled={!api.canUndo} title="撤销" style={icon}>↶</button>
-          <button onClick={api.redo} disabled={!api.canRedo} title="重做" style={icon}>↷</button>
+          <button onClick={undoLocal} disabled={!canUndoLocal} title="撤销(仅本树内,不越过挂载边界)" style={icon}>↶</button>
+          <button onClick={redoLocal} disabled={!canRedoLocal} title="重做(仅本树内)" style={icon}>↷</button>
           {frequencyMode && (
             <>
               <div style={segmented} role="tablist" aria-label="初因频率口径">
@@ -105,21 +135,22 @@ export function BarrierFtModal(
             <FaultTreeCanvas
               key={ftName}
               nodes={graph.nodes} edges={graph.edges} editable highlight={new Set<string>()} fitKey={ftName}
-              onConnectNodes={(s, t) => api.set((prev) => connect(prev, ftName, s, t))}
-              onDeleteNodes={(ids) => { api.set((prev) => ids.reduce((m, id) => deleteNode(m, ftName, id), prev)); setSelected(null) }}
+              onConnectNodes={(s, t) => localSet((prev) => connect(prev, ftName, s, t))}
+              onDeleteNodes={(ids) => { localSet((prev) => ids.reduce((m, id) => deleteNode(m, ftName, id), prev)); setSelected(null) }}
               onSelect={setSelected}
             />
           </div>
           <div style={{ width: 360, borderLeft: '1px solid var(--psa-line)', overflowY: 'auto', background: 'var(--psa-surface)' }}>
             <Inspector
               model={model} ftName={ftName} selected={selected}
-              onUpdateNode={(id, patch) => api.set((prev) => updateNode(prev, ftName, id, patch))}
-              onUpdateParam={(id, v) => api.set((prev) => updateParam(prev, id, v))}
-              onSetTop={(id) => api.set((prev) => setTop(prev, ftName, id))}
-              onDelete={(id) => { api.set((prev) => deleteNode(prev, ftName, id)); setSelected(null) }}
-              onRenameNode={(o, n) => { api.set((prev) => renameNode(prev, ftName, o, n)); setSelected(n) }}
+              onUpdateNode={(id, patch) => localSet((prev) => updateNode(prev, ftName, id, patch))}
+              onUpdateParam={(id, v) => localSet((prev) => updateParam(prev, id, v))}
+              onSetTop={(id) => localSet((prev) => setTop(prev, ftName, id))}
+              onDelete={(id) => { localSet((prev) => deleteNode(prev, ftName, id)); setSelected(null) }}
+              onRenameNode={(o, n) => { localSet((prev) => renameNode(prev, ftName, o, n)); setSelected(n) }}
+              onConnectChild={(g, c) => localSet((prev) => connect(prev, ftName, g, c))}
               frequencyMode={frequencyMode}
-              onSetParamKind={frequencyMode ? (id, k) => api.set((prev) => setParamKind(prev, id, k)) : undefined}
+              onSetParamKind={frequencyMode ? (id, k) => localSet((prev) => setParamKind(prev, id, k)) : undefined}
             />
           </div>
         </div>

@@ -398,6 +398,7 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
             onSetTop={(id) => cvSet((prev: ModelJson) => setTop(prev, cvFtName, id))}
             onDelete={(id) => { cvSet((prev: ModelJson) => deleteNode(prev, cvFtName, id)); setSelected(null) }}
             onRenameNode={(o, n) => { if (cvModel) { cvSet((prev: ModelJson) => renameNode(prev, cvFtName, o, n)); setSelected(n) } }}
+            onConnectChild={(g, c) => cvSet((prev: ModelJson) => connect(prev, cvFtName, g, c))}
           />
         )}
       </div>
