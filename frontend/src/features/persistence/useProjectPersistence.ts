@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AuthRequiredError, SaveConflictError, deleteSaved, listSaved, saveWorkspace, wasSavedOffline } from '../../api'
+import { AuthRequiredError, SaveConflictError, deleteSaved, listProjectVersions, listSaved, saveWorkspace, wasSavedOffline } from '../../api'
 import type { SavedItem } from '../../api'
 import { deserializeProject, serializeProject } from '../../project'
 import type { ProjectEta, ProjectPayload } from '../../project'
@@ -77,6 +77,19 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   }
 
   const refreshList = async () => { setSaved(await listSaved()); setArchiveLocal(wasSavedOffline()) }
+  // 导出钉扎基线同步(自冲突报障 2026-07-21):导出报告会 auto-pin 一个证据版本,
+  // 前端基线若不跟进,下一次保存会把**自己钉的版本**当他人并发而 409。导出成功后调用:
+  // 取服务器头版本推进发起槽基线。内容即刚导出的载荷,推进无数据风险;真正的并发仍受 CAS 保护。
+  const syncBaselineAfterPin = async (wid: string) => {
+    try {
+      const st = useProjectStore.getState()
+      const idn = wid === st.workspaceId ? st.identity : st.parked[wid]?.identity
+      if (!idn?.projectUuid) return
+      const versions = await listProjectVersions(idn.projectUuid)
+      const head = versions[versions.length - 1]?.content_hash
+      if (head) setIdentityFor(wid, { lastVersionHash: head })
+    } catch { /* 同步失败不打扰导出成功;下一次保存最多多走一次冲突对话 */ }
+  }
   // R2-审 F1:身份写回一律槽定向 —— await 归来时活动项目可能已不是发起者。
   const captureUuidFor = (wid: string, rec: unknown) => {
     const v = (rec as { version?: { project_uuid?: string; content_hash?: string } })?.version
@@ -342,7 +355,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
   return {
     saved, savedId: pendingId || savedId, archiveLocal, projectUuid, lastVersionHash, loading, conflict, sessionDraft,
     fmeaRows, fmeaMapping, persistFmeaRows, persistFmeaMapping,
-    buildPayload, onSaveWorkspace, onSaveAs, loadProject, onExportFile, onImportFile, onDeleteSaved,
+    buildPayload, onSaveWorkspace, onSaveAs, loadProject, onExportFile, onImportFile, onDeleteSaved, syncBaselineAfterPin,
     resolveConflictOverwrite, resolveConflictSaveAsCopy, dismissConflict,
     restoreSessionDraft, discardSessionDraft,
   }

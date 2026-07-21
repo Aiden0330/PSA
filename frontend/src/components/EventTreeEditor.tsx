@@ -49,7 +49,7 @@ function prepareCanvasForExport(svg: SVGSVGElement): SVGSVGElement {
  */
 export function EventTreeEditor(
   { model, onChange, linked, fts, ftsApi, pfds, onAttachFt, onDetachFt, onFtEdited, libBarriers, libComponents,
-    etaSummaries = [], aggregateTotals, onSelectEta, onToggleEta, onAddBarrier, onEditInitFt, getReportContext, etEngineOptions }: {
+    etaSummaries = [], aggregateTotals, onSelectEta, onToggleEta, onAddBarrier, onEditInitFt, getReportContext, onExported, etEngineOptions }: {
     model: EventTreeModel; onChange: (m: EventTreeModel | ((prev: EventTreeModel) => EventTreeModel)) => void; linked?: Linked
     fts?: any; ftsApi?: Api; pfds?: Record<string, number>
     onAttachFt?: (idx: number) => void; onDetachFt?: (idx: number) => void; onFtEdited?: (feId: string) => void
@@ -60,6 +60,8 @@ export function EventTreeEditor(
     onEditInitFt?: () => void
     /** ADR-2 报告钉扎:随导出请求提交项目上下文 → 后端 auto-pin 版本 + 案例 + 证据页脚 */
     getReportContext?: () => { project_uuid: string; project_payload: unknown }
+    /** 导出成功(auto-pin 已产生新版本)后的回调——父层借此推进该槽 CAS 基线(防自冲突 409) */
+    onExported?: () => void
     /** 4c/Gap8:ETA 分析设置(house 覆盖 / 命名边界条件集)—— 套用到引擎精确量化与重要度;
      *  空对象即零扰动(不含 post 规则:那是 FTA 专属)。F-α 起导出/报告与量化同源消费(FE-01)。 */
     etEngineOptions?: { house_states?: Record<string, boolean>; boundary_condition_set?: string; boundary_condition_sets?: unknown[] }
@@ -195,6 +197,7 @@ export function EventTreeEditor(
         labels: Object.fromEntries(model.functionalEvents.map((f) => [f.id, f.label])),
         ...(getReportContext?.() ?? {}),                     // ADR-2:钉扎版本 + 案例 + 证据页脚(点击时惰性构造)
       }, model.initEvent, png)
+      onExported?.()                                         // 钉扎产生新版本 → 推进基线,防下一次保存自冲突
     } catch (e: any) { setQErr(String(e?.message ?? e)) }
     finally { setExpBusy(false) }
   }

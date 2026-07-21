@@ -348,7 +348,8 @@ export function EtaWorkbench(
             libBarriers={lib?.barrier_effectiveness ?? []} libComponents={lib?.component_failure_rates ?? []}
             etaSummaries={summaries} aggregateTotals={aggregateTotals}
             onSelectEta={selectEta} onToggleEta={onToggleEta} onAddBarrier={onAddBarrier}
-            onEditInitFt={onEditInitFt} getReportContext={getReportContext} etEngineOptions={etEngineOptions} />
+            onEditInitFt={onEditInitFt} getReportContext={getReportContext}
+            onExported={() => { void persistence.syncBaselineAfterPin(P().workspaceId) }} etEngineOptions={etEngineOptions} />
         )}
       </div>
 

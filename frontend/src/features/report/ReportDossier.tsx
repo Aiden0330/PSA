@@ -9,6 +9,7 @@ import type { ProjectEta } from '../../project'
 import { composeModel } from '../../stores/derived'
 import { useActiveEta, etaDisplayName } from '../../stores/useActiveEta'
 import { useAuthStore } from '../../stores/authStore'
+import { useProjectStore } from '../../stores/projectStore'
 import { useEvidenceGuard } from './evidenceGuard'
 import type { ProjectPersistence } from '../persistence/useProjectPersistence'
 
@@ -127,6 +128,7 @@ export function ReportDossier({ persistence }: { persistence: ProjectPersistence
         ...(pu ? { project_uuid: pu, project_payload: persistence.buildPayload() } : {}),
       }, useAgg ? `勾选集聚合(${checkedTabs.length} 树)` : etModel.initEvent)
       refresh()                                              // auto-pin 产生了新版本/案例 → 台账即时更新
+      void persistence.syncBaselineAfterPin(useProjectStore.getState().workspaceId)   // 防自冲突 409(2026-07-21)
     } catch (e: any) { setErr(String(e?.message ?? e)) }
     finally { setBusy(false) }
   }
