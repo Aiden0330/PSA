@@ -42,7 +42,8 @@ def test_importance_and_uncertainty_pin_cases(tmp_path, monkeypatch):
     ctx = {"project_uuid": PUUID, "project_payload": _payload(), "scenario_name": "IE"}
 
     imp = client.post("/api/event-tree/importance", json={**_et_req(), **ctx}).json()
-    assert imp["case"]["version_hash"] == content_hash(to_canonical(_payload(), PUUID)[0])
+    # 钉扎带权威名(冒烟修复 2026-07-21):resolved = 库名 ?? scenario_name("IE")
+    assert imp["case"]["version_hash"] == content_hash(to_canonical(_payload(), PUUID, project_name="IE")[0])
 
     unc = client.post("/api/event-tree/uncertainty",
                       json={**_et_req(), "samples": 50, "seed": 1, **ctx}).json()

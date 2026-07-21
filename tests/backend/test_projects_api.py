@@ -96,7 +96,8 @@ def test_report_auto_pin_case_and_footer(tmp_path, monkeypatch):
     assert len(cases) == 1 and cases[0]["kind"] == "report"
     case = cases[0]
     # 验收:case 钉扎的版本哈希 == 当前文档哈希
-    doc, _ = to_canonical(payload, puuid)
+    # 钉扎带权威名(冒烟修复 2026-07-21):本请求未传 scenario_name → schema 缺省「ETA」
+    doc, _ = to_canonical(payload, puuid, project_name="ETA")
     vs = client.get(f"/api/projects/{puuid}/versions").json()
     v = next(x for x in vs if x["id"] == case["version_id"])
     assert v["origin"] == "auto_pin"

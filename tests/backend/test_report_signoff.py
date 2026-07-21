@@ -89,3 +89,30 @@ def test_docx_pdf_render_with_and_without_signoff():
     for fmt, magic in (("docx", b"PK\x03\x04"), ("pdf", b"%PDF")):
         r = client.post(f"/api/report?format={fmt}", json=_report_req(0.1))
         assert r.status_code == 200 and r.content[:4] == magic
+
+
+def test_gate_hits_version_saved_via_api_saved(tmp_path):
+    """冒烟 2026-07-21 发现:真实链路是 /api/saved(带项目名)保存 → 签发该版 → 导出。
+    此前 _pin_case 调 to_canonical 不传 project_name,而 content_hash 含 project.name ——
+    同一 payload 带名/无名哈希不同,导出门**永不命中**经 /api/saved 保存的签发版,
+    签发报告被误标「工作稿」。锚:经 /api/saved 的签发版,导出必须出签发行,且
+    auto-pin 幂等命中同哈希(不产生第二条平行版本链)。"""
+    r = client.post("/api/saved", json={"name": "签发门-经存档", "payload": _v2_payload(0.1)})
+    assert r.status_code == 200
+    puuid = r.json()["version"]["project_uuid"]
+    vid = r.json()["version"]["id"]
+    saved_hash = r.json()["version"]["content_hash"]
+
+    assert client.post(f"/api/projects/{puuid}/reviews", json={"version_id": vid}).status_code == 200
+    assert client.post(f"/api/projects/{puuid}/reviews/{vid}/sign", json={"note": "ok"}).status_code == 200
+
+    req = _report_req(0.1)
+    req["project_uuid"] = puuid
+    resp = client.post("/api/report?format=csv", json=req)
+    assert resp.status_code == 200
+    body = resp.content.decode("utf-8")
+    assert "· 签发 " in body and "工作稿" not in body
+
+    versions = client.get(f"/api/projects/{puuid}/versions").json()
+    assert len(versions) == 1                              # 幂等命中,无平行 auto_pin 版本
+    assert versions[0]["content_hash"] == saved_hash

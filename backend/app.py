@@ -186,8 +186,17 @@ def _pin_case(project_uuid: str, project_payload, kind: str, name_hint: str | No
     from backend import store
     from backend.canonical import to_canonical, build_engine_request, integrated_variant
     from backend.execution import request_hash, REQUEST_HASH_SCHEME
+    # 冒烟发现 2026-07-21:content_hash 含 project.name,/api/saved 侧规范化带名而此处
+    # 不带——同一 payload 两个哈希,导出门永不命中经 /api/saved 保存的签发版(签发报告
+    # 被误标「工作稿」),auto-pin 还会另起平行版本链。修:先解析**单一权威名**
+    # (库中已存名 → 否则本次 name_hint 兜底,与下方 ensure_project 建行同源),
+    # 规范化与建行都用它——两条创建路径(保存/钉扎)自此同名同哈希。
+    proj = store.get_project(project_uuid)
+    resolved_name = (proj or {}).get("name") or (name_hint or "项目")
     try:
-        doc, sidecar = to_canonical(project_payload, project_uuid)
+        doc, sidecar = to_canonical(project_payload, project_uuid, project_name=resolved_name)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(400, f"project_payload 无法规范化: {e}")
     # EB-02 一致性:任何库写之前先比对,不一致即 409(不留半钉扎)。
@@ -234,7 +243,7 @@ def _pin_case(project_uuid: str, project_payload, kind: str, name_hint: str | No
         settings["pin_binding_reason"] = "checked_set"   # 唯一跳绑通道(规格 §5 v2 候选)
     if resolved_settings is not None:
         settings["resolved_settings"] = resolved_settings
-    store.ensure_project(project_uuid, name_hint or "项目")
+    store.ensure_project(project_uuid, resolved_name)
     ver = store.create_version(project_uuid, doc, sidecar, origin="auto_pin",
                                message=f"auto: {kind}")
     case_id = store.create_case(project_uuid, ver["id"], kind, settings=settings,
