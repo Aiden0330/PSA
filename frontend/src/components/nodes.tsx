@@ -103,7 +103,7 @@ export function GateNode({ id, data }: { id: string; data: any }) {
   // nodeLabel is the user-editable description; label is the node id (fallback)
   const ieLabel: string = data.nodeLabel ?? data.label
   return (
-    <div style={{ ...box(150, data.highlighted), ...dragH.style }} onClick={(e) => { e.stopPropagation(); data.onNodeSelect?.(id) }}
+    <div className="nopan" style={{ ...box(150, data.highlighted), ...dragH.style }} onClick={(e) => { e.stopPropagation(); data.onNodeSelect?.(id) }}
       onPointerDown={dragH.onPointerDown} onPointerMove={dragH.onPointerMove} onPointerUp={dragH.onPointerUp} onClickCapture={dragH.onClickCapture}>
       <Handle type="target" position={Position.Top} style={{ background: color }} />
       <div style={IE_RECT}>{ieLabel}{data.isTop ? ' ★' : ''}</div>
@@ -127,7 +127,7 @@ export function GateNode({ id, data }: { id: string; data: any }) {
 export function BasicEventNode({ id, data }: { id: string; data: any }) {
   const dragH = useSelfDrag(id, data)
   return (
-    <div style={{ ...box(130, data.highlighted), ...dragH.style }} onClick={(e) => { e.stopPropagation(); data.onNodeSelect?.(id) }}
+    <div className="nopan" style={{ ...box(130, data.highlighted), ...dragH.style }} onClick={(e) => { e.stopPropagation(); data.onNodeSelect?.(id) }}
       onPointerDown={dragH.onPointerDown} onPointerMove={dragH.onPointerMove} onPointerUp={dragH.onPointerUp} onClickCapture={dragH.onClickCapture}>
       <Handle type="target" position={Position.Top} style={{ background: '#d97706' }} />
       <svg width="130" height="40" viewBox="0 0 130 40">
@@ -141,7 +141,7 @@ export function BasicEventNode({ id, data }: { id: string; data: any }) {
 export function HouseNode({ id, data }: { id: string; data: any }) {
   const dragH = useSelfDrag(id, data)
   return (
-    <div style={{ ...box(130, data.highlighted), ...dragH.style }} onClick={(e) => { e.stopPropagation(); data.onNodeSelect?.(id) }}
+    <div className="nopan" style={{ ...box(130, data.highlighted), ...dragH.style }} onClick={(e) => { e.stopPropagation(); data.onNodeSelect?.(id) }}
       onPointerDown={dragH.onPointerDown} onPointerMove={dragH.onPointerMove} onPointerUp={dragH.onPointerUp} onClickCapture={dragH.onClickCapture}>
       <Handle type="target" position={Position.Top} style={{ background: 'var(--psa-primary)' }} />
       <svg width="130" height="40" viewBox="0 0 130 40">
