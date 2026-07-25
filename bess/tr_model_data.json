@@ -49,5 +49,5 @@
     "note": "LFP 单位电量 HF 产出可能高于 NMC;'LFP 不产 HF' 为被证伪的过度简化"
   },
 
-  "epri_root_cause_pct": {"integration_assembly_construction": 36, "operation": 29, "design": 21, "manufacturing": 4, "note": "72% 事故发生于头两年;失效率十年降约 98%(第三方解读,待核验)"}
+  "epri_root_cause_pct": {"integration_assembly_construction": 36, "operation": 29, "design": 21, "manufacturing": 4, "note": "72% 事故发生于头两年;失效率十年降约 98%。2026-07-24 核验(EPRI 2024-05 白皮书原文):四类根因命名与本表一致(design; manufacturing; integration, assembly & construction; operation),基数为参与分析的 26 起事件(2 起双根因,合计 28 次归类);正文明示 Integration/Assembly/Construction 最高、Manufacturing 最低,与本表 36/29/21/4 的次序吻合。具体百分比出自图 4 图面,文本提取不含图形,故按第三方读图对待(次序已核,数值未逐一核)。EPRI Storage Wiki 另载:2018→2025 按累计部署容量归一的失效率降 99%。"}
 }
