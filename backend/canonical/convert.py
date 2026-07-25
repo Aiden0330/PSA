@@ -46,14 +46,19 @@ _DEFAULT_CONS_DESC = {
 }
 _CONS_ORDER = ["C1", "C2", "C3", "C4", "C5"]
 _MODEL_OPT_FIELDS = ["consequenceDefs", "consequences", "initFreqSource", "product"]
-_FE_OPT_FIELDS = ["label", "linkFt", "source", "grade", "evidence"]
+_FE_OPT_FIELDS = ["label", "linkFt", "source", "grade", "evidence", "url", "note"]
 _PAYLOAD_OPT_FIELDS = ["userFts", "fmeaRows", "fmeaMapping"]
 
 
 def _prov_from_fe(fe: dict) -> M.Provenance:
+    # url/note 与 citation 同为口径承重的出处字段(规格 2026-07-25 屏障快照)。
+    # legacy FE(无 url/note 键)构造出的 Source 与旧实现逐位相同 ⇒ 内容哈希不变。
+    src = None
+    if any(fe.get(k) is not None for k in ("source", "url", "note")):
+        src = M.Source(citation=fe.get("source"), url=fe.get("url"), note=fe.get("note"))
     return M.Provenance(
         origin="human",
-        source=M.Source(citation=fe["source"]) if fe.get("source") is not None else None,
+        source=src,
         grade=fe.get("grade"),
         evidence=[fe["evidence"]] if fe.get("evidence") is not None else [],
     )
@@ -297,6 +302,10 @@ def to_canonical(payload: dict, project_uuid: str,
             params.append(pparam)
             param_by_ref[pref] = pparam
             ff: dict[str, Any] = {"present": [k for k in _FE_OPT_FIELDS if k in fe]}
+            # category 为展示性分类(warning/active/passive),走侧车不进签名内容
+            # (linkFt_raw 先例);grade/url/note 才是口径承重,进 Provenance。
+            if fe.get("category") is not None:
+                ff["category"] = fe["category"]
             linked = None
             if fe.get("linkFt") is not None:
                 if fe["linkFt"] in tree_by_ref:
@@ -412,6 +421,12 @@ def to_v2(doc: M.ProjectDocument, sidecar: Optional[dict] = None) -> dict:
                 d["grade"] = prov.grade
             if "evidence" in present:
                 d["evidence"] = prov.evidence[0] if prov.evidence else None
+            if "url" in present:
+                d["url"] = prov.source.url if prov.source else None
+            if "note" in present:
+                d["note"] = prov.source.note if prov.source else None
+            if "category" in ff:
+                d["category"] = ff["category"]
             fes_out.append(d)
 
         model: dict[str, Any] = {

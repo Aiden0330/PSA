@@ -53,7 +53,7 @@ export function EventTreeEditor(
     model: EventTreeModel; onChange: (m: EventTreeModel | ((prev: EventTreeModel) => EventTreeModel)) => void; linked?: Linked
     fts?: any; ftsApi?: Api; pfds?: Record<string, number>
     onAttachFt?: (idx: number) => void; onDetachFt?: (idx: number) => void; onFtEdited?: (feId: string) => void
-    libBarriers?: { id: string; name: string; pfd: number; source?: { citation?: string } }[]
+    libBarriers?: { id: string; name: string; pfd: number; grade?: string; category?: string; source?: { citation?: string; url?: string; note?: string } }[]
     libComponents?: any[]
     etaSummaries?: EtaSummary[]; aggregateTotals?: Record<string, number>
     onSelectEta?: (key: string) => void; onToggleEta?: (key: string) => void; onAddBarrier?: () => void

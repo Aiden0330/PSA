@@ -51,7 +51,7 @@ export function EtInspector(
     onEditFt: (feId: string) => void
     onAttachFt?: (idx: number) => void
     onDetachFt?: (idx: number) => void
-    libBarriers?: { id: string; name: string; pfd: number; source?: { citation?: string } }[]
+    libBarriers?: { id: string; name: string; pfd: number; grade?: string; category?: string; source?: { citation?: string; url?: string; note?: string } }[]
     onAddBarrier: () => void
     onMoveFe: (d: number, dir: -1 | 1) => void
     onEditInitFt?: () => void
@@ -277,15 +277,27 @@ export function EtInspector(
                         style={{ flex: 1, fontSize: 12 }}
                       />
                     </div>
-                    {/* 置信分级展示 */}
-                    {model.functionalEvents[selIdx].grade && (
-                      <div style={{ fontSize: 11, color: 'var(--psa-muted)', marginBottom: 4 }}>
-                        置信:{model.functionalEvents[selIdx].grade}
-                        {model.functionalEvents[selIdx].evidence && (
-                          <span title={model.functionalEvents[selIdx].evidence}> · <span style={{ color: 'var(--psa-faint)', cursor: 'help' }}>证据链</span></span>
-                        )}
-                      </div>
-                    )}
+                    {/* 置信/口径/出处展示(库快照随节点走;手改 PFD 后 grade 由 setFailProb 降 D 并标注) */}
+                    {(() => {
+                      const fe = model.functionalEvents[selIdx]
+                      if (!fe.grade && !fe.category && !fe.note && !fe.url && !fe.evidence) return null
+                      return (
+                        <div style={{ fontSize: 11, color: 'var(--psa-muted)', marginBottom: 4 }}>
+                          {fe.grade && <>置信:{fe.grade}</>}
+                          {fe.category && <span> · {fe.category}</span>}
+                          {fe.note && (
+                            <span title={fe.note}> · <span style={{ color: 'var(--psa-faint)', cursor: 'help' }}>口径</span></span>
+                          )}
+                          {fe.url && (
+                            <a href={fe.url} target="_blank" rel="noopener noreferrer" title={fe.url}
+                              style={{ color: 'var(--psa-primary)', textDecoration: 'none' }}> ↗</a>
+                          )}
+                          {fe.evidence && (
+                            <span title={fe.evidence}> · <span style={{ color: 'var(--psa-faint)', cursor: 'help' }}>证据链</span></span>
+                          )}
+                        </div>
+                      )
+                    })()}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <button onClick={() => onAttachFt?.(selIdx)} disabled={selIdx < 0 || !canEditFt}
                         style={{ background: 'var(--psa-teal)', color: '#fff', border: 0, borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}>挂载 FTA</button>

@@ -154,3 +154,30 @@ def test_init_provenance_survives_roundtrip():
     p2 = copy.deepcopy(payload)
     p2["etas"][0]["model"]["initGrade"] = "C"
     assert content_hash(to_canonical(p2, PUUID)[0]) != content_hash(doc)
+
+
+def test_fe_snapshot_fields_roundtrip_and_hash_invariance():
+    """规格 2026-07-25-barrier-snapshot-provenance:FE 快照字段 url/note/category
+    往返无损;grade/url/note 进 canonical Provenance(可签名内容),category 走侧车;
+    legacy 载荷(无新键)canonical 文档哈希逐位不变。"""
+    legacy = _rich_payload()
+    h_before = content_hash(to_canonical(copy.deepcopy(legacy), PUUID)[0])
+
+    payload = _rich_payload()
+    fe0 = payload["etas"][0]["model"]["functionalEvents"][0]
+    fe0["url"] = "https://iopscience.iop.org/article/10.1149/1945-7111/ad2440"
+    fe0["note"] = "事件级召回口径;PFD 系推断"
+    fe0["category"] = "warning"
+    doc, sidecar = to_canonical(copy.deepcopy(payload), PUUID)
+    # 往返无损
+    assert to_v2(doc, sidecar) == payload
+    # 口径承重字段进 canonical(报告/签名可及),不是只活在侧车
+    fe = next(x for x in doc.event_trees[0].functional_events if x.ref == "B_OFFGAS")
+    assert fe.provenance.grade == "D"
+    assert fe.provenance.source.url == fe0["url"]
+    assert fe.provenance.source.note == fe0["note"]
+    # 铸造的 PFD 参数同享完整出处
+    p = next(x for x in doc.event_trees[0].parameters if x.ref == "B_OFFGAS__PFD")
+    assert p.provenance.source.url == fe0["url"]
+    # legacy 哈希不变量(旧存档幂等钉扎不受扰)
+    assert content_hash(to_canonical(copy.deepcopy(legacy), PUUID)[0]) == h_before

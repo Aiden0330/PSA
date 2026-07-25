@@ -3,7 +3,7 @@
 // 「有序可跳过」:沿任一路径,分支的 feIndex 严格递增 → 可跳过中间屏障、继续到任意更靠后屏障。
 // 频率 = 初始频率 × 路径上各分支概率之积(各功能事件相互独立时即精确;跳过的屏障不参与)。
 
-export interface FuncEvent { id: string; label: string; failProb: number; linkFt?: string; source?: string; grade?: string; evidence?: string }
+export interface FuncEvent { id: string; label: string; failProb: number; linkFt?: string; source?: string; grade?: string; evidence?: string; category?: string; note?: string; url?: string }
 
 /** 现场贝叶斯更新:将第 idx 个功能事件的 failProb/grade/evidence 设为 patch 中的值。
  *  failProb 夹到 [0,1];返回新模型(不可变)。 */
@@ -251,8 +251,17 @@ export function setConsequence(m: EventTreeModel, path: string[], c: string): Ev
   const root = replaceAt(m.root, path, (n) => (n.kind === 'leaf' ? { ...n, consequence: c } : n))
   return { ...m, root }
 }
+/** 手改 PFD 的唯一咽喉。值实际变化且节点带库快照(grade)时,快照失效:按 D 计并在
+ *  evidence 标注原 grade/原值;citation/url/note/category 保留(出处事实不因手改消失,
+ *  失效的是置信分级)。贝叶斯路径走 applyFieldUpdate,有意设 A,不经此处。 */
 export function setFailProb(m: EventTreeModel, idx: number, p: number): EventTreeModel {
-  return { ...m, functionalEvents: m.functionalEvents.map((f, i) => (i === idx ? { ...f, failProb: Math.min(1, Math.max(0, p)) } : f)) }
+  return { ...m, functionalEvents: m.functionalEvents.map((f, i) => {
+    if (i !== idx) return f
+    const v = Math.min(1, Math.max(0, p))
+    if (v === f.failProb || f.grade === undefined) return { ...f, failProb: v }
+    const mark = `手改数值,库快照失效(原 ${f.grade}/${f.failProb})`
+    return { ...f, failProb: v, grade: 'D', evidence: f.evidence ? `${f.evidence};${mark}` : mark }
+  }) }
 }
 export function setInitEvent(m: EventTreeModel, name: string): EventTreeModel {
   return { ...m, initEvent: name }
@@ -291,11 +300,17 @@ function uniqId(base: string, taken: string[]): string {
   while (taken.includes(`${base}_${i}`)) i++
   return `${base}_${i}`
 }
-export interface LibBarrier { id: string; name: string; pfd: number; source?: { citation?: string } }
-/** 从参考库屏障追加功能事件(label=名称, failProb=pfd, 记来源)。 */
+export interface LibBarrier { id: string; name: string; pfd: number; grade?: string; category?: string; source?: { citation?: string; url?: string; note?: string } }
+/** 从参考库屏障追加功能事件 —— 快照 grade/category/note/url/citation(证据链声明:
+ *  引用即快照;undefined 不落键,保证 JSON 边界前后模型一致)。 */
 export function addBarrierFromLib(m: EventTreeModel, b: LibBarrier): EventTreeModel {
   const id = uniqId(b.id, m.functionalEvents.map((f) => f.id))
-  const fe: FuncEvent = { id, label: b.name, failProb: b.pfd, source: b.source?.citation }
+  const fe: FuncEvent = { id, label: b.name, failProb: b.pfd }
+  if (b.source?.citation !== undefined) fe.source = b.source.citation
+  if (b.grade !== undefined) fe.grade = b.grade
+  if (b.category !== undefined) fe.category = b.category
+  if (b.source?.note !== undefined) fe.note = b.source.note
+  if (b.source?.url !== undefined) fe.url = b.source.url
   return { ...m, functionalEvents: [...m.functionalEvents, fe] }
 }
 
