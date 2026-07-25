@@ -84,14 +84,19 @@ export function FtaWorkbench({ lib, ai, persistence, example }: { lib: LibraryDa
     const n = userFtsModel.fault_trees.length + 1
     const name = window.prompt('新建 FTA 名称', '我的故障树 ' + n)
     if (!name || !name.trim()) return
-    const m2 = addFaultTree(userFtsModel, name.trim())
-    P().setUserFts(m2)
-    const created = m2.fault_trees[m2.fault_trees.length - 1].name
+    // 函数式写(psa/no-stale-model-set):新建名在 updater 内取回 —— zustand set 同步,
+    // 下一行读到的必是本次结果(与 BarrierFtModal 的 syncLocalFlags 同一同步语义)。
+    let created = ''
+    P().setUserFts((prev) => {
+      const m2 = addFaultTree(prev, name.trim())
+      created = m2.fault_trees[m2.fault_trees.length - 1].name
+      return m2
+    })
     setFtEditTarget({ src: 'standalone', name: created }); setSelected(null); setResult(null); setError(null)
   }
   const onDeleteFt = (name: string) => {
     if (!window.confirm(`删除自建 FTA「${name}」?`)) return
-    P().setUserFts(deleteFaultTree(userFtsModel, name))
+    P().setUserFts((prev) => deleteFaultTree(prev, name))
     if (ftEditTarget.src === 'standalone' && ftEditTarget.name === name) { setFtEditTarget({ src: 'model' }); setSelected(null); setResult(null); setError(null) }
   }
 
