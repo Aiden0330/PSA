@@ -85,8 +85,10 @@ canonical 手册。基线:py 366 collected(含 24 benchmark 逐位)· fe 281 · 
 文档地图:`docs/README.md`。
 
 **悬置项**:GitHub 远程已建且 CI 四作业**全绿全阻断**(github.com/Aiden1981/PSA,
-2026-07-15;CUDD Linux 首跑即过,Gap 6b 收口);AI 真实供应商首跑待 API key(runbook 就绪);
-两份已裁决规格与 UI exact/Σ 切换 **已全部落地**(2026-07-15,Opus 批:582e0c0 /
-017a1fd+ad32763 / 81987e0,Windows runbook 12bcbcd);parity 残余 = 序列级 LFT 集成
-(禁独改类,需 Fable 规格先行)与长尾 Gap 7/8。Windows 历史:`git-archive repo/`(ignored);被取代的旧手册
-与技能蓝图在 `docs/archive/`。
+2026-07-15;CUDD Linux 首跑即过,Gap 6b 收口);AI 真实供应商首跑待 API key(runbook 就绪)。
+**引擎 parity backlog 已清空**(2026-07-25 核对:LFT 序列集成、Gap 7/8、periodic-test
+Complete `7ed0f1e`、regime-A rebind `f2fc916` 均已实现,`tests/banked/` 88/88 零跳过;
+台账曾状态漂移,以 riskspectrum-parity 台账为准)。剩余候选见台账 backlog 表(集成 MC
+分组抽样为禁独改类)。参考库 2026-07-24/25 全库来源审计:76/115 带核验落地页、分级
+C21/D94、屏障库引用快照(grade/note/url/category)随节点走。Windows 历史:
+`git-archive repo/`(ignored);被取代的旧手册与技能蓝图在 `docs/archive/`。

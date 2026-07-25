@@ -85,3 +85,18 @@ def test_existing_scenario_ids_preserved():
     ids = {b["id"] for b in load_library()["barrier_effectiveness"]}
     assert {"B_OFFGAS", "B_BMS", "B_THERMAL", "B_DEFLAG", "B_SPACING", "B_RESPONSE"} <= ids
 
+
+
+def test_display_name_fields_present():
+    """Schema 守护(审计 §7.2-2,IE_FLEET_2025 事故):IE 用 `label`、器件/屏障用
+    `name` 作 UI 显示名 —— 写错字段(如 IE 写成 name)会让参考库表格该行静默空白,
+    其余测试全绿也拦不住。逐条强制非空。"""
+    lib = load_library()
+    for e in lib["initiating_events"]:
+        assert isinstance(e.get("label"), str) and e["label"].strip(), \
+            f"IE '{e['id']}' 缺非空 label(勿用 name)"
+        assert "name" not in e, f"IE '{e['id']}' 出现 name 字段——UI 渲染 label,该字段是无声弹药"
+    for sec in ("component_failure_rates", "barrier_effectiveness"):
+        for e in lib[sec]:
+            assert isinstance(e.get("name"), str) and e["name"].strip(), \
+                f"{sec} '{e['id']}' 缺非空 name"

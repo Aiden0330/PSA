@@ -48,8 +48,8 @@ RWF≡RRW、停役≡house 强制、ICCDP 平凡后算——本仓库已全部�
 | 候选 | 出处 | 状态 |
 |---|---|---|
 | 集成模式的 MC 不确定性/屏障重要度(初因分组进抽样/扰动语义) | LFT 规格 §6 | 未启动(禁独改,需 Fable 规格) |
-| periodic-test 10 参 Complete(Markov 迭代)+ 瞬时 Q(t) 曲线 + IEC/PDS 显示分解 | Gap 7 规格 §1 | **已 BANKED 2026-07-15**:规格 `2026-07-15-periodic-test-complete-banked.md` + 26 锚点 `tests/banked/`(探针自动激活)——SCRAM 逐行转录 × Decimal-60 × 独立 MC 三角验证;λ≈μ 朴素形负概率缺陷预捕获入 §3 强制条款。后 Fable 可机械实现 |
-| exchange regime-A(house 条件参数重绑定,精确且 BDD 兼容)+ MEF define-substitution XML I/O | Gap 7 卷宗 §1.2 | **已 BANKED 2026-07-15**:规格 `2026-07-15-regime-a-rebind-mef-substitution-banked.md` + 23 锚点(双探针分组激活)——单一咽喉有效库视图设计(unavailability() 10+ 调用点普查),映射表对照 SCRAM substitution.cc + input.rng L435-468 |
+| periodic-test 10 参 Complete(Markov 迭代)+ 瞬时 Q(t) 曲线 + IEC/PDS 显示分解 | Gap 7 规格 §1 | **✅ 已实现**(commit `7ed0f1e`;λ≈μ 朴素形负概率 tiny-x 消去补丁 `faaecbf`,评审 365e7e5 G1)——26 锚点探针激活全绿。**台账勘误 2026-07-25**:此行曾长期停留在"BANKED 待实现",实测 `tests/banked/` 88/88 零跳过才发现状态漂移 |
+| exchange regime-A(house 条件参数重绑定,精确且 BDD 兼容)+ MEF define-substitution XML I/O | Gap 7 卷宗 §1.2 | **✅ 已实现**(commits `f2fc916` + `0078d65` 评审收口)——23 锚点双探针激活全绿。同上勘误 |
 | 「配置风险 Δ」分析案例薄片(baseline 钉扎 + 强制停役 → ΔP+RAW/RRW+ICCDP) | Gap 7 卷宗 §3 | 未启动(可放行级,任意模型可做) |
 | 组合聚合「勾选集」不确定性 UI 触发(通道已实现无调用点) | spec A 实现报告 | 未启动(半天级前端) |
 | wheel 打包含 backend(`pyproject.toml` packages.find 仅 `psaengine*`/`bess*` → build wheel 不含 `backend`;editable 安装掩盖)+ 干净环境 smoke-import `backend.app` | EB-12/O5 | 未启动(**低优先**:§5 部署为源码路径 `uv sync`,非 wheel;修时须动 pyproject/CI 打包面,避免与 CI 作业交互——独立小包处理) |
