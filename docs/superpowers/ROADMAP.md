@@ -612,7 +612,27 @@ BU-304a 三档统计原文确认。全库 34 去重 URL 存活扫描:404 清零,
 **UI**:`ReferenceLibrary` URL 单元格渲染 ↗ 外链(_blank + noopener noreferrer,锚点与
 输入框并存);锁测 `ReferenceLibrary.urlLink.test.tsx`。
 
-**门**:tsc -b 0 错 · fe **465** 全绿 · test_library 12 绿 · capture 后 `embedded ≡ disk`
+**门**:tsc -b 0 错 · fe **464** 全绿 · test_library 12 绿 · capture 后 `embedded ≡ disk`
 逐位断言 · bundle 2.86MB · 真实 UI DOM 检查 75 锚点与带链条目数一致。
 
-基线 py 664 · fe **465** · bundle 2.86 MB。
+基线 py 664 · fe **464** · bundle 2.86 MB。
+
+## 2026-07-25 · 屏障快照修复 + 台账勘误 + 分级清扫(审计 §7.2 收口,批次 1/2/3)
+
+**1(feat)**:`addBarrierFromLib` 快照 grade/category/note/url/citation 五字段;
+`setFailProb` 手改失效(降 D + 标注原 grade/原值,出处保留);canonical url/note 进既有
+`Source`(零 schema 变更,legacy 哈希逐位不变),category 走侧车;检视器置信行扩展
+(category · 口径悬浮 · ↗)。锁:vitest 8 + canonical 往返/哈希 1。真实应用 fiber 级
+端到端验证:选库→五字段齐;手改 0.07→0.2→`库快照失效(原 D/0.07)`。规格
+`2026-07-25-barrier-snapshot-provenance.md`。F-1"防护只能写进条目名"局面终结。
+
+**2(docs+test)**:parity 台账勘误——periodic-test Complete(`7ed0f1e`)与 regime-A
+(`f2fc916`)实为已实现(banked 88/88 零跳过),两行 BANKED→✅;CLAUDE.md 现状段改
+"引擎 parity backlog 已清空";`test_display_name_fields_present` 钉死 IE label/器件屏障
+name 非空且 IE 禁 name 键(IE_FLEET_2025 事故机制化防复发)。
+
+**3(data)**:分级清扫 7 条 C→D(sil-1/2/3、vent-sil2、CFR_BMS、CFR_PCS、
+pas-fk-clean-agent),判别式"类目/统计直读=C,折算/类比/假定=D";CFR_CONTACTOR 边界
+裁定维持 C。零数值变更。分级 C 21 / D 94。审计报告 §10。
+
+基线 py **632+279** · fe **472** · bundle 2.86 MB。

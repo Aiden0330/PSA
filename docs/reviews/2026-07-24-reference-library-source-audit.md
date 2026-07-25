@@ -293,3 +293,44 @@ Semantic Scholar(Bukowski 2002)· 《储能科学与技术》DOI(chndoi 解析,�
   12 绿;capture-data 后 `embedded ≡ disk` 逐位断言通过;bundle 2.86MB 重建。
 - 真实 UI(DOM 检查,按既定实践):参考库页渲染 **75 个 `_blank+noopener` 锚点**
   (与带链条目数一致,sys-external-heat 修复前),12+ 域名可见。
+
+---
+
+## 10 · 附录批次(2026-07-25 下午):§7.2 遗留三项收口
+
+### 10.1 §7.2-1 屏障快照机制修复(规格 `2026-07-25-barrier-snapshot-provenance.md`)
+
+`addBarrierFromLib` 现快照 **grade/category/note/url/citation** 五字段;`setFailProb`
+(手改 PFD 唯一咽喉)在值实际变化且带 grade 时**清快照**:降 D + evidence 标注
+`手改数值,库快照失效(原 <grade>/<value>)`,出处字段保留。canonical 层:url/note 进
+既有 `Source`(零 schema 变更,legacy 哈希逐位不变——金锚测试为证),category 走侧车
+(linkFt_raw 先例)。检视器置信行扩展:category·口径悬浮·↗ 外链。
+锁:vitest 8(快照/失效矩阵/贝叶斯不受扰)+ py canonical 往返与哈希不变量 1。
+**真实应用端到端验证**(DOM+fiber):从库选 B_GAS_DET → 内存模型五字段齐;手改
+0.07→0.2 → `evidence="手改数值,库快照失效(原 D/0.07)"`、url 保留。F-1 的
+"防护只能写进条目名"局面终结——口径警示现在随节点走。
+
+### 10.2 §7.2-2 显示名 schema 守护
+
+`test_display_name_fields_present`:IE 强制非空 `label` 且**禁止出现 `name` 键**;
+器件/屏障强制非空 `name`。IE_FLEET_2025 类静默空白行不再可能全绿混入。
+
+### 10.3 §7.2-4 分级清扫(7 条 C→D,零数值变更)
+
+| id | 判据 |
+|---|---|
+| `sil-1/2/3` | 标准规范带边界值非统计;分级表 D 行示例本身就是"SIL 类比" |
+| `vent-sil2` | 他人 QRA 示例事件树取值(审计点名) |
+| `CFR_BMS` / `CFR_PCS` | note 自述"量级折算"——非手册类目直读 |
+| `pas-fk-clean-agent` | NFPA 2001 为设计标准,不含 PFD 统计,0.15 系推断 |
+
+**维持 C 的边界裁定**:`CFR_CONTACTOR`(OREDA 类目直读,付费手册与 PDS/NPRD 同类,
+在线不可定位页码已注记)、`lopa-*`/`cooling-water-loss`(CCPS 手册公开通用值直读)、
+NFPA 统计族(§9.3 逐位核验)。判别式:**类目/统计直读=C,折算/类比/假定=D**。
+分级分布:C 21 / D 94。
+
+### 10.4 顺带勘误
+
+parity 台账两行长期停留"BANKED 待实现",实测 `tests/banked/` 88/88 零跳过——
+periodic-test Complete(`7ed0f1e`)与 regime-A rebind(`f2fc916`)早已实现;台账与
+CLAUDE.md 现状段已更正。**引擎侧 parity backlog 至此清空**(剩余候选均为未裁决新项)。
