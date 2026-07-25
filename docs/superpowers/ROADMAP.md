@@ -596,3 +596,23 @@ PDF 提取不足以否证图表型证据);② 免责 note 我落到了 `warn-off
 现场证据写进报告。diff 卫生:改为逐条语义比对、与 HEAD 相同者原行还原。
 
 基线 py **664** · fe **463** · bundle 2.85 MB。
+
+## 2026-07-25 · 参考库 URL 全量补链 + 表格外链(审计报告 §9)
+
+**触发**:用户指令"review parameter library and add url link for the table whenever available"。
+
+**数据**:落地页覆盖 32→**76/115(66.1%)**——44 处补链、2 处纠链(`B_THERMAL` 次要引文
+→DNV 首要引文、`IE_FLEET_STAT`→中文 DOI)、1 处真 404 修复(`sys-external-heat` NFPA 旧
+路径)。20 个不同源文档逐一在线核验后才写入;拒挂链亦有记录(`breaker-metalclad-ieee493`
+引 1980 版数据、现行页仅 2007 版——防版次错觉)。附带收获:`nfpa-dry-chem/co2/foam` 的
+0.42/0.16/0.18 与 NFPA 2009 USS14 报告 58%/84%/82% **逐位吻合**,模糊引文升级为精确出处;
+BU-304a 三档统计原文确认。全库 34 去重 URL 存活扫描:404 清零,3 主机(nrc/nfsa/nrel)
+云端拒连但检索索引在列,登记待人工抽查。零数值/分级/口径变更。
+
+**UI**:`ReferenceLibrary` URL 单元格渲染 ↗ 外链(_blank + noopener noreferrer,锚点与
+输入框并存);锁测 `ReferenceLibrary.urlLink.test.tsx`。
+
+**门**:tsc -b 0 错 · fe **465** 全绿 · test_library 12 绿 · capture 后 `embedded ≡ disk`
+逐位断言 · bundle 2.86MB · 真实 UI DOM 检查 75 锚点与带链条目数一致。
+
+基线 py 664 · fe **465** · bundle 2.86 MB。

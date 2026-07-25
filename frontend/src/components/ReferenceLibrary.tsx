@@ -218,8 +218,11 @@ export function ReferenceLibrary({ onLibraryChange }: { onLibraryChange?: () => 
                           )
                         }
                         const shown = draft && draft.k === k ? draft.v : String(cellVal(row, c))
-                        return (
-                          <td key={c.key} style={td}>
+                        // URL 列:已提交值(非输入中的草稿)是 http(s) 时给外链锚点——
+                        // note/grade 不随节点快照走,这里是用户核对出处的唯一入口
+                        const committedUrl = c.key === 'url' ? String(cellVal(row, c)) : ''
+                        const linkable = /^https?:\/\//.test(committedUrl)
+                        const cellInput = (
                             <input
                               style={{ ...inp, ...(c.num ? { fontFamily: 'var(--psa-font-mono)', fontVariantNumeric: 'tabular-nums' } : {}) }}
                               className={c.num ? 'psa-num' : undefined}
@@ -232,6 +235,19 @@ export function ReferenceLibrary({ onLibraryChange }: { onLibraryChange?: () => 
                               }}
                               onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--psa-primary)')}
                               onBlur={(e) => { const el = e.currentTarget; const orig = String(cellVal(row, c)); if (el.value !== orig && !commitCell(spec, row, c, el.value)) el.value = orig; el.style.borderColor = 'transparent' }} />
+                        )
+                        return (
+                          <td key={c.key} style={td}>
+                            {linkable ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <a href={committedUrl} target="_blank" rel="noopener noreferrer" title={committedUrl}
+                                  aria-label={`打开来源:${committedUrl}`}
+                                  style={{ flex: 'none', color: 'var(--psa-primary)', textDecoration: 'none', fontSize: 12 }}>
+                                  ↗
+                                </a>
+                                {cellInput}
+                              </div>
+                            ) : cellInput}
                           </td>
                         )
                       })}
