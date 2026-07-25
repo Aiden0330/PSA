@@ -270,18 +270,29 @@ export async function listSaved(): Promise<SavedItem[]> {
     return lsList()
   }
 }
+/** 后端权威答复「无此存档」。与网络失败严格区分:收到它意味着服务器可达且明确说没有。 */
+export class SavedNotFoundError extends Error {}
+
 export async function loadSaved(id: string): Promise<SavedRecord> {
+  // 报障 2026-07-25(存档 27489f5c「不存在」):此前任何失败一律回退 localStorage,
+  // 把本地缺副本谎报成"存档不存在"——存档实际在服务器上完好。三态分治(F2-R4 同病同修):
+  let r: Response
   try {
-    const r = await savedFetch(`/saved/${id}`)
-    if (!r.ok) throw new Error(`/saved/${id} → ${r.status}`)
-    const data = (await r.json()) as SavedRecord
-    _savedOffline = false
-    return data
+    r = await savedFetch(`/saved/${id}`)
   } catch (e) {
     if (e instanceof AuthRequiredError) throw e
-    _savedOffline = true
-    return lsLoad(id) // 本地无此 id 时 lsLoad 自身抛「不存在」并向上传播(混合模式非目标)
+    _savedOffline = true                       // 只有网络层失败才是「离线」
+    try {
+      return lsLoad(id)
+    } catch {
+      throw new Error(`后端未连接,且本地无存档 ${id} 的离线副本(存档可能仍在服务器上,启动后端后重试)`)
+    }
   }
+  if (r.status === 404) throw new SavedNotFoundError(`存档 ${id} 在服务器上不存在(可能已在别处删除)`)
+  if (!r.ok) throw new Error(`读取存档 ${id} → HTTP ${r.status}(后端可达但处理失败;不回退本地陈本)`)
+  const data = (await r.json()) as SavedRecord
+  _savedOffline = false
+  return data
 }
 export async function saveWorkspace(name: string, payload: any, id?: string, baseVersionHash?: string): Promise<SavedItem> {
   try {

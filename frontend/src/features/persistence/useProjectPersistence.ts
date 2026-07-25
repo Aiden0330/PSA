@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AuthRequiredError, SaveConflictError, deleteSaved, listProjectVersions, listSaved, saveWorkspace, wasSavedOffline } from '../../api'
+import { AuthRequiredError, SaveConflictError, SavedNotFoundError, deleteSaved, listProjectVersions, listSaved, saveWorkspace, wasSavedOffline } from '../../api'
 import type { SavedItem } from '../../api'
 import { deserializeProject, serializeProject } from '../../project'
 import type { ProjectEta, ProjectPayload } from '../../project'
@@ -267,7 +267,7 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
 
   // 读取项目存档(R2):已打开(活动/停放)→ 仅聚焦切换,绝不重载(保护未保存编辑);
   // 未打开 → fetch 后作为新槽打开(停放当前项目)。pendingId 保证受控下拉在 await 期间不回弹。
-  const loadProject = async (id: string) => {
+  const loadProject = async (id: string, opts?: { auto?: boolean }) => {
     try { localStorage.setItem(LAST_KEY, id) } catch { /* 隐私模式等:降级为不记忆 */ }
     const st = useProjectStore.getState()
     const isOpen = st.identity.savedId === id || Object.values(st.parked).some((sl) => sl.identity.savedId === id)
@@ -291,7 +291,15 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
       // R2-审 F7:组合总览/他端可能打开 mount 后新建的存档 —— 列表跟上,防原地保存降级为新建
       void refreshList().catch(() => {})
     } catch (e: any) {
-      onError(`读取存档失败:${String(e?.message ?? e)}`)
+      // 自动恢复(非用户点击)撞上权威 404:上次打开的存档已被删除——自愈:清记忆键
+      // 防每次启动复发,提示降为一次性说明;其余错误(含网络断)保留 LAST_KEY,
+      // 后端恢复后下次启动仍能自动找回。
+      if (opts?.auto && e instanceof SavedNotFoundError) {
+        try { localStorage.removeItem(LAST_KEY) } catch { /* 隐私模式 */ }
+        onError('上次打开的存档已在服务器上删除,已回到空白草稿(不影响其余存档)。')
+      } else {
+        onError(`读取存档失败:${String(e?.message ?? e)}`)
+      }
     } finally { setLoading(false); setPendingId('') }
   }
 
@@ -309,7 +317,12 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     listSaved().then((list) => {
       if (autoReopened.current) return
       autoReopened.current = true
-      if (list.some((s2) => s2.id === last)) void loadProject(last)
+      if (list.some((s2) => s2.id === last)) {
+        void loadProject(last, { auto: true })
+      } else if (!wasSavedOffline()) {
+        // 服务器列表权威地不含该 id(离线回退列表不算数)⇒ 记忆键已失效,自愈防复发
+        try { localStorage.removeItem(LAST_KEY) } catch { /* 隐私模式 */ }
+      }
     }).catch(() => { autoReopened.current = true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
