@@ -816,6 +816,8 @@ def api_admin_account_disable(username: str, disabled: bool = True, _=Depends(re
         store.set_account_disabled(username, disabled)
     except LookupError:
         raise HTTPException(404, f"无此账户:{username}")
+    except ValueError as e:                     # C5:末位 admin 锁死防护 → 409(状态冲突,非无效输入)
+        raise HTTPException(409, str(e))
     return {"username": username, "disabled": disabled}
 
 @app.get("/api/schema/project-document/1.0")

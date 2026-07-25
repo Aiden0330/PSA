@@ -616,6 +616,17 @@ def set_password(username: str, new_password: str) -> None:
 
 def set_account_disabled(username: str, disabled: bool) -> None:
     with _conn() as cx:
+        # C5 锁死防护(加固补测 2026-07-22):停用最后一个启用的 admin 后无人能再管理
+        # 账户(启用/建号全是 ADMIN 守卫)——系统性锁死,且 local 模式下无越权后门。
+        # 同一事务内先查后改,与 UPDATE 原子(sqlite 单写者)。
+        if disabled:
+            row = cx.execute("SELECT role FROM accounts WHERE username=?", (username,)).fetchone()
+            if row is not None and row["role"] == "admin":
+                n = cx.execute("SELECT COUNT(*) AS n FROM accounts"
+                               " WHERE role='admin' AND disabled=0").fetchone()["n"]
+                if n <= 1:
+                    raise ValueError("不能停用最后一个启用的 admin 账户——"
+                                     "否则将无人能管理账户(先创建/启用另一个 admin)")
         cur = cx.execute("UPDATE accounts SET disabled=? WHERE username=?",
                          (1 if disabled else 0, username))
         if cur.rowcount == 0:
