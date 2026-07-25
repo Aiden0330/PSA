@@ -68,7 +68,8 @@ def q_levels(model: str, factors: dict, m: int, q_t: float, staggered: bool = Fa
     raise ValueError(f"unsupported CCF model '{model}' (mgl|alpha|phi; beta via apply_ccf)")
 
 
-def _mint_ccf_event(g: PDAG, lib: ParameterLibrary, cid: str, grp_id: str, q: float) -> None:
+def _mint_ccf_event(g: PDAG, lib: ParameterLibrary, cid: str, grp_id: str, q: float,
+                    source: str | None = None) -> None:
     """生成 CCF 事件并入图/库。生成名撞用户命名空间(节点或参数)即响亮——
     review EB-04(2026-07-16 三方评审):此前 PDAG.basic 对重名静默沿用用户节点、
     ParameterLibrary.add 静默覆盖用户参数(用户 CCF_g q=.9 被无声改写为 βQ,
@@ -77,7 +78,9 @@ def _mint_ccf_event(g: PDAG, lib: ParameterLibrary, cid: str, grp_id: str, q: fl
         raise ValueError(
             f"CCF group '{grp_id}': generated event id '{cid}' collides with an "
             "existing node/parameter; rename the user-side node/parameter or the group")
-    lib.add(Parameter(cid, "probability", q))
+    # source = 本组代表成员的参数 ref(q 由它的值导出)。MC 通道据此整组联动抽样:
+    # 2^m−1 个铸参认知同源一个库参数,逐 ref 独立抽会按 √n 收窄上分位(非保守)。
+    lib.add(Parameter(cid, "probability", q, epistemic_source=source))
     g.basic(cid, param_ref=cid)
 
 
@@ -87,6 +90,11 @@ def _expand_multilevel(g: PDAG, lib: ParameterLibrary, grp, members: list[str]) 
     m = len(members)
     qs = [lib.get(g.nodes[x].param_ref).unavailability() for x in members]
     q_rep = qs[0]
+    # 认知源:多层模型(mgl/alpha/phi)强制同质性校验(下方),组内 Q_t 必同源。
+    # engine-review F4 裁决(2026-07-22):规格 §4 把 phi 列为"不联动",前提是"Q_k 非线性
+    # 于单一 Q_t"。本库 phi 实现为 q_k = φ_k·Q_t(ccf_expand q_levels),对 Q_t **线性** ⇒
+    # 该前提不成立,联动数学自洽且与 mgl/alpha 同理。规格 §4 已随本次落地修订记录。
+    rep_ref = g.nodes[members[0]].param_ref
     # NUREG 同质假设:多层展开按单一 Q_t;成员异质时静默取首成员会使其余成员边际概率
     # 被无声改写(评审缺陷 #6)——显式拒绝,提示用 beta(逐成员)或先统一参数
     if any(abs(q - q_rep) > _HOMOG_TOL * max(q_rep, 1e-300) for q in qs):
@@ -100,12 +108,12 @@ def _expand_multilevel(g: PDAG, lib: ParameterLibrary, grp, members: list[str]) 
     for k in range(2, m + 1):
         for combo in combinations(ordered, k):
             cid = f"CCF_{grp.id}_" + "_".join(combo)
-            _mint_ccf_event(g, lib, cid, grp.id, qk[k - 1])
+            _mint_ccf_event(g, lib, cid, grp.id, qk[k - 1], source=rep_ref)
             subset_ids[frozenset(combo)] = cid
 
     for mem in members:
         indep_id = f"{mem}__I"
-        _mint_ccf_event(g, lib, indep_id, grp.id, qk[0])
+        _mint_ccf_event(g, lib, indep_id, grp.id, qk[0], source=rep_ref)
         node = g.nodes[mem]                          # 原位把成员改成 OR 门
         node.is_basic = False
         node.param_ref = None
@@ -141,13 +149,22 @@ def apply_ccf(pdag: PDAG, ccf_groups, params: ParameterLibrary):
             beta = grp.factors.get("beta", 0.0)
             if beta <= 0:
                 continue
-            q_rep = lib.get(g.nodes[members[0]].param_ref).unavailability()   # 代表 Q(首成员)
+            rep_ref = g.nodes[members[0]].param_ref                            # 代表成员参数(q_rep 出处)
+            q_rep = lib.get(rep_ref).unavailability()                          # 代表 Q(首成员)
+            qm_of = {mem: lib.get(g.nodes[mem].param_ref).unavailability() for mem in members}
+            # 认知联动前提(规格 §2)= 组员同 Q_t(同型冗余部件 ⇒ 失效率同出一处数据源)。
+            # engine-review F2(2026-07-22):异质 beta 组不满足该前提,全组共源是未授权
+            # 扩展(把不同数据源的部件强行相关,夸大到不可信)。异质时退回**派生忠实**:
+            # 各成员独立部分随自己的参数走,共因项随代表参数走。
+            homogeneous = all(abs(q - q_rep) <= _HOMOG_TOL * max(q_rep, 1e-300)
+                              for q in qm_of.values())
             ccf_id = f"CCF_{grp.id}"
-            _mint_ccf_event(g, lib, ccf_id, grp.id, beta * q_rep)
+            _mint_ccf_event(g, lib, ccf_id, grp.id, beta * q_rep, source=rep_ref)
             for m in members:
-                qm = lib.get(g.nodes[m].param_ref).unavailability()
+                qm = qm_of[m]
                 indep_id = f"{m}__I"
-                _mint_ccf_event(g, lib, indep_id, grp.id, (1.0 - beta) * qm)
+                src = rep_ref if homogeneous else g.nodes[m].param_ref
+                _mint_ccf_event(g, lib, indep_id, grp.id, (1.0 - beta) * qm, source=src)
                 node = g.nodes[m]                    # 原位把 m 改成 OR 门
                 node.is_basic = False
                 node.param_ref = None

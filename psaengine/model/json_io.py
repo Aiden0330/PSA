@@ -20,6 +20,7 @@ def _param(d: dict) -> Parameter:
                      test_interval=d.get("test_interval"), mission_time=d.get("mission_time"),
                      gamma=d.get("gamma"), alpha=d.get("alpha"), beta=d.get("beta"),
                      t0=d.get("t0"),   # Gap 7 精确 Q(t) 模型字段透传
+                     epistemic_source=d.get("epistemic_source"),   # CCF 联动源(往返对称)
                      # periodic_test_complete 十参(banked 规格 2026-07-15)——save 侧
                      # parameters_to_json 走 vars() 非 None 全量,天然对称
                      lambda_test=d.get("lambda_test"), theta=d.get("theta"),

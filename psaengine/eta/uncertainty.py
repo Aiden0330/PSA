@@ -23,6 +23,84 @@ def _validate_mc_params(samples: int, error_factor: float) -> None:
         raise ValueError(f"error_factor must be finite and >= 1, got {error_factor!r}")
 
 
+class _MergedParams:
+    """aggregate 通道的跨树参数视图(只需 .get(ref));同名同法则由 spec A 锁保证。"""
+
+    def __init__(self, by_ref: dict):
+        self._by_ref = by_ref
+
+    def get(self, ref: str):
+        return self._by_ref[ref]
+
+
+def _epistemic_links(params, median_by_ref: dict[str, float]):
+    """CCF 组内认知联动(规格 2026-07-17-ccf-group-sokc-linkage §2,semver 0.4.0)。
+
+    CCF 展开为一组铸 2^m−1 个参数,各持独立 ref 但**认知同源**一个库参数(q_levels 对
+    Q_t 线性)。逐 ref 独立抽 ⇒ 并联贡献上分位按 ~√n 收窄,方向非保守(批次 F 修掉的
+    单树同病,藏在展开层)。法则:带 epistemic_source 的 ref 不独立抽,其样本 =
+    median_minted × (sampled[source] / median_source),缩放后仍截 [0,1]。
+
+    返回 (draw_refs, linked, median_draw):
+      draw_refs   —— 实际参与 RNG 抽取的 ref(确定序);源 ref 即使不在树内也纳入
+      linked      —— {铸参 ref: 源 ref}
+      median_draw —— 抽样空间的 median(含树外源)
+    无联动参数时 draw_refs ≡ sorted(median_by_ref)、linked 空 —— 无 CCF 模型的抽样流
+    逐位不变(L3 冻结锁)。"""
+    linked: dict[str, str] = {}
+    for ref in sorted(median_by_ref):                      # 确定序:与 PYTHONHASHSEED 无关
+        try:
+            src = getattr(params.get(ref), "epistemic_source", None)
+        except Exception:
+            src = None
+        if src and src != ref:
+            linked[ref] = src
+    if not linked:
+        return sorted(median_by_ref), {}, dict(median_by_ref)
+    # engine-review F3(2026-07-22):json_io 使该字段成为**用户输入面**。无校验时
+    # 链式(A→B→C)/环(A↔B)会静默出数且结果依赖字典序(破坏 G5 逐位重放保证),
+    # 悬空源裸 KeyError,频率源会被 [0,1] 截断(量纲违规)。三条一律响亮拒绝。
+    for ref in sorted(linked):
+        src = linked[ref]
+        try:
+            sp = params.get(src)
+        except Exception:
+            raise ValueError(f"epistemic_source '{src}'(参数 '{ref}' 声明)不存在于参数库")
+        if getattr(sp, "epistemic_source", None):
+            raise ValueError(f"epistemic_source 不得链式:'{ref}' → '{src}' → "
+                             f"'{sp.epistemic_source}';认知源须为叶(单跳)")
+        if getattr(sp, "kind", None) == "frequency":
+            raise ValueError(f"epistemic_source '{src}' 为频率量纲,不可作概率铸参"
+                             f"'{ref}' 的认知源(量纲混用)")
+        # engine-review 复审 R1(2026-07-22):**声明方**量纲同样要查。频率参数若自带
+        # epistemic_source,其样本会走 _apply_links 的 [0,1] 截断(λ=2.4/yr → 封 1.0),
+        # 实测 ~8× 静默低估——非保守,且撞 CLAUDE.md 硬约束 4(量纲绝不静默混算)。
+        # 引擎铸参恒概率量纲,此拒绝对产品路径零扰动,只封死 json_io 输入面。
+        if getattr(params.get(ref), "kind", None) == "frequency":
+            raise ValueError(f"频率参数 '{ref}' 不可声明 epistemic_source:认知联动按概率"
+                             f"量纲缩放并截 [0,1],会静默压低频率(量纲混用)")
+    median_draw = {r: v for r, v in median_by_ref.items() if r not in linked}
+    for src in set(linked.values()):
+        if src not in median_draw:
+            median_draw[src] = (median_by_ref[src] if src in median_by_ref
+                                else params.get(src).unavailability())
+    return sorted(median_draw), linked, median_draw
+
+
+def _apply_links(sampled: dict, raw: dict, linked: dict,
+                 median_by_ref: dict, median_draw: dict) -> None:
+    """把联动铸参的样本按源因子就地写入 sampled(等比缩放,**逐 ref 各自**截 [0,1])。
+
+    engine-review F2(2026-07-22):因子必须取源的**未截断**抽样。用截断值会让源自身的
+    [0,1] 封顶(q_rep=0.5 ⇒ 因子最大 2.0)被全组继承——对 q=0.01 的组员是外来的、
+    无物理依据的压窄(非保守)。每个铸参只受自己的物理上界约束。"""
+    for ref in sorted(linked):
+        src = linked[ref]
+        ms = median_draw[src]
+        v = median_by_ref[ref] * (raw[src] / ms) if ms > 0 else median_by_ref[ref]
+        sampled[ref] = min(max(v, 0.0), 1.0)
+
+
 def event_tree_uncertainty(model: Model, et_name: str, samples: int = 1000,
                            seed: int = 42, error_factor: float = 3.0,
                            house_states: dict | None = None,
@@ -52,13 +130,20 @@ def event_tree_uncertainty(model: Model, et_name: str, samples: int = 1000,
     # P-7 向量化:抽样循环逐字不动(RNG 流与标量版逐位同),抽完按 ref 收列向量;
     # BDD 求值改 batch(每序列一次遍历,节点级全样本 numpy 乘加——与标量同表达式
     # ⇒ 每样本逐位同);逐样本后果 Σ 仍 fsum(S-B 口径)。57s/千样本 → 秒级。
+    draw_refs, linked, median_draw = _epistemic_links(b.params, median_by_ref)
     sample_by_ref = {ref: np.empty(samples) for ref in refs}
     for i in range(samples):
-        if sigma > 0:
-            sampled = {ref: (float(np.clip(np.exp(rng.normal(log(median_by_ref[ref]), sigma)), 0.0, 1.0))
-                             if median_by_ref[ref] > 0 else 0.0) for ref in refs}
-        else:
-            sampled = {ref: median_by_ref[ref] for ref in refs}
+        raw: dict[str, float] = {}
+        sampled: dict[str, float] = {}
+        for ref in draw_refs:                    # 抽样序与旧版逐字同 → RNG 流逐位同
+            mu = median_draw[ref]
+            if sigma <= 0 or mu <= 0:
+                raw[ref] = sampled[ref] = (mu if sigma <= 0 else 0.0)
+                continue
+            d = float(np.exp(rng.normal(log(mu), sigma)))
+            raw[ref] = d
+            sampled[ref] = float(np.clip(d, 0.0, 1.0))
+        _apply_links(sampled, raw, linked, median_by_ref, median_draw)
         for ref in refs:
             sample_by_ref[ref][i] = sampled[ref]
     q_vec = {bb: sample_by_ref[ref] for bb, ref in ref_of.items()}
@@ -85,7 +170,11 @@ def _param_law_signature(p) -> tuple:
     d = getattr(p, "distribution", None)
     dist = (d.family, tuple(sorted(d.params.items()))) if d is not None else None
     return (p.kind, p.value, p.mttr, p.test_interval, p.mission_time,
-            p.gamma, p.alpha, p.beta, p.t0, dist)
+            p.gamma, p.alpha, p.beta, p.t0, dist,
+            # engine-review F5(2026-07-22):CCF 铸参名 CCF_<gid> 不含成员名——两树复用
+            # 组 id 但成员不同、库值恰同时,同名铸参会带不同 epistemic_source;此门若不
+            # 看该字段就静默"首见者胜",把树 2 的组内相关拆散。纳入指纹 ⇒ 歧义复用点名拒绝。
+            getattr(p, "epistemic_source", None))
 
 
 def _assert_shared_ref_consistent(ref: str, p, tidx: int, law_by_ref: dict) -> None:
@@ -127,6 +216,7 @@ def aggregate_event_tree_uncertainty(specs: list, samples: int = 1000,
     trees = []
     median_by_ref: dict[str, float] = {}
     law_by_ref: dict[str, tuple] = {}     # EB-09/O3:同 ref 名参数法则一致性(spec A load 边界)
+    param_by_ref: dict[str, object] = {}  # ref → Parameter(首见者;CCF 联动查 epistemic_source)
     for tidx, (model, et_name) in enumerate(specs):
         b = _build_event_tree(model, et_name, house_states, boundary_condition_set)
         et, big, m, all_basics, fe_bdd = b.et, b.big, b.m, b.all_basics, b.fe_bdd
@@ -143,6 +233,9 @@ def aggregate_event_tree_uncertainty(specs: list, samples: int = 1000,
             _assert_shared_ref_consistent(ref, p, tidx, law_by_ref)  # spec A:异值同名点名拒绝
             if ref not in median_by_ref:
                 median_by_ref[ref] = p.unavailability()
+            param_by_ref.setdefault(ref, p)                          # CCF 联动:跨树参数视图
+        for pid in b.params.ids():                                   # 源参数可能不被任何底事件引用
+            param_by_ref.setdefault(pid, b.params.get(pid))
         trees.append({"m": m, "seq_exprs": seq_exprs, "ref_of": ref_of,
                       "init_frequency": et.init_frequency})
 
@@ -150,13 +243,21 @@ def aggregate_event_tree_uncertainty(specs: list, samples: int = 1000,
     rng = np.random.default_rng(seed)         # 单一 RNG 流(不逐树重播种)
     sigma = log(error_factor) / 1.645 if error_factor > 1 else 0.0
     # P-7 向量化:抽样循环逐字不动 → 收列向量;每 (树,序列) 一次 batch 遍历。
+    # CCF 联动:跨树按 ref 名合并的参数视图(同名同法则已由 _assert_shared_ref_consistent 锁)
+    draw_refs, linked, median_draw = _epistemic_links(_MergedParams(param_by_ref), median_by_ref)
     sample_by_ref = {ref: np.empty(samples) for ref in refs}
     for i in range(samples):
-        if sigma > 0:                          # 一次迭代 = 一个联合参数向量(按 ref 名)
-            sampled = {ref: (float(np.clip(np.exp(rng.normal(log(median_by_ref[ref]), sigma)), 0.0, 1.0))
-                             if median_by_ref[ref] > 0 else 0.0) for ref in refs}
-        else:
-            sampled = {ref: median_by_ref[ref] for ref in refs}
+        raw = {}                               # 一次迭代 = 一个联合参数向量(按 ref 名)
+        sampled = {}
+        for ref in draw_refs:
+            mu = median_draw[ref]
+            if sigma <= 0 or mu <= 0:
+                raw[ref] = sampled[ref] = (mu if sigma <= 0 else 0.0)
+                continue
+            d = float(np.exp(rng.normal(log(mu), sigma)))
+            raw[ref] = d
+            sampled[ref] = float(np.clip(d, 0.0, 1.0))
+        _apply_links(sampled, raw, linked, median_by_ref, median_draw)
         for ref in refs:
             sample_by_ref[ref][i] = sampled[ref]
     tree_probs = []                            # [(init_frequency, [(c, N 向量)…])…] 保持树序
@@ -260,19 +361,20 @@ def event_tree_uncertainty_integrated(model: Model, et_name: str, ie_ft_name: st
     rng = np.random.default_rng(seed)
     sigma = log(error_factor) / 1.645 if error_factor > 1 else 0.0
     # P-7 向量化:抽样循环逐字不动 → 收列向量;每 (初因,序列) 对一次 batch 遍历。
+    draw_refs, linked, median_draw = _epistemic_links(params, median_by_ref)
     sample_by_ref = {ref: np.empty(samples) for ref in refs}
     for i in range(samples):
-        if sigma > 0:
-            sampled = {}
-            for ref in refs:
-                mu = median_by_ref[ref]
-                if mu <= 0:
-                    sampled[ref] = 0.0
-                    continue
-                draw = float(np.exp(rng.normal(log(mu), sigma)))
-                sampled[ref] = draw if ref in freq_refs else float(np.clip(draw, 0.0, 1.0))
-        else:
-            sampled = {ref: median_by_ref[ref] for ref in refs}
+        raw = {}
+        sampled = {}
+        for ref in draw_refs:
+            mu = median_draw[ref]
+            if sigma <= 0 or mu <= 0:
+                raw[ref] = sampled[ref] = (mu if sigma <= 0 else 0.0)
+                continue
+            draw = float(np.exp(rng.normal(log(mu), sigma)))
+            raw[ref] = draw
+            sampled[ref] = draw if ref in freq_refs else float(np.clip(draw, 0.0, 1.0))
+        _apply_links(sampled, raw, linked, median_by_ref, median_draw)   # 铸参恒概率量纲 → 截 [0,1]
         for ref in refs:
             sample_by_ref[ref][i] = sampled[ref]
     q_vec = {bb: sample_by_ref[ref] for bb, ref in ref_of.items()}

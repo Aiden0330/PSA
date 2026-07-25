@@ -174,12 +174,15 @@ def test_C4_group9_still_rejected():
         quantify_event_tree(m, "TR")
 
 
-# ── 指纹:语义变更 ⇒ semver 0.3.0 ────────────────────────────────────────────────
+# ── 指纹:语义变更 ⇒ semver ≥ 0.3.0 ──────────────────────────────────────────────
 
 def test_semver_bumped_for_mc_semantics_change():
+    """批次 F 的保证 = **永不退回 0.2.x**(旧带只在 0.2.x 可复现,指纹不得撒谎)。
+    改为下限断言:后续批次继续上抬 semver 时不制造跨批次 churn,各批次的精确钉扎
+    放在自己的锚点文件里(如 CCF 联动 = 0.4.0,见 tests/banked/test_ccf_sokc_banked.py)。"""
     from backend import store
-    assert store.engine_fingerprint()["semver"] == "0.3.0", (
-        "MC 抽样/求和语义变更必须升 semver——旧带只在 0.2.x 可复现,指纹不得撒谎")
+    got = tuple(int(x) for x in store.engine_fingerprint()["semver"].split("."))
+    assert got >= (0, 3, 0), f"semver {got} 低于批次 F 基线 0.3.0"
 
 
 # ── 收口(engine-review F-1):MGL 词汇止 ρ₇ → 8 组点名拒绝;alpha/phi 到 8 ─────────

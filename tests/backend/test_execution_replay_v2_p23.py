@@ -262,7 +262,7 @@ def test_G8_engine_fingerprint_structure():
     assert set(fp) == {"semver", "git_sha", "dirty", "request_schema_version",
                        "benchmark_corpus_version"}
     assert fp["semver"] != "0.1.0"                      # 占位版本已升(EB-08 可辨)
-    assert fp["semver"] == "0.3.0"
+    assert fp["semver"] == "0.4.0"
     assert isinstance(fp["git_sha"], str) and fp["git_sha"]
     assert fp["request_schema_version"] == "2"
     assert isinstance(fp["benchmark_corpus_version"], str) and fp["benchmark_corpus_version"]
@@ -279,7 +279,7 @@ def test_G8_fingerprint_git_degrades_without_crash(monkeypatch):
     fp = store.engine_fingerprint()
     assert fp["git_sha"] == "unknown"
     assert fp["dirty"] is None
-    assert fp["semver"] == "0.3.0"                      # semver 不依赖 git
+    assert fp["semver"] == "0.4.0"                      # semver 不依赖 git
 
 
 # ── MEF 导出对四新 kind 响亮拒绝(不静默固化 Q(t))──────────────────────────────
@@ -403,7 +403,7 @@ def test_G4_consistent_pin_records_request_hash_and_fingerprint(tmp_path, monkey
     assert len(cases) == 1
     settings = json.loads(cases[0]["settings_json"])
     assert settings.get("request_hash")                       # 请求哈希入案例
-    assert settings["engine_fingerprint"]["semver"] == "0.3.0"
+    assert settings["engine_fingerprint"]["semver"] == "0.4.0"
     assert settings["engine_fingerprint"]["request_schema_version"] == "2"
     assert settings["resolved_settings"]["house_states"] == {}
 
@@ -454,7 +454,7 @@ def test_G5_replay_from_pinned_version_bit_identical(tmp_path, monkeypatch):
     assert r.status_code == 200, r.text
     case = client.get(f"/api/projects/{puuid}/cases").json()[0]
     settings = json.loads(case["settings_json"])
-    assert settings.get("request_hash") and settings["engine_fingerprint"]["semver"] == "0.3.0"
+    assert settings.get("request_hash") and settings["engine_fingerprint"]["semver"] == "0.4.0"
 
     # 反构:从钉扎版本(库中 canonical)重建引擎请求 → quantify;与计算所用请求 quantify 逐位一致
     raw = store.get_version_raw(puuid, case["version_id"])

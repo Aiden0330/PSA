@@ -35,6 +35,10 @@ class Parameter:
     distribution: Optional[Distribution] = None
     source: Optional[str] = None
     version: Optional[str] = None
+    # CCF 组内认知联动(规格 2026-07-17-ccf-group-sokc-linkage,semver 0.4.0):
+    # 铸参(CCF 展开产物)标记其**认知来源** ref —— MC 抽样时不独立抽,而是随源参数
+    # 的抽样因子整组共乘(q_levels 对 Q_t 线性)。普通参数恒 None(零扰动边界)。
+    epistemic_source: Optional[str] = None
 
     def unavailability(self) -> float:
         """返回基本事件不可用度 q∈[0,1]。"""

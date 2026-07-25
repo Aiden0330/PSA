@@ -1,6 +1,6 @@
 [project]
 name = "bess-psa"
-version = "0.3.0"
+version = "0.4.0"
 description = "Exact BDD/ZBDD PSA engine for BESS thermal-runaway QRA"
 requires-python = ">=3.11"
 dependencies = [
