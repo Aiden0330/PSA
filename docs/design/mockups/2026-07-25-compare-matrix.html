@@ -1,0 +1,80 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>方向A · 供应商对标矩阵</title><style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--c3:#d97706;--c4:#ea580c;--c5:#dc2626;
+--gA:#16a34a;--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--dng:#dc2626;--ok:#16a34a}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:14px}header .hint{color:var(--faint);font-size:11px;margin-left:auto}
+.ribbon{display:flex;align-items:center;gap:8px;padding:7px 14px;background:#fff;border-bottom:1px solid var(--line)}
+.btn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 10px;font-size:12px;color:var(--ink2);cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+select{border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:12px}
+main{padding:14px;display:grid;gap:14px;max-width:1180px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ch{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;font-size:12.5px}
+.ch .meta{margin-left:auto;font-weight:400;color:var(--faint);font-size:11px}
+table{border-collapse:collapse;width:100%}
+th{font-size:11px;color:var(--muted);text-align:left;padding:6px 10px;background:var(--soft);border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+tr:hover td{background:#fafcff}
+.g{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff}
+.gA{background:var(--gA)}.gB{background:var(--gB)}.gC{background:var(--gC)}.gD{background:var(--gD)}
+.dn{color:var(--ok);font-weight:600}.up{color:var(--dng);font-weight:600}.eq{color:var(--faint)}
+.base{outline:2px solid var(--acc);outline-offset:-2px;border-radius:4px}
+.sup{font-size:11px;color:var(--muted)}
+.cons{font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;color:#fff}
+.C3{background:var(--c3)}.C4{background:var(--c4)}.C5{background:var(--c5)}
+.foot{padding:8px 12px;color:var(--faint);font-size:10.5px;border-top:1px solid var(--line)}
+.drv{height:8px;border-radius:4px;background:#fecaca;position:relative}.drv>i{position:absolute;inset:0;width:var(--w);background:var(--dng);border-radius:4px}
+.drv.neg{background:#bbf7d0}.drv.neg>i{background:var(--ok)}
+</style></head><body>
+<header><h1>系统对比 · 供应商对标矩阵</h1><span class="g gB">方向 A</span>
+<span class="hint">赌注:分析师信表格——同一事件树结构 × 各家参数集,逐序列/逐屏障 Δ 即证据</span></header>
+<div class="ribbon">
+  基准:<select id="base"><option value="A">供应商A · LFP 280Ah(基准)</option><option value="B">供应商B · LFP 314Ah 大电芯</option><option value="C">供应商C · LFP 半固态(送样)</option></select>
+  <span class="sup">同一 ETA 结构「电芯内短 → 热失控」v2.3 · 各列 = 独立分析案例(参数集快照)</span>
+  <button class="btn pri">导出对比报告(Word)</button><button class="btn">另存为分析案例组</button>
+</div>
+<main>
+
+<div class="card"><div class="ch">总量对比 <span class="meta">/舱·年 · 5 MWh 标准舱 · 点列头切换基准</span></div>
+<table><thead><tr><th>指标</th><th class="base">供应商A · 280Ah <span class="g gC">C</span></th><th>供应商B · 314Ah <span class="g gB">B</span></th><th>供应商C · 半固态 <span class="g gD">D</span></th></tr></thead>
+<tbody>
+<tr><td>电芯内短初因频率(产品维度换算)</td><td class="num">8.32×10⁻⁴</td><td class="num">1.05×10⁻³ <span class="up">+26%</span></td><td class="num">4.20×10⁻⁴ <span class="dn">−50%</span></td></tr>
+<tr><td>C3+(舱内起火)</td><td class="num">2.08×10⁻⁵</td><td class="num">3.66×10⁻⁵ <span class="up">+76%</span></td><td class="num">9.80×10⁻⁶ <span class="dn">−53%</span></td></tr>
+<tr><td>C4+(爆燃/多模组)</td><td class="num">1.64×10⁻⁶</td><td class="num">3.90×10⁻⁶ <span class="up">+138%</span></td><td class="num">7.10×10⁻⁷ <span class="dn">−57%</span></td></tr>
+<tr><td>p95 / p50(不确定性,C4+)</td><td class="num">4.1×</td><td class="num">3.8×</td><td class="num">9.6× <span class="up">带最宽</span></td></tr>
+<tr><td>参数置信构成</td><td>C×6 · D×8</td><td><b>B×9</b> · C×2 · D×3</td><td>D×14 <span class="up">全推断</span></td></tr>
+</tbody></table>
+<div class="foot">供应商C 数值最低但 p95/p50 = 9.6× 且全 D 级——矩阵同屏呈现"低数值≠低风险结论"。</div></div>
+
+<div class="card"><div class="ch">Δ 归因 · 逐屏障(B 相对 A) <span class="meta">哪些差异真正驱动 C4+ 的 +138%</span></div>
+<table><thead><tr><th>屏障 / 参数</th><th>供应商A</th><th>供应商B</th><th>Δ 贡献(C4+)</th><th style="width:130px">驱动强度</th></tr></thead>
+<tbody>
+<tr><td>电芯内短 λ(/cell·yr)<span class="sup"> · 314Ah 大电芯档</span></td><td class="num">1.0×10⁻⁷ <span class="g gC">C</span></td><td class="num">1.5×10⁻⁷ <span class="g gB">B</span></td><td class="num up">+58%</td><td><div class="drv"><i style="--w:100%"></i></div></td></tr>
+<tr><td>早期离气探测+联动 B_OFFGAS</td><td class="num">PFD 0.05 <span class="g gD">D</span></td><td class="num">PFD 0.05 <span class="g gD">D</span></td><td class="num eq">0</td><td><div class="drv"><i style="--w:0%"></i></div></td></tr>
+<tr><td>BMS 三级切断 B_BMS<span class="sup"> · B 家为双通道冗余</span></td><td class="num">PFD 0.10 <span class="g gC">C</span></td><td class="num">PFD 0.036 <span class="g gB">B</span></td><td class="num dn">−41%</td><td><div class="drv neg"><i style="--w:52%"></i></div></td></tr>
+<tr><td>电芯间热障(气凝胶)pas-thermal-barrier</td><td class="num">PFD 0.30 <span class="g gD">D</span></td><td class="num">PFD 0.55 <span class="g gD">D</span><span class="sup"> 大电芯热容↑</span></td><td class="num up">+64%</td><td><div class="drv"><i style="--w:78%"></i></div></td></tr>
+<tr><td>舱级灭火(全氟己酮)pas-fk-clean-agent</td><td class="num">PFD 0.15 <span class="g gD">D</span></td><td class="num">PFD 0.15 <span class="g gD">D</span></td><td class="num eq">0</td><td><div class="drv"><i style="--w:0%"></i></div></td></tr>
+<tr><td>泄爆面 NFPA 68 pas-explosion-vent</td><td class="num">PFD 0.10 <span class="g gC">C</span></td><td class="num">PFD 0.10 <span class="g gC">C</span></td><td class="num eq">0</td><td><div class="drv"><i style="--w:0%"></i></div></td></tr>
+</tbody></table>
+<div class="foot">Δ 归因由重要度(FV/Birnbaum)差分自动生成;每格数值可点开溯源(引用快照 grade/note/url 随节点走)。B 家 BMS 冗余(实测 B 级)抵不过大电芯热障退化——结论句可直接进报告。</div></div>
+
+<div class="card"><div class="ch">序列级明细(前 6 条,按 |Δ| 排序)<span class="meta">RiskSpectrum 式割集密度</span></div>
+<table><thead><tr><th>#</th><th>序列(失效路径)</th><th>后果</th><th>供应商A</th><th>供应商B</th><th>Δ</th></tr></thead>
+<tbody>
+<tr><td class="num">S-07</td><td>内短 → 离气未报 → BMS 未切 → 热障失效 → 舱内蔓延</td><td><span class="cons C4">C4</span></td><td class="num">8.9×10⁻⁷</td><td class="num">2.4×10⁻⁶</td><td class="num up">+170%</td></tr>
+<tr><td class="num">S-04</td><td>内短 → 离气报警 → 人工确认迟(SPAR-H)→ 单模组起火</td><td><span class="cons C3">C3</span></td><td class="num">6.1×10⁻⁶</td><td class="num">9.8×10⁻⁶</td><td class="num up">+61%</td></tr>
+<tr><td class="num">S-11</td><td>内短 → BMS 切断成功 → 单体排气,无起火</td><td><span class="cons C3" style="background:#65a30d">C2</span></td><td class="num">7.5×10⁻⁴</td><td class="num">9.7×10⁻⁴</td><td class="num up">+29%</td></tr>
+<tr><td class="num">S-09</td><td>内短 → 热障有效 → 灭火成功 → 单模组损失</td><td><span class="cons C3">C3</span></td><td class="num">1.2×10⁻⁵</td><td class="num">1.4×10⁻⁵</td><td class="num up">+17%</td></tr>
+<tr><td class="num">S-13</td><td>内短 → 灭火失败 → 泄爆动作 → 爆燃未致结构损</td><td><span class="cons C4">C4</span></td><td class="num">6.4×10⁻⁷</td><td class="num">1.3×10⁻⁶</td><td class="num up">+103%</td></tr>
+<tr><td class="num">S-15</td><td>… 泄爆失效 → 舱体爆炸</td><td><span class="cons C5">C5</span></td><td class="num">7.1×10⁻⁸</td><td class="num">1.5×10⁻⁷</td><td class="num up">+111%</td></tr>
+</tbody></table>
+<div class="foot">口径互锁:两列同一结构、同一截断(1×10⁻¹²)、同一 MC 种子;结构性差异(B 家多一道 PCS 直流侧熔断)以 ◇ 标记并在 diff 视图单列——不允许"结构不同还硬比"。</div></div>
+
+</main>
+<script>
+document.getElementById('base').addEventListener('change',()=>{
+  alert('mockup:切换基准列后,全表 Δ 相对新基准重算(实现时由分析案例组一次拉取)')})
+</script></body></html>

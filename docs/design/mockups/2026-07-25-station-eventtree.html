@@ -1,0 +1,70 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>方向D · 站级序列(MU-PSA 式)</title><style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--c3:#d97706;--c4:#ea580c;--c5:#dc2626;
+--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--dng:#dc2626;--ok:#16a34a}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:14px}header .hint{color:var(--faint);font-size:11px;margin-left:auto}
+.g{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff}
+.gB{background:var(--gB)}.gC{background:var(--gC)}.gD{background:var(--gD)}
+main{padding:14px;display:grid;gap:14px;max-width:1150px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ch{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;font-size:12.5px}
+.ch .meta{margin-left:auto;font-weight:400;color:var(--faint);font-size:11px}
+table{border-collapse:collapse;width:100%}
+th{font-size:11px;color:var(--muted);text-align:left;padding:6px 10px;background:var(--soft);border-bottom:1px solid var(--line)}
+td{padding:6px 10px;border-bottom:1px solid #f1f5f9}
+.cons{font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;color:#fff}
+.N1{background:#65a30d}.N2{background:var(--c3)}.N3{background:var(--c4)}.N5{background:var(--c5)}
+.path{font-family:var(--mono);font-size:10.5px;color:var(--ink2)}
+.path .ok{color:var(--ok)}.path .no{color:var(--dng)}
+.foot{padding:8px 12px;color:var(--faint);font-size:10.5px;border-top:1px solid var(--line)}
+.pad{padding:12px}
+.ie{display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;font-size:11.5px;padding:4px 0;border-bottom:1px dashed #f1f5f9;color:var(--ink2)}
+.sw{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;margin-left:8px}
+.sw span{padding:3px 10px;font-size:11px;cursor:pointer;color:var(--ink2)}
+.sw span.on{background:var(--acc);color:#fff}
+.ccf td{background:#fffbeb}
+.delta{color:var(--dng);font-weight:600}
+</style></head><body>
+<header><h1>站级评估 · 站级事件树(多机组 PSA 式)</h1><span class="g" style="background:#0f766e">方向 D</span>
+<span class="hint">赌注:复用既有 ETA 机制最快落地——舱=机组:单舱结果作 IE,舱间/站级屏障作功能事件,后果=涉及舱数</span></header>
+<main>
+
+<div class="card"><div class="ch">站级初始事件(来自各系统模型的输出,版本哈希钉扎)<span class="meta">RiskSpectrum MU-PSA 同法:复用单元结果不重建</span></div>
+<div class="pad">
+<div class="ie"><span>IE-ST1 · 任一 <b>供应商A</b> 舱 C3+ 起火(24 舱 × 2.08×10⁻⁵,模型 v2.3 · <span class="num">f488b89f</span>)</span><b class="num">4.99×10⁻⁴</b><span class="g gC">C</span><span>/站·年</span></div>
+<div class="ie"><span>IE-ST2 · 任一 <b>供应商B</b> 舱 C3+ 起火(16 舱 × 3.66×10⁻⁵,模型 v1.8 · <span class="num">a3c17d02</span>)</span><b class="num">5.86×10⁻⁴</b><span class="g gB">B</span><span>/站·年</span></div>
+<div class="ie"><span>IE-ST3 · 站外部火源侵入 IE_EXT_FIRE(NFPA 855 场景)</span><b class="num">1.0×10⁻⁴</b><span class="g gD">D</span><span>/站·年</span></div>
+</div></div>
+
+<div class="card"><div class="ch">站级事件树 · IE-ST1(A 舱起火 → 蔓延链)
+<span class="meta">跨舱 CCF:<span class="sw" id="sw"><span class="on" data-m="on">计入</span><span data-m="off">忽略</span></span></span></div>
+<table><thead><tr><th>#</th><th>路径(站级屏障判定)</th><th>后果(涉及舱数)</th><th id="hdr">频率(计入跨舱 CCF)</th><th>Δ vs 忽略</th></tr></thead>
+<tbody id="tb">
+<tr><td class="num">ST-01</td><td class="path">舱级灭火成功 <span class="ok">✓</span></td><td><span class="cons N1">单舱内控制</span></td><td class="num" data-on="4.44×10⁻⁴" data-off="4.44×10⁻⁴">4.44×10⁻⁴</td><td class="num">—</td></tr>
+<tr><td class="num">ST-02</td><td class="path">灭火失败 <span class="no">✗</span> → 邻舱间距/防火墙有效 <span class="ok">✓</span> → 站级消防压制 <span class="ok">✓</span></td><td><span class="cons N1">单舱烧尽</span></td><td class="num" data-on="4.61×10⁻⁵" data-off="4.66×10⁻⁵">4.61×10⁻⁵</td><td class="num">−1%</td></tr>
+<tr><td class="num">ST-03</td><td class="path">灭火失败 <span class="no">✗</span> → 间距失效 <span class="no">✗</span> → 邻舱受累 → 二级间距有效 <span class="ok">✓</span></td><td><span class="cons N2">2–3 舱</span></td><td class="num" data-on="8.9×10⁻⁶" data-off="5.3×10⁻⁶">8.9×10⁻⁶</td><td class="num delta" data-on="+68%" data-off="">+68%</td></tr>
+<tr class="ccf"><td class="num">ST-04</td><td class="path">同上 + <b>同厂 BMS 固件 CCF</b>(邻舱预警共因失效,β=0.05)</td><td><span class="cons N3">3–5 舱</span></td><td class="num" data-on="6.1×10⁻⁷" data-off="1.6×10⁻⁷">6.1×10⁻⁷</td><td class="num delta" data-on="+281%" data-off="">+281%</td></tr>
+<tr><td class="num">ST-05</td><td class="path">… → 站级消防失效 <span class="no">✗</span>(就绪性 0.26 ⊕ 条件有效)→ 应急响应失效 <span class="no">✗</span></td><td><span class="cons N5">整排 ≥5 舱</span></td><td class="num" data-on="7.4×10⁻⁷" data-off="4.2×10⁻⁷">7.4×10⁻⁷</td><td class="num delta" data-on="+76%" data-off="">+76%</td></tr>
+</tbody></table>
+<div class="foot">切「忽略」看独立假设的低估幅度——多舱级后果对跨舱 CCF 最敏感(ST-04:+281%),与核电多机组 PSA 结论同构("计入跨机组依赖后多机组释放概率上升")。</div></div>
+
+<div class="card"><div class="ch">跨舱依赖申报清单(MU-PSA 式,证据链必填)<span class="meta">每行须给依据,AI 只起草不定稿</span></div>
+<table><thead><tr><th>依赖</th><th>覆盖范围</th><th>模型</th><th>参数</th><th>依据</th></tr></thead><tbody>
+<tr><td>同厂 BMS 固件版本共因</td><td>A 舱 ×24</td><td>β 因子(SOKC 联动)</td><td class="num">β = 0.05 <span class="g gD">D</span></td><td>同一 OTA 批次;NUREG/CR-5485 类比,note 载推断</td></tr>
+<tr><td>站级消防水源共享</td><td>全站</td><td>共享设备(单点)</td><td class="num">PFD 0.29</td><td>就绪性 act-suppress-readiness ⊕ 条件有效性 η</td></tr>
+<tr><td>同一运维班组(夜班响应)</td><td>全站</td><td>HRA 依赖(SPAR-H)</td><td class="num">完全相关取包络</td><td>hep-diagnosis-sparh · NUREG/CR-6883</td></tr>
+</tbody></table>
+<div class="foot">与方向 C 的关系:本页是"先能算"的骨架(现引擎即可跑);拓扑画布是它的导航壳,二期把每条蔓延边落到平面图。舱数改配(24A+16B → 30A+10B)即刻重算——选型与站级评估在同一张树上闭环。</div></div>
+
+</main>
+<script>
+document.querySelectorAll('#sw span').forEach(s=>s.onclick=()=>{
+  document.querySelectorAll('#sw span').forEach(x=>x.classList.remove('on'));s.classList.add('on')
+  const m=s.dataset.m
+  document.getElementById('hdr').textContent='频率('+(m==='on'?'计入':'忽略')+'跨舱 CCF)'
+  document.querySelectorAll('#tb [data-on]').forEach(c=>{c.textContent=c.dataset[m]||c.textContent})
+})
+</script></body></html>

@@ -1,0 +1,90 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>方向C · 站级拓扑画布</title><style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--c4:#ea580c;--c5:#dc2626;
+--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--dng:#dc2626;--sA:#0f766e;--sB:#2563eb}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:14px}header .hint{color:var(--faint);font-size:11px;margin-left:auto}
+.g{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff}
+.gB{background:var(--gB)}.gC{background:var(--gC)}.gD{background:var(--gD)}
+.kpis{display:flex;gap:10px;padding:8px 14px;background:#fff;border-bottom:1px solid var(--line)}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:6px 12px}
+.kpi .l{font-size:10px;color:var(--faint)}.kpi .v{font-family:var(--mono);font-size:15px;font-weight:700}
+.kpi.red .v{color:var(--dng)}
+main{flex:1;display:flex;min-height:0}
+.canvas{flex:1;position:relative;overflow:auto;padding:26px}
+.grid{display:grid;grid-template-columns:repeat(5,120px);grid-auto-rows:64px;gap:18px 26px;position:relative;width:max-content}
+.cab{border-radius:8px;color:#fff;padding:5px 8px;font-size:10.5px;cursor:pointer;position:relative;box-shadow:0 1px 3px rgba(15,23,42,.18)}
+.cab .id{font-family:var(--mono);font-weight:700;font-size:11px}
+.cab .f{font-family:var(--mono);font-size:9.5px;opacity:.85}
+.cab.sA{background:var(--sA)}.cab.sB{background:var(--sB)}
+.cab.sel{outline:3px solid #f59e0b;outline-offset:2px}
+.cab.r1{box-shadow:0 0 0 4px rgba(220,38,38,.45)}
+.cab.r2{box-shadow:0 0 0 4px rgba(234,88,12,.35)}
+.wall{position:absolute;background:#94a3b8;border-radius:2px}
+.wall.fire{background:#dc2626}
+.wall .t{position:absolute;left:50%;top:50%;transform:translate(-50%,-140%);background:#fff;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:9px;color:var(--ink2);white-space:nowrap;font-family:var(--mono)}
+.aisle{position:absolute;left:0;right:0;text-align:center;font-size:9.5px;color:var(--faint);font-family:var(--mono)}
+.side{width:330px;background:#fff;border-left:1px solid var(--line);overflow:auto;padding:12px;flex-shrink:0}
+.side h3{font-size:12.5px;margin-bottom:8px}
+.row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #f1f5f9;font-size:11.5px;color:var(--ink2)}
+.row b{font-family:var(--mono)}
+.sec{margin-top:12px;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:var(--faint)}
+.btn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 10px;font-size:12px;color:var(--ink2);cursor:pointer;margin-top:8px}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.note{font-size:10.5px;color:var(--faint);margin-top:8px;line-height:1.5}
+.toggle{display:flex;gap:6px;padding:0 14px 8px;background:#fff;border-bottom:1px solid var(--line)}
+.tg{border:1px solid var(--line);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;color:var(--ink2)}
+.tg.on{background:#e6f2f0;border-color:var(--acc);color:var(--acc);font-weight:600}
+</style></head><body>
+<header><h1>站级评估 · 拓扑画布(200 MWh · 40 舱示例,视口示前 20)</h1><span class="g" style="background:#9333ea">方向 C</span>
+<span class="hint">赌注:拓扑即模型——平面图摆舱、屏障是边;点舱下钻系统级,蔓延圈层直读</span></header>
+<div class="kpis">
+  <div class="kpi"><div class="l">任一舱 C3+(/站·年)</div><div class="v">6.2×10⁻⁴</div></div>
+  <div class="kpi"><div class="l">多舱事件 ≥2 舱(/站·年)</div><div class="v">1.8×10⁻⁵</div></div>
+  <div class="kpi red"><div class="l">整排蔓延 ≥5 舱(/站·年)</div><div class="v">7.4×10⁻⁷</div></div>
+  <div class="kpi"><div class="l">站界外后果(毒气/爆炸波)</div><div class="v">2.1×10⁻⁷</div></div>
+  <div class="kpi"><div class="l">跨舱 CCF 组</div><div class="v">3 组</div></div>
+</div>
+<div class="toggle">图层:<span class="tg on" id="tgProp">蔓延圈层(源:A-07)</span><span class="tg">供应商着色</span><span class="tg">屏障 PFD 标注</span><span class="tg">消防分区</span></div>
+<main>
+<div class="canvas"><div class="grid" id="grid"></div></div>
+<div class="side" id="side">
+  <h3>舱 A-07 · 供应商A · 5 MWh <span class="g gC">C</span></h3>
+  <div class="row"><span>舱级 C3+(承接系统模型 v2.3)</span><b>2.08×10⁻⁵</b></div>
+  <div class="row"><span>舱级 C4+</span><b>1.64×10⁻⁶</b></div>
+  <div class="sec">向邻舱蔓延(多米诺一级)</div>
+  <div class="row"><span>→ A-06 · 间距 3 m + 端部防火墙</span><b>PFD 0.03</b></div>
+  <div class="row"><span>→ A-08 · 间距 3 m(无墙)B_SPACING</span><b>PFD 0.10 <span class="g gD">D</span></b></div>
+  <div class="row"><span>→ B-07(对排)· 巡检道 6 m</span><b>PFD 0.02</b></div>
+  <div class="sec">站级屏障(对本源事件)</div>
+  <div class="row"><span>站级消防联动(就绪性⊕条件有效)</span><b>PFD 0.29</b></div>
+  <div class="row"><span>应急响应 B_RESPONSE(SPAR-H 口径)</span><b>PFD 0.20 <span class="g gD">D</span></b></div>
+  <div class="sec">该源的蔓延序列(自动生成)</div>
+  <div class="row"><span>A-07 单舱(圈层 0)</span><b>2.0×10⁻⁵</b></div>
+  <div class="row"><span>+A-08(圈层 1,红圈)</span><b>1.9×10⁻⁶</b></div>
+  <div class="row"><span>+A-06/B-07(圈层 2,橙圈)</span><b>1.1×10⁻⁷</b></div>
+  <button class="btn pri">打开该舱系统级模型 →</button>
+  <button class="btn">编辑舱间屏障(此边引用参考库 B_SPACING)</button>
+  <div class="note">舱=系统项目实例(引用供应商模型版本哈希,证据链续接);边=舱间屏障(参考库快照 grade/note/url 随边走)。同供应商舱共享 BMS 固件 → 跨舱 CCF 组自动提示(β=0.05,SOKC 联动抽样)。</div>
+</div>
+</main>
+<script>
+const G=document.getElementById('grid')
+const cabs=[]
+for(let r=0;r<4;r++)for(let c=0;c<5;c++){
+  const isB=(r>=2), id=(isB?'B':'A')+'-'+String(r%2*5+c+1).padStart(2,'0')
+  const el=document.createElement('div')
+  el.className='cab '+(isB?'sB':'sA')+(id==='A-07'?' sel':'')+(id==='A-08'?' r1':'')+(id==='A-06'||id==='B-07'?' r2':'')
+  el.innerHTML=`<div class="id">${id}</div><div class="f">${isB?'3.7×10⁻⁵':'2.1×10⁻⁵'}</div>`
+  el.title=`舱 ${id} · C3+ /舱·年(点击下钻)`
+  el.onclick=()=>{document.querySelectorAll('.cab').forEach(x=>x.classList.remove('sel'));el.classList.add('sel');
+    document.querySelector('.side h3').innerHTML=`舱 ${id} · 供应商${isB?'B':'A'} · 5 MWh <span class="g ${isB?'gB':'gC'}">${isB?'B':'C'}</span>`}
+  G.appendChild(el);cabs.push(el)
+}
+// 防火墙(第 2、4 列间)与排间巡检道标注
+const w1=document.createElement('div');w1.className='wall fire';w1.style.cssText='left:271px;top:-6px;width:4px;height:226px'
+w1.innerHTML='<span class="t">防火墙 2h · PFD 0.03 <b style="color:#d97706">C</b></span>';G.appendChild(w1)
+const a=document.createElement('div');a.className='aisle';a.style.top='150px';a.textContent='—— 巡检道 6 m · 对排蔓延 PFD 0.02(工程推断 D)——';G.appendChild(a)
+</script></body></html>

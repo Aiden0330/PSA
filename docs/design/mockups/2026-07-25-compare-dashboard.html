@@ -1,0 +1,81 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>方向B · 选型决策仪表盘</title><style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--c1:#16a34a;--c2:#65a30d;--c3:#d97706;--c4:#ea580c;--c5:#dc2626;
+--gA:#16a34a;--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--dng:#dc2626;--ok:#16a34a;
+--sA:#0f766e;--sB:#2563eb;--sC:#9333ea}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:14px}header .hint{color:var(--faint);font-size:11px;margin-left:auto}
+main{padding:14px;display:grid;grid-template-columns:1.1fr .9fr;gap:14px;max-width:1200px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ch{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;font-size:12.5px}
+.ch .meta{margin-left:auto;font-weight:400;color:var(--faint);font-size:11px}
+.pad{padding:12px}
+.legend{display:flex;gap:14px;padding:8px 12px;font-size:11px;color:var(--ink2)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.g{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff}
+.gB{background:var(--gB)}.gC{background:var(--gC)}.gD{background:var(--gD)}
+.matrix{display:grid;grid-template-columns:52px repeat(5,1fr);gap:3px;padding:12px}
+.mx{height:52px;border-radius:6px;position:relative;font-size:10px;color:#fff;display:flex;align-items:flex-end;padding:4px 6px}
+.z1{background:#dcfce7;color:#166534}.z2{background:#fef3c7;color:#92400e}.z3{background:#fee2e2;color:#991b1b}
+.axl{display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--faint);font-family:var(--mono)}
+.pin{position:absolute;top:5px;left:6px;display:flex;gap:4px}
+.pt{width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.35);font-size:8px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+.wf{padding:12px}
+.wrow{display:grid;grid-template-columns:220px 1fr 90px;align-items:center;gap:8px;margin-bottom:7px;cursor:pointer;border-radius:6px;padding:3px 6px}
+.wrow:hover,.wrow.on{background:var(--soft)}
+.wlab{font-size:11.5px;color:var(--ink2)}
+.wbar{height:14px;position:relative;background:#f1f5f9;border-radius:4px;overflow:hidden}
+.wbar>i{position:absolute;top:0;bottom:0;border-radius:3px}
+.wv{font-family:var(--mono);font-size:11px;text-align:right}
+.up{color:var(--dng)}.dn{color:var(--ok)}
+.band{padding:12px}
+.brow{display:grid;grid-template-columns:120px 1fr 120px;gap:10px;align-items:center;margin-bottom:12px}
+.bl{position:relative;height:22px}
+.bline{position:absolute;top:10px;left:var(--l);right:calc(100% - var(--r));height:3px;border-radius:2px;opacity:.5}
+.bmed{position:absolute;top:4px;left:var(--m);width:3px;height:15px;border-radius:2px}
+.axis{display:grid;grid-template-columns:120px 1fr 120px;gap:10px;color:var(--faint);font-size:10px;font-family:var(--mono)}
+.verdict{padding:12px;font-size:12px;line-height:1.6;color:var(--ink2);border-top:1px dashed var(--line)}
+.verdict b{color:var(--ink)}
+.foot{padding:8px 12px;color:var(--faint);font-size:10.5px;border-top:1px solid var(--line)}
+</style></head><body>
+<header><h1>系统对比 · 选型决策仪表盘</h1><span class="g gB" style="background:var(--sC)">方向 B</span>
+<span class="hint">赌注:管理层/业主要一眼定论——矩阵落点 + Δ 瀑布归因 + 不确定带,三图一结论</span></header>
+<div class="legend"><span><span class="dot" style="background:var(--sA)"></span>供应商A · LFP 280Ah <span class="g gC">C</span></span>
+<span><span class="dot" style="background:var(--sB)"></span>供应商B · LFP 314Ah <span class="g gB">B</span></span>
+<span><span class="dot" style="background:var(--sC)"></span>供应商C · 半固态送样 <span class="g gD">D</span></span></div>
+<main>
+
+<div class="card"><div class="ch">风险矩阵落点(C4+ · /舱·年)<span class="meta">riskmatrix.ts 同色语义</span></div>
+<div class="matrix">
+  <div class="axl">≥10⁻⁴</div><div class="mx z2"></div><div class="mx z3"></div><div class="mx z3"></div><div class="mx z3"></div><div class="mx z3"></div>
+  <div class="axl">10⁻⁵</div><div class="mx z1"></div><div class="mx z2"></div><div class="mx z3"><div class="pin"></div></div><div class="mx z3"></div><div class="mx z3"></div>
+  <div class="axl">10⁻⁶</div><div class="mx z1"></div><div class="mx z1"></div><div class="mx z2"><div class="pin"><span class="pt" style="background:var(--sB)">B</span></div></div><div class="mx z2"></div><div class="mx z3"></div>
+  <div class="axl">10⁻⁷</div><div class="mx z1"></div><div class="mx z1"></div><div class="mx z1"><div class="pin"><span class="pt" style="background:var(--sA)">A</span><span class="pt" style="background:var(--sC)">C?</span></div></div><div class="mx z2"></div><div class="mx z2"></div>
+  <div class="axl"></div><div class="axl">C1</div><div class="axl">C2</div><div class="axl">C3</div><div class="axl">C4</div><div class="axl">C5</div>
+</div>
+<div class="verdict"><b>一句话结论(自动生成,进报告需人工签认)</b>:A、B 均落黄区内侧;B 因大电芯热障退化贴近红区边界;
+C 落点最低但置信全 D、p95 已跨两格 —— <b>落点 = p50,气泡边界 = p95</b>,监管口径不许拿均值讲故事。</div></div>
+
+<div class="card"><div class="ch">Δ 瀑布 · B 相对 A(C4+:1.64×10⁻⁶ → 3.90×10⁻⁶)<span class="meta">点行高亮溯源</span></div>
+<div class="wf">
+  <div class="wrow on"><span class="wlab">电芯内短 λ(314Ah 大电芯档)<span class="g gB">B</span></span><div class="wbar"><i style="left:30%;width:52%;background:var(--dng)"></i></div><span class="wv up">+1.31×10⁻⁶</span></div>
+  <div class="wrow"><span class="wlab">电芯间热障退化(热容↑)<span class="g gD">D</span></span><div class="wbar"><i style="left:30%;width:40%;background:var(--dng)"></i></div><span class="wv up">+1.02×10⁻⁶</span></div>
+  <div class="wrow"><span class="wlab">BMS 双通道冗余(厂商实测)<span class="g gB">B</span></span><div class="wbar"><i style="left:12%;width:18%;background:var(--ok)"></i></div><span class="wv dn">−4.6×10⁻⁷</span></div>
+  <div class="wrow"><span class="wlab">PCS 直流侧熔断(B 独有,结构差异 ◇)</span><div class="wbar"><i style="left:22%;width:8%;background:var(--ok)"></i></div><span class="wv dn">−1.9×10⁻⁷</span></div>
+  <div class="wrow"><span class="wlab">其余(交互项余项)</span><div class="wbar"><i style="left:30%;width:5%;background:var(--faint)"></i></div><span class="wv">+5.8×10⁻⁸</span></div>
+</div>
+<div class="foot">瀑布 = 重要度差分 + 逐项替换复算(one-at-a-time swap),交互余项显式列出不藏账;◇ 标记结构性差异。</div></div>
+
+<div class="card" style="grid-column:1 / -1"><div class="ch">不确定带并排(C4+ · p05 — p50 — p95)<span class="meta">MC 10 000 抽样 · SOKC 组内联动</span></div>
+<div class="band">
+  <div class="brow"><span>供应商A <span class="g gC">C</span></span><div class="bl"><i class="bline" style="--l:34%;--r:58%;background:var(--sA)"></i><i class="bmed" style="--m:46%;background:var(--sA)"></i></div><span class="num">4.2×10⁻⁷ / 1.6×10⁻⁶ / 6.7×10⁻⁶</span></div>
+  <div class="brow"><span>供应商B <span class="g gB">B</span></span><div class="bl"><i class="bline" style="--l:44%;--r:70%;background:var(--sB)"></i><i class="bmed" style="--m:56%;background:var(--sB)"></i></div><span class="num">1.1×10⁻⁶ / 3.9×10⁻⁶ / 1.5×10⁻⁵</span></div>
+  <div class="brow"><span>供应商C <span class="g gD">D</span></span><div class="bl"><i class="bline" style="--l:18%;--r:44%;background:var(--sC)"></i><i class="bmed" style="--m:38%;background:var(--sC)"></i></div><span class="num">7.4×10⁻⁸ / 7.1×10⁻⁷ / 6.8×10⁻⁶</span></div>
+  <div class="axis"><span></span><div style="display:flex;justify-content:space-between"><span>10⁻⁸</span><span>10⁻⁷</span><span>10⁻⁶</span><span>10⁻⁵</span><span>10⁻⁴</span></div><span></span></div>
+</div>
+<div class="verdict">C 的 p95 与 A 的 p95 同量级 —— "半固态更安全"在当前证据(全 D 级)下<b>不成立</b>;
+决策建议:A/B 按厂商实测补 B 级数据后复算,C 要求送样测试(贝叶斯更新通道 D→A)。</div></div>
+
+</main></body></html>
