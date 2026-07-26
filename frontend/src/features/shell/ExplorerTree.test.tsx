@@ -112,3 +112,40 @@ describe('ExplorerTree FE-13 — 键盘可达', () => {
     expect(setTab).toHaveBeenCalledWith('bess')
   })
 })
+
+describe('统一稳定序(报障 2026-07-25:点开存档随机换位)', () => {
+  it('打开项目与存档按名称交错排序,打开态原位标注而非置顶成组', () => {
+    const p2 = { ...persistence, saved: [
+      { id: 'a1', name: 'A 存档', saved_at: 't' },
+      { id: 'z9', name: 'Z 存档', saved_at: 't' },
+    ] } as any
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    act(() => root!.render(<ExplorerTree persistence={p2} tab={'home' as any} setTab={vi.fn()} />))
+    const prj = [...host.querySelectorAll('.it.prj')].map((e) => e.textContent?.replace(/\s+/g, ' ').trim())
+    const idx = (s: string) => prj.findIndex((t) => t!.includes(s))
+    // 不变量:呈现序 = 名称字典序(zh),与打开/存档身份无关 —— 期望序用同一比较器算,
+    // 不硬编码 locale 的拉丁/汉字先后(环境 ICU 差异)。
+    const names = ['A 存档', 'Z 存档', '项目 A', '项目 B']
+    const expected = names.slice().sort((x, y) => x.localeCompare(y, 'zh'))
+    const actual = names.slice().sort((x, y) => idx(x) - idx(y))
+    for (const n of names) expect(idx(n)).toBeGreaterThanOrEqual(0)
+    expect(actual).toEqual(expected)
+    // 打开的项目仍在同一列表(未被抽走):活动项目行带展开箭头 ▾
+    expect(prj.find((t) => t!.includes('项目 A'))!.startsWith('▾')).toBe(true)
+  })
+
+  it('打开的存档不再重复出现在存档段(去重逻辑保持)', () => {
+    const p2 = { ...persistence, saved: [
+      { id: 's1', name: '项目 A', saved_at: 't' },   // 与打开项目同 savedId
+      { id: 'a1', name: 'A 存档', saved_at: 't' },
+    ] } as any
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    act(() => root!.render(<ExplorerTree persistence={p2} tab={'home' as any} setTab={vi.fn()} />))
+    const hits = [...host.querySelectorAll('.it.prj')].filter((e) => e.textContent?.includes('项目 A'))
+    expect(hits).toHaveLength(1)
+  })
+})

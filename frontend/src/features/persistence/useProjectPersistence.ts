@@ -115,10 +115,16 @@ export function useProjectPersistence(onError: (msg: string) => void, onLibraryO
     if (savedId) {
       name = existing?.name || useProjectStore.getState().identity.displayName || 'ETA 项目'
     } else {
+      // 默认名优先取项目显示名;仅无名草稿才回落到活动 ETA 名(报障 2026-07-25:
+      // 默认名 = 事件树名「IE_TR」,一路回车就造出同名双胞胎项目)。
+      const dn = useProjectStore.getState().identity.displayName
       const at = etaTabs.find((t) => t.key === activeKey)
-      const dflt = (at ? etaDisplayName(at, etModel) : '') || etModel.initEvent || 'ETA 项目'
+      const dflt = (dn && dn !== '未命名项目' ? dn : '') || (at ? etaDisplayName(at, etModel) : '') || etModel.initEvent || 'ETA 项目'
       const prompted = window.prompt('项目存档名称', dflt)
       if (!prompted) return
+      // 同名存档知情确认(与另存为同款守卫;同名双胞胎让用户在两份档案间无感横跳)
+      if (saved.some((s2) => s2.name === prompted) &&
+          !window.confirm(`已存在同名存档「${prompted}」。继续将创建**第二份**同名档案(树中以 #id 区分)。确定继续?建议改用不同名称。`)) return
       name = prompted
     }
     savingRef.current.add(wid)

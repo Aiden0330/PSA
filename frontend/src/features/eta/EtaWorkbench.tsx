@@ -250,7 +250,8 @@ export function EtaWorkbench(
           <option value="">—</option>
           {persistence.saved.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        <button onClick={persistence.onDeleteSaved} disabled={!persistence.savedId} className="psa-btn psa-btn--danger"><Icon name="trash" size={14} />删除</button>
+        <button onClick={persistence.onDeleteSaved} disabled={!persistence.savedId} className="psa-btn psa-btn--danger"
+          title="删除整个项目存档(单删某个 ETA 用其页签上的 ✕)"><Icon name="trash" size={14} />删除项目</button>
         {persistence.archiveLocal && <span style={{ fontSize: 11.5, color: 'var(--psa-faint)' }} title="后端不可达,存档保存在此浏览器(localStorage)">离线存档</span>}
         <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--psa-faint)' }}>前端积式实时;引擎精确量化按需</span>
       </div>

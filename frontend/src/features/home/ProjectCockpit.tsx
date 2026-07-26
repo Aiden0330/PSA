@@ -71,6 +71,9 @@ export function ProjectCockpit(
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => setTab('bess')} className="psa-btn psa-btn--primary"><Icon name="bolt" size={14} />进入 ETA 画布</button>
           <button onClick={persistence.onSaveWorkspace} className="psa-btn psa-btn--dark"><Icon name="save" size={14} />保存项目</button>
+          <button onClick={persistence.onDeleteSaved} disabled={!persistence.savedId} className="psa-btn psa-btn--danger"
+            title={persistence.savedId ? '删除当前项目存档(有确认;版本库历史保留)' : '草稿尚未存档,无可删除的存档'}>
+            <Icon name="trash" size={14} />删除项目</button>
           <select value="" onChange={(e) => { if (e.target.value) { onOpenScenario(e.target.value); e.currentTarget.value = '' } }} style={sel} title="打开内置场景为新页签">
             <option value="">打开场景…</option>
             {scenarios.map((s) => <option key={s.id} value={'sc:' + s.id}>{s.name}</option>)}

@@ -74,6 +74,17 @@ export function ExplorerTree({ persistence, tab, setTab }: {
   // 自动重开又置顶,树观感乱跳。改为名称字典序(中文拼音感知)+ id 决胜,永远可预测。
   const archived = persistence.saved.filter((s) => !openSavedIds.has(s.id))
     .slice().sort((x, y) => x.name.localeCompare(y.name, 'zh') || x.id.localeCompare(y.id))
+  // 统一稳定序(报障 2026-07-25:点开存档会"随机换位")——此前打开项目置顶成组、
+  // 存档排后,点开/关闭即跨组迁移,观感乱跳。改为单一列表按名排序,打开态原位标注
+  // (▾/▸ + 存档徽章),条目位置不因打开/关闭而移动。同名去歧义跨两类统一判定。
+  type Row =
+    | { kind: 'open'; name: string; sortId: string; o: (typeof openSorted)[number] }
+    | { kind: 'arch'; name: string; sortId: string; a: (typeof archived)[number] }
+  const rows: Row[] = [
+    ...openSorted.map((o) => ({ kind: 'open' as const, name: o.identity.displayName || '未命名项目', sortId: o.identity.savedId || o.workspaceId, o })),
+    ...archived.map((a) => ({ kind: 'arch' as const, name: a.name, sortId: a.id, a })),
+  ].sort((x, y) => x.name.localeCompare(y.name, 'zh') || x.sortId.localeCompare(y.sortId))
+  const dupName = (name: string) => rows.filter((r) => r.name === name).length > 1
   const etaCount = etaTabs.length
   const ftCount = (userFtsModel?.fault_trees?.length ?? 0)
 
@@ -84,11 +95,20 @@ export function ExplorerTree({ persistence, tab, setTab }: {
     <nav className="exp-tree" role="tree" aria-label="项目与页面导航">
       <div className="grp" role="presentation">项目({openProjects.length + archived.length})</div>
 
-      {openSorted.map((o) => {
+      {rows.map((row) => {
+        if (row.kind === 'arch') {
+          const a = row.a
+          return (
+            <TreeItem key={a.id} className="it prj" onActivate={() => persistence.loadProject(a.id)} title={`打开该存档项目(id ${a.id})`}
+              style={{ opacity: persistence.loading ? 0.6 : 1 }}>
+              ▸ {a.name}{dupName(a.name) && <span style={{ color: 'var(--psa-faint)', fontFamily: 'var(--psa-font-mono)', fontSize: 10 }}> #{a.id.slice(0, 4)}</span>}<span className="st arch">存档</span>
+            </TreeItem>
+          )
+        }
+        const o = row.o
         const active = o.workspaceId === activeWid
-        const name = o.identity.displayName || '未命名项目'
-        const dupOpen = openSorted.filter((x) => (x.identity.displayName || '未命名项目') === name).length > 1
-        const tag = dupOpen ? <span style={{ color: 'var(--psa-faint)', fontFamily: 'var(--psa-font-mono)', fontSize: 10 }}> #{(o.identity.savedId || o.workspaceId).slice(0, 4)}</span> : null
+        const name = row.name
+        const tag = dupName(name) ? <span style={{ color: 'var(--psa-faint)', fontFamily: 'var(--psa-font-mono)', fontSize: 10 }}> #{(o.identity.savedId || o.workspaceId).slice(0, 4)}</span> : null
         if (!active) {
           return (
             <TreeItem key={o.workspaceId} className="it prj" onActivate={() => switchProject(o.workspaceId)} title="切换到该项目">
@@ -125,18 +145,6 @@ export function ExplorerTree({ persistence, tab, setTab }: {
               return <TreeItem key={p.tab} className={'it sub' + (tab === p.tab ? ' on' : '')} selected={tab === p.tab} onActivate={() => onPage(p.tab)}>{p.label}</TreeItem>
             })}
           </div>
-        )
-      })}
-
-      {archived.map((a) => {
-        // 同名存档去歧义(报障 2026-07-20:两份 test1 让用户在双胞胎间横跳丢改动)——
-        // 名字撞车时缀短 id,肉眼可辨"打开的是哪一份"
-        const dup = archived.filter((x) => x.name === a.name).length > 1
-        return (
-          <TreeItem key={a.id} className="it prj" onActivate={() => persistence.loadProject(a.id)} title={`打开该存档项目(id ${a.id})`}
-            style={{ opacity: persistence.loading ? 0.6 : 1 }}>
-            ▸ {a.name}{dup && <span style={{ color: 'var(--psa-faint)', fontFamily: 'var(--psa-font-mono)', fontSize: 10 }}> #{a.id.slice(0, 4)}</span>}<span className="st arch">存档</span>
-          </TreeItem>
         )
       })}
 
