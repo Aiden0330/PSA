@@ -659,6 +659,77 @@ def api_compare_assemble(members: str, base: int = 0, _=Depends(require_authenti
         raise HTTPException(e.status, e.detail)
 
 
+class CompareGroupIn(BaseModel):
+    name: str
+    members: list[dict]
+    base_index: int = 0
+
+
+class CompareGroupPatch(BaseModel):
+    name: str | None = None
+    members: list[dict] | None = None
+    base_index: int | None = None
+
+
+def _validate_group_members(members: list[dict]) -> None:
+    from backend import compare
+    if not 2 <= len(members) <= 4:
+        raise HTTPException(422, f"对比成员数须为 2–4,实得 {len(members)}")
+    for m in members:
+        if not isinstance(m.get("project_uuid"), str) or not isinstance(m.get("case_id"), int):
+            raise HTTPException(422, f"成员形状非法:{m}(需 project_uuid:str + case_id:int)")
+        try:
+            compare._load_case(m["project_uuid"], m["case_id"])
+        except compare.CompareError as e:
+            raise HTTPException(e.status, e.detail)
+
+
+@app.post("/api/compare/groups")
+def api_compare_group_create(body: CompareGroupIn, _=Depends(require_authenticated)):
+    from backend import store
+    _validate_group_members(body.members)
+    if not 0 <= body.base_index < len(body.members):
+        raise HTTPException(422, f"base_index={body.base_index} 越界")
+    return store.create_compare_group(body.name, body.members, body.base_index)
+
+
+@app.get("/api/compare/groups")
+def api_compare_group_list(_=Depends(require_authenticated)):
+    from backend import store
+    return store.list_compare_groups()
+
+
+@app.get("/api/compare/groups/{gid}")
+def api_compare_group_get(gid: int, _=Depends(require_authenticated)):
+    from backend import store
+    g = store.get_compare_group(gid)
+    if g is None:
+        raise HTTPException(404, f"no compare group {gid}")
+    return g
+
+
+@app.put("/api/compare/groups/{gid}")
+def api_compare_group_update(gid: int, body: CompareGroupPatch, _=Depends(require_authenticated)):
+    from backend import store
+    if body.members is not None:
+        _validate_group_members(body.members)
+    g = store.update_compare_group(gid, name=body.name, members=body.members,
+                                   base_index=body.base_index)
+    if g is None:
+        raise HTTPException(404, f"no compare group {gid}")
+    if not 0 <= g["base_index"] < len(g["members"]):
+        raise HTTPException(422, f"base_index={g['base_index']} 越界")
+    return g
+
+
+@app.delete("/api/compare/groups/{gid}")
+def api_compare_group_delete(gid: int, _=Depends(require_authenticated)):
+    from backend import store
+    if not store.delete_compare_group(gid):
+        raise HTTPException(404, f"no compare group {gid}")
+    return {"ok": True}
+
+
 @app.get("/api/portfolio")
 def api_portfolio(_=Depends(require_authenticated)):
     """R5 组合总览:每项目一行,数字取自已钉扎案例(证据链正确性)。只读聚合面,

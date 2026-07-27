@@ -55,6 +55,12 @@ CREATE TABLE IF NOT EXISTS analysis_cases(
   settings_json TEXT NOT NULL DEFAULT '{}', results_json TEXT NOT NULL DEFAULT '{}',
   artifacts_json TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL, actor TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS compare_groups(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  members_json TEXT NOT NULL,
+  base_index INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL, modified_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS ai_drafts(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   draft_id TEXT NOT NULL,
@@ -543,6 +549,70 @@ def list_audit(puuid: str, limit: int = 200) -> list[dict]:
         rows = cx.execute("SELECT * FROM audit_log WHERE project_uuid=?"
                           " ORDER BY id DESC LIMIT ?", (puuid, limit)).fetchall()
         return [dict(r) for r in rows]
+
+
+def _group_row(r: sqlite3.Row) -> dict:
+    d = dict(r)
+    d["members"] = json.loads(d.pop("members_json"))
+    return d
+
+
+def create_compare_group(name: str, members: list[dict], base_index: int = 0) -> dict:
+    """对比案例组(规格 2026-07-26 §3):保存**引用**(puuid+case_id)不复制数字。
+    成员存在性/kind 校验在 API 层(compare._load_case),此处只管形状与留痕。"""
+    with _conn() as cx:
+        now = _now()
+        cur = cx.execute(
+            "INSERT INTO compare_groups(name,members_json,base_index,created_at,created_by,modified_at)"
+            " VALUES(?,?,?,?,?,?)",
+            (name, json.dumps(members, ensure_ascii=False), base_index, now, actor(), now))
+        gid = cur.lastrowid
+        record_audit(cx, "compare.group.create",
+                     details={"group_id": gid, "name": name, "members": members})
+        r = cx.execute("SELECT * FROM compare_groups WHERE id=?", (gid,)).fetchone()
+        return _group_row(r)
+
+
+def list_compare_groups() -> list[dict]:
+    with _conn() as cx:
+        rows = cx.execute("SELECT * FROM compare_groups ORDER BY modified_at DESC").fetchall()
+        return [_group_row(r) for r in rows]
+
+
+def get_compare_group(gid: int) -> Optional[dict]:
+    with _conn() as cx:
+        r = cx.execute("SELECT * FROM compare_groups WHERE id=?", (gid,)).fetchone()
+        return _group_row(r) if r else None
+
+
+def update_compare_group(gid: int, *, name: str | None = None,
+                         members: list[dict] | None = None,
+                         base_index: int | None = None) -> Optional[dict]:
+    with _conn() as cx:
+        r = cx.execute("SELECT * FROM compare_groups WHERE id=?", (gid,)).fetchone()
+        if r is None:
+            return None
+        cur = _group_row(r)
+        new_name = name if name is not None else cur["name"]
+        new_members = members if members is not None else cur["members"]
+        new_base = base_index if base_index is not None else cur["base_index"]
+        cx.execute("UPDATE compare_groups SET name=?,members_json=?,base_index=?,modified_at=? WHERE id=?",
+                   (new_name, json.dumps(new_members, ensure_ascii=False), new_base, _now(), gid))
+        record_audit(cx, "compare.group.update",
+                     details={"group_id": gid, "name": new_name, "members": new_members,
+                              "base_index": new_base})
+        r2 = cx.execute("SELECT * FROM compare_groups WHERE id=?", (gid,)).fetchone()
+        return _group_row(r2)
+
+
+def delete_compare_group(gid: int) -> bool:
+    with _conn() as cx:
+        r = cx.execute("SELECT name FROM compare_groups WHERE id=?", (gid,)).fetchone()
+        if r is None:
+            return False
+        cx.execute("DELETE FROM compare_groups WHERE id=?", (gid,))
+        record_audit(cx, "compare.group.delete", details={"group_id": gid, "name": r["name"]})
+        return True
 
 
 def list_cases(puuid: str) -> list[dict]:
