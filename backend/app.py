@@ -730,6 +730,79 @@ def api_compare_group_delete(gid: int, _=Depends(require_authenticated)):
     return {"ok": True}
 
 
+class StationIn(BaseModel):
+    name: str
+    products: list[dict]
+    rows: list[dict]
+    edge_defaults: dict = {}
+    edge_overrides: list[dict] = []
+    station_barriers: list[dict] = []
+    ccf_groups: list[dict] = []
+    offsite: dict = {}
+
+
+def _station_doc(body: StationIn) -> dict:
+    from backend import compare, station
+    doc = body.model_dump()
+    try:
+        station.validate_station(doc)
+    except compare.CompareError as e:
+        raise HTTPException(e.status, e.detail)
+    return doc
+
+
+@app.post("/api/station")
+def api_station_create(body: StationIn, _=Depends(require_authenticated)):
+    from backend import store
+    return store.create_station(body.name, _station_doc(body))
+
+
+@app.get("/api/station")
+def api_station_list(_=Depends(require_authenticated)):
+    from backend import store
+    return store.list_stations()
+
+
+@app.get("/api/station/{sid}")
+def api_station_get(sid: int, _=Depends(require_authenticated)):
+    from backend import store
+    s = store.get_station(sid)
+    if s is None:
+        raise HTTPException(404, f"no station {sid}")
+    return s
+
+
+@app.put("/api/station/{sid}")
+def api_station_update(sid: int, body: StationIn, _=Depends(require_authenticated)):
+    from backend import store
+    s = store.update_station(sid, body.name, _station_doc(body))
+    if s is None:
+        raise HTTPException(404, f"no station {sid}")
+    return s
+
+
+@app.delete("/api/station/{sid}")
+def api_station_delete(sid: int, _=Depends(require_authenticated)):
+    from backend import store
+    if not store.delete_station(sid):
+        raise HTTPException(404, f"no station {sid}")
+    return {"ok": True}
+
+
+@app.get("/api/station/{sid}/quantify")
+def api_station_quantify(sid: int, _=Depends(require_authenticated)):
+    """站级量化(规格 2026-07-27 §2):舱级频率直读产品钉扎案例;站层组合公式见
+    backend/station.py(连续区间蔓延模型,简化清单随响应申报)。"""
+    from backend import compare, station, store
+    s = store.get_station(sid)
+    if s is None:
+        raise HTTPException(404, f"no station {sid}")
+    try:
+        return station.quantify(s)
+    except compare.CompareError as e:
+        raise HTTPException(e.status, e.detail)
+
+
 @app.get("/api/portfolio")
 def api_portfolio(_=Depends(require_authenticated)):
     """R5 组合总览:每项目一行,数字取自已钉扎案例(证据链正确性)。只读聚合面,

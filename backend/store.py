@@ -55,6 +55,11 @@ CREATE TABLE IF NOT EXISTS analysis_cases(
   settings_json TEXT NOT NULL DEFAULT '{}', results_json TEXT NOT NULL DEFAULT '{}',
   artifacts_json TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL, actor TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS station_models(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  doc_json TEXT NOT NULL,
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL, modified_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS compare_groups(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -612,6 +617,57 @@ def delete_compare_group(gid: int) -> bool:
             return False
         cx.execute("DELETE FROM compare_groups WHERE id=?", (gid,))
         record_audit(cx, "compare.group.delete", details={"group_id": gid, "name": r["name"]})
+        return True
+
+
+def _station_row(r: sqlite3.Row) -> dict:
+    d = dict(r)
+    doc = json.loads(d.pop("doc_json"))
+    doc.update({k: d[k] for k in ("id", "name", "created_at", "created_by", "modified_at")})
+    return doc
+
+
+def create_station(name: str, doc: dict) -> dict:
+    with _conn() as cx:
+        now = _now()
+        cur = cx.execute(
+            "INSERT INTO station_models(name,doc_json,created_at,created_by,modified_at) VALUES(?,?,?,?,?)",
+            (name, json.dumps(doc, ensure_ascii=False), now, actor(), now))
+        sid = cur.lastrowid
+        record_audit(cx, "station.create", details={"station_id": sid, "name": name})
+        return _station_row(cx.execute("SELECT * FROM station_models WHERE id=?", (sid,)).fetchone())
+
+
+def list_stations() -> list[dict]:
+    with _conn() as cx:
+        return [{"id": r["id"], "name": r["name"], "modified_at": r["modified_at"],
+                 "created_by": r["created_by"]}
+                for r in cx.execute("SELECT * FROM station_models ORDER BY modified_at DESC")]
+
+
+def get_station(sid: int) -> Optional[dict]:
+    with _conn() as cx:
+        r = cx.execute("SELECT * FROM station_models WHERE id=?", (sid,)).fetchone()
+        return _station_row(r) if r else None
+
+
+def update_station(sid: int, name: str, doc: dict) -> Optional[dict]:
+    with _conn() as cx:
+        if cx.execute("SELECT 1 FROM station_models WHERE id=?", (sid,)).fetchone() is None:
+            return None
+        cx.execute("UPDATE station_models SET name=?,doc_json=?,modified_at=? WHERE id=?",
+                   (name, json.dumps(doc, ensure_ascii=False), _now(), sid))
+        record_audit(cx, "station.update", details={"station_id": sid, "name": name})
+        return _station_row(cx.execute("SELECT * FROM station_models WHERE id=?", (sid,)).fetchone())
+
+
+def delete_station(sid: int) -> bool:
+    with _conn() as cx:
+        r = cx.execute("SELECT name FROM station_models WHERE id=?", (sid,)).fetchone()
+        if r is None:
+            return False
+        cx.execute("DELETE FROM station_models WHERE id=?", (sid,))
+        record_audit(cx, "station.delete", details={"station_id": sid, "name": r["name"]})
         return True
 
 
