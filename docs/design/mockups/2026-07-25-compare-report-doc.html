@@ -1,0 +1,84 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>方向G · 比选报告文档式</title><style>
+:root{--bg:#e8edf3;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--dng:#dc2626}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12.5px/1.7 -apple-system,'PingFang SC',serif}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px;font-family:-apple-system,'PingFang SC',sans-serif}
+header h1{font-size:14px}header .hint{color:var(--faint);font-size:11px;margin-left:auto}
+.g{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff}
+.gB{background:var(--gB)}.gC{background:var(--gC)}.gD{background:var(--gD)}
+.toolbar{display:flex;gap:8px;padding:7px 14px;background:#fff;border-bottom:1px solid var(--line);font-family:-apple-system,sans-serif}
+.btn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 10px;font-size:12px;color:var(--ink2);cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.page{max-width:820px;margin:18px auto;background:#fff;box-shadow:0 2px 14px rgba(15,23,42,.12);padding:52px 64px;border-radius:3px}
+h2{font-size:17px;margin-bottom:4px}
+.sub{font-size:11px;color:var(--muted);font-family:-apple-system,sans-serif;margin-bottom:22px}
+h3{font-size:14px;margin:20px 0 8px}
+p{margin-bottom:10px;color:var(--ink2)}
+sup{font-family:var(--mono);font-size:9px;color:var(--acc)}
+table{border-collapse:collapse;width:100%;margin:10px 0 14px;font-family:-apple-system,sans-serif;font-size:11.5px}
+th{border:1px solid #cbd5e1;background:var(--soft);padding:5px 8px;text-align:left;font-size:11px}
+td{border:1px solid #e2e8f0;padding:5px 8px}
+.cap{font-size:10.5px;color:var(--muted);text-align:center;margin:-8px 0 14px;font-family:-apple-system,sans-serif}
+.concl{border-left:3px solid var(--acc);background:var(--soft);padding:10px 14px;margin:14px 0}
+.sig{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:26px;font-family:-apple-system,sans-serif;font-size:11.5px}
+.sigbox{border-top:1px solid var(--ink2);padding-top:6px;color:var(--ink2)}
+.sigbox .who{color:var(--faint);font-size:10.5px}
+.footer{margin-top:30px;padding-top:10px;border-top:1px solid var(--line);font-size:10px;color:var(--faint);font-family:var(--mono);line-height:1.5}
+.up{color:var(--dng);font-weight:600}
+.prov{position:fixed;right:18px;top:120px;width:230px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;font-family:-apple-system,sans-serif;font-size:11px;box-shadow:0 2px 10px rgba(15,23,42,.1)}
+.prov h4{font-size:11.5px;margin-bottom:6px}
+.prov .r{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #f1f5f9;color:var(--ink2)}
+@media(max-width:1200px){.prov{display:none}}
+</style></head><body>
+<header><h1>系统对比 · 比选报告文档式</h1><span class="g" style="background:#475569">方向 G</span>
+<span class="hint">赌注:交付物就是文档——对比页直接以"报告第 5 章"形态呈现,所见即所签</span></header>
+<div class="toolbar"><button class="btn pri">导出 Word(进证据链台账)</button><button class="btn">钉扎本章数据版本</button><button class="btn">送审</button>
+<span style="margin-left:auto;font-size:11px;color:var(--faint)">正文每个数字带溯源角标,点击展开(右侧浮窗)</span></div>
+
+<div class="page">
+<h2>第 5 章 储能系统供应商比选 —— 热失控风险维度</h2>
+<div class="sub">项目:某 200 MWh 独立储能站 · 分析基准:事件树 v2.3(内容哈希 <span class="num">f488b89f</span>)· 生成 2026-07-25 · <b>工作稿(未签发)</b></div>
+
+<h3>5.1 比选口径</h3>
+<p>三家候选系统在<b>同一事件树结构</b>下比对,仅替换供应商参数集<sup>[口径1]</sup>。供应商B 的 PCS 直流侧熔断为结构性差异,单独列示于 5.4,不参与共享结构对比。截断 1×10⁻¹²,MC 10 000 抽样,认知同源联动(SOKC)开启。</p>
+
+<h3>5.2 结果汇总</h3>
+<table><thead><tr><th>指标(/舱·年)</th><th>供应商A · LFP 280Ah <span class="g gC">C</span></th><th>供应商B · LFP 314Ah <span class="g gB">B</span></th><th>供应商C · 半固态 <span class="g gD">D</span></th></tr></thead>
+<tbody>
+<tr><td>C3+(舱内起火)</td><td class="num">2.08×10⁻⁵<sup>[1]</sup></td><td class="num">3.66×10⁻⁵<sup>[2]</sup> <span class="up">+76%</span></td><td class="num">9.80×10⁻⁶<sup>[3]</sup></td></tr>
+<tr><td>C4+(爆燃及以上)</td><td class="num">1.64×10⁻⁶</td><td class="num">3.90×10⁻⁶ <span class="up">+138%</span></td><td class="num">7.10×10⁻⁷</td></tr>
+<tr><td>C4+ 不确定带 p05–p95</td><td class="num">4.2×10⁻⁷ – 6.7×10⁻⁶</td><td class="num">1.1×10⁻⁶ – 1.5×10⁻⁵</td><td class="num">7.4×10⁻⁸ – 6.8×10⁻⁶</td></tr>
+<tr><td>参数置信构成</td><td>C×6 · D×8</td><td>B×9 · C×2 · D×3</td><td>D×14</td></tr>
+</tbody></table>
+<div class="cap">表 5-1 三家系统风险指标(数值均含溯源角标;导出 Word 后角标转文末引注)</div>
+
+<h3>5.3 差异归因</h3>
+<p>供应商B 相对 A 的 C4+ 增量 +2.26×10⁻⁶ 分解为:大电芯内短基率 <b>+1.31×10⁻⁶</b><sup>[4]</sup>、
+电芯间热障退化 <b>+1.02×10⁻⁶</b><sup>[5]</sup>、BMS 双通道冗余 <b>−4.6×10⁻⁷</b><sup>[6]</sup>(厂商实测,B 级)、
+结构性熔断 <b>−1.9×10⁻⁷</b>、交互余项 +5.8×10⁻⁸。</p>
+<div class="concl"><b>5.3 结论</b>:B 家的控制系统优势(实测级证据)不足以补偿 314Ah 大电芯带来的物理性退化;
+若选 B,应要求热障方案升级并以 UL 9540A 单元级复测作为合同条件。C 家数值最低但全部参数为推断级(D),
+p95 与 A 同量级 —— <b>"更安全"的结论在当前证据下不成立</b>,建议送样测试后经贝叶斯更新(D→A)复评。</div>
+
+<h3>5.4 结构性差异与敏感性(节选)</h3>
+<p>B 家 PCS 直流侧熔断支路使外短路类序列频率下降 38%<sup>[7]</sup>;对整站选型的影响在站级评估(第 6 章)中体现——
+同厂 BMS 固件的跨舱共因是多舱后果的首要驱动。</p>
+
+<div class="sig">
+<div class="sigbox">分析:______<div class="who">编制 · 日期</div></div>
+<div class="sigbox">评审:______<div class="who">校核 · 日期</div></div>
+<div class="sigbox">批准:______<div class="who">签发 · 日期</div></div>
+</div>
+<div class="footer">数据免责声明:内置数值为公开来源参考量级,仅用于演示与初步筛查;正式分析须项目数据校核并由具备资质的工程师审核。<br>
+本章由分析案例组 CMP-2026-003 生成:A=case 3f95(v2.3/f488b89f) · B=case 7c12(v1.8/a3c17d02) · C=case 9e04(送样 v0.9/draft)· 生成器 bess-psa 0.4.0</div>
+</div>
+
+<div class="prov"><h4>溯源 · 角标 [2]</h4>
+<div class="r"><span>数值</span><b class="num">3.66×10⁻⁵</b></div>
+<div class="r"><span>来源</span><span>分析案例 7c12</span></div>
+<div class="r"><span>模型版本</span><span class="num">a3c17d02</span></div>
+<div class="r"><span>参数集</span><span>供应商B 实测包 <span class="g gB">B</span></span></div>
+<div class="r"><span>关键假设</span><span>热障 PFD 0.55(D,推断)</span></div>
+<div style="margin-top:6px;color:var(--faint);font-size:10px">点击正文任意角标切换本窗;导出 Word 时转为文末引注 + 附录参数表。</div></div>
+</body></html>

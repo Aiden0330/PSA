@@ -1,0 +1,71 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>方向E · 单树双值(画布上对比)</title><style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--c2:#65a30d;--c3:#d97706;--c4:#ea580c;--c5:#dc2626;
+--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--dng:#dc2626;--ok:#16a34a;--sA:#0f766e;--sB:#2563eb}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:14px}header .hint{color:var(--faint);font-size:11px;margin-left:auto}
+.g{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff}
+.gB{background:var(--gB)}.gC{background:var(--gC)}.gD{background:var(--gD)}
+.bar{display:flex;gap:14px;align-items:center;padding:7px 14px;background:#fff;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--ink2)}
+.sw{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px}
+main{padding:14px;max-width:1150px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ch{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;font-size:12.5px}
+.ch .meta{margin-left:auto;font-weight:400;color:var(--faint);font-size:11px}
+.tree{overflow-x:auto;padding:14px}
+table.et{border-collapse:collapse;min-width:1050px}
+.et th{font-size:11px;color:var(--muted);padding:6px 8px;border-bottom:2px solid var(--line);text-align:center;vertical-align:bottom}
+.et th .pfds{display:flex;gap:4px;justify-content:center;margin-top:3px}
+.pfd{font-family:var(--mono);font-size:9.5px;padding:1px 5px;border-radius:4px;color:#fff}
+.pA{background:var(--sA)}.pB{background:var(--sB)}
+.pfd.hot{outline:2px solid var(--dng);outline-offset:1px}
+.et td{padding:0;height:34px;position:relative;min-width:118px}
+.et td.lab{min-width:46px;font-family:var(--mono);font-size:10.5px;color:var(--faint);text-align:center}
+.h{position:absolute;left:0;right:0;top:50%;height:2px;background:#cbd5e1}
+.d{position:absolute;left:50%;top:50%;bottom:-17px;width:2px;background:#cbd5e1}
+.okg,.nog{position:absolute;left:50%;top:50%;transform:translate(-50%,-58%);font-size:10px;background:#fff;padding:0 3px;font-family:var(--mono)}
+.okg{color:var(--ok)}.nog{color:var(--dng)}
+.freq{white-space:nowrap;font-family:var(--mono);font-size:10.5px;padding-left:8px}
+.freq .a{color:var(--sA)}.freq .b{color:var(--sB)}
+.dchip{display:inline-block;font-size:9.5px;font-weight:700;border-radius:4px;padding:0 4px;margin-left:5px}
+.up{background:#fee2e2;color:#991b1b}.dnn{background:#dcfce7;color:#166534}.z{background:var(--soft);color:var(--faint)}
+.cons{font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;color:#fff;margin-left:6px}
+.C2{background:var(--c2)}.C3{background:var(--c3)}.C4{background:var(--c4)}.C5{background:var(--c5)}
+tr.seq:hover td{background:#fafcff}
+.foot{padding:8px 12px;color:var(--faint);font-size:10.5px;border-top:1px solid var(--line)}
+</style></head><body>
+<header><h1>系统对比 · 单树双值——在事件树画布上直接比</h1><span class="g" style="background:#b45309">方向 E</span>
+<span class="hint">赌注:PSA 工程师用树思考——同一棵树,每个分支双色双值,分歧发生在哪一跳一眼可见</span></header>
+<div class="bar"><span><span class="sw" style="background:var(--sA)"></span>供应商A · LFP 280Ah <span class="g gC">C</span></span>
+<span><span class="sw" style="background:var(--sB)"></span>供应商B · LFP 314Ah <span class="g gB">B</span></span>
+<span style="color:var(--faint)">红框 = 该屏障 PFD 两家差 ≥1.5×(Δ 热点);列头即屏障检视器入口</span></div>
+<main><div class="card">
+<div class="ch">电芯内短 → 热失控(共享结构 v2.3;结构性差异 ◇ 单列)<span class="meta">初因:A 8.32×10⁻⁴ / B 1.05×10⁻³ /舱·年</span></div>
+<div class="tree"><table class="et">
+<thead><tr>
+<th>初因<br>电芯内短</th>
+<th>早期离气探测+联动<br><div class="pfds"><span class="pfd pA">0.05</span><span class="pfd pB">0.05</span></div></th>
+<th>BMS 三级切断<br><div class="pfds"><span class="pfd pA hot">0.10</span><span class="pfd pB hot">0.036</span></div></th>
+<th>电芯间热障(气凝胶)<br><div class="pfds"><span class="pfd pA hot">0.30</span><span class="pfd pB hot">0.55</span></div></th>
+<th>舱级灭火(全氟己酮)<br><div class="pfds"><span class="pfd pA">0.15</span><span class="pfd pB">0.15</span></div></th>
+<th>泄爆 NFPA 68<br><div class="pfds"><span class="pfd pA">0.10</span><span class="pfd pB">0.10</span></div></th>
+<th style="text-align:left;padding-left:8px">序列频率(A / B)</th>
+</tr></thead>
+<tbody>
+<tr class="seq"><td class="lab">S-11</td><td><span class="h"></span><span class="d"></span></td><td><span class="h" style="right:50%"></span><span class="okg">✓</span></td><td></td><td></td><td></td>
+<td class="freq"><span class="a">7.5×10⁻⁴</span> / <span class="b">9.7×10⁻⁴</span><span class="dchip up">+29%</span><span class="cons C2">C2</span></td></tr>
+<tr class="seq"><td class="lab">S-09</td><td><span class="d"></span></td><td><span class="h"></span><span class="d"></span><span class="nog">✗</span></td><td><span class="h" style="right:50%"></span><span class="okg">✓</span></td><td></td><td></td>
+<td class="freq"><span class="a">5.8×10⁻⁵</span> / <span class="b">3.4×10⁻⁵</span><span class="dchip dnn">−41%</span><span class="cons C3">C3</span></td></tr>
+<tr class="seq"><td class="lab">S-07</td><td></td><td><span class="d"></span></td><td><span class="h"></span><span class="d"></span><span class="nog">✗</span></td><td><span class="h" style="right:50%"></span><span class="okg">✓</span></td><td></td>
+<td class="freq"><span class="a">1.2×10⁻⁵</span> / <span class="b">1.4×10⁻⁵</span><span class="dchip up">+17%</span><span class="cons C3">C3</span></td></tr>
+<tr class="seq"><td class="lab">S-13</td><td></td><td></td><td><span class="d"></span></td><td><span class="h"></span><span class="d"></span><span class="nog">✗</span></td><td><span class="h" style="right:50%"></span><span class="okg">✓</span></td>
+<td class="freq"><span class="a">6.4×10⁻⁷</span> / <span class="b">1.3×10⁻⁶</span><span class="dchip up">+103%</span><span class="cons C4">C4</span></td></tr>
+<tr class="seq"><td class="lab">S-15</td><td></td><td></td><td></td><td><span class="d"></span></td><td><span class="h"></span><span class="nog">✗</span></td>
+<td class="freq"><span class="a">7.1×10⁻⁸</span> / <span class="b">1.5×10⁻⁷</span><span class="dchip up">+111%</span><span class="cons C5">C5</span></td></tr>
+</tbody></table></div>
+<div class="foot">画布语义与 ETA 编辑器一致(上=成功/右转=失效);列头 PFD 芯片点开即双方参数溯源(快照 grade/note/url)。
+◇ 结构差异(B 家 PCS 直流熔断支路)在其位置以虚线支线显示,不参与共享列——"结构不同硬比"被版面本身禁止。
+交互设想:点任一序列行 → 右侧滑出该序列的双方割集与不确定带;树画布复用 EtCanvas 缩放/直角走线。</div>
+</div></main></body></html>

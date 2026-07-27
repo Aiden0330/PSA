@@ -1,0 +1,79 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>方向F · 纵深防御屏障墙</title><style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--c4:#ea580c;--c5:#dc2626;
+--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--dng:#dc2626;--ok:#16a34a;--sA:#0f766e;--sB:#2563eb;--sC:#9333ea}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:14px}header .hint{color:var(--faint);font-size:11px;margin-left:auto}
+.g{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff}
+.gB{background:var(--gB)}.gC{background:var(--gC)}.gD{background:var(--gD)}
+main{padding:14px;max-width:1150px;margin:0 auto;display:grid;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ch{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;font-size:12.5px}
+.ch .meta{margin-left:auto;font-weight:400;color:var(--faint);font-size:11px}
+.lanes{padding:16px;overflow-x:auto}
+.cats{display:grid;grid-template-columns:150px repeat(5,1fr) 150px;gap:8px;font-size:10.5px;color:var(--faint);text-align:center;margin-bottom:6px;min-width:1000px}
+.lane{display:grid;grid-template-columns:150px repeat(5,1fr) 150px;gap:8px;align-items:stretch;margin-bottom:14px;min-width:1000px}
+.src{border-radius:8px;color:#fff;padding:7px 9px;font-size:11px;display:flex;flex-direction:column;justify-content:center}
+.src .f{font-family:var(--mono);font-size:12px;font-weight:700}
+.wall{border-radius:6px;position:relative;background:#fee2e2;overflow:hidden;min-height:56px;cursor:pointer}
+.wall>i{position:absolute;left:0;top:0;bottom:0;width:var(--eff);background:var(--wc,#0f766e);opacity:.88}
+.wall .t{position:absolute;inset:0;padding:5px 7px;color:#fff;font-size:10px;display:flex;flex-direction:column;justify-content:space-between;z-index:1}
+.wall .t .pf{font-family:var(--mono);font-weight:700}
+.wall.leak::after{content:'';position:absolute;right:0;top:0;bottom:0;width:calc(100% - var(--eff));background:repeating-linear-gradient(45deg,#fecaca 0 6px,#fee2e2 6px 12px)}
+.wall.hot{outline:2.5px solid var(--dng);outline-offset:2px}
+.res{border:2px dashed var(--line);border-radius:8px;display:flex;flex-direction:column;justify-content:center;padding:7px 9px;font-size:11px;color:var(--ink2)}
+.res .f{font-family:var(--mono);font-size:12.5px;font-weight:700}
+.legend{display:flex;gap:16px;padding:0 16px 12px;font-size:10.5px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.cmp{padding:12px 16px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--ink2);line-height:1.6}
+.cmp b{color:var(--ink)}
+.foot{padding:8px 12px;color:var(--faint);font-size:10.5px;border-top:1px solid var(--line)}
+</style></head><body>
+<header><h1>系统对比 · 纵深防御屏障墙</h1><span class="g" style="background:#16a34a">方向 F</span>
+<span class="hint">赌注:业主/监管按"纵深防御层"思考——同类屏障纵向对齐,谁的墙薄一眼看穿</span></header>
+<main><div class="card">
+<div class="ch">电芯内短 → 逐层拦截(墙实心宽度 = 拦截率 1−PFD;斜纹 = 漏过)<span class="meta">点任一列跨供应商联动高亮</span></div>
+<div class="lanes">
+<div class="cats"><span></span><span>预警 · warning</span><span>主动 · active</span><span>被动 · passive(电芯级)</span><span>主动 · 舱级灭火</span><span>被动 · 泄爆</span><span>残余(C4+)</span></div>
+
+<div class="lane">
+  <div class="src" style="background:var(--sA)">供应商A · 280Ah <span class="g gC" style="margin-top:2px;width:max-content">C</span><span class="f">8.32×10⁻⁴</span></div>
+  <div class="wall" style="--eff:95%;--wc:var(--sA)"><div class="t"><span>早期离气探测+联动</span><span class="pf">PFD 0.05 · D</span></div></div>
+  <div class="wall leak" style="--eff:90%;--wc:var(--sA)"><div class="t"><span>BMS 三级切断</span><span class="pf">PFD 0.10 · C</span></div></div>
+  <div class="wall leak hot" style="--eff:70%;--wc:var(--sA)"><div class="t"><span>电芯间热障(气凝胶)</span><span class="pf">PFD 0.30 · D</span></div></div>
+  <div class="wall leak" style="--eff:85%;--wc:var(--sA)"><div class="t"><span>全氟己酮灭火</span><span class="pf">PFD 0.15 · D</span></div></div>
+  <div class="wall leak" style="--eff:90%;--wc:var(--sA)"><div class="t"><span>泄爆面 NFPA 68</span><span class="pf">PFD 0.10 · C</span></div></div>
+  <div class="res">残余 C4+<span class="f">1.64×10⁻⁶</span><span style="font-size:10px;color:var(--faint)">/舱·年</span></div>
+</div>
+
+<div class="lane">
+  <div class="src" style="background:var(--sB)">供应商B · 314Ah <span class="g gB" style="margin-top:2px;width:max-content">B</span><span class="f">1.05×10⁻³</span></div>
+  <div class="wall" style="--eff:95%;--wc:var(--sB)"><div class="t"><span>早期离气探测+联动</span><span class="pf">PFD 0.05 · D</span></div></div>
+  <div class="wall" style="--eff:96.4%;--wc:var(--sB)"><div class="t"><span>BMS 切断(双通道冗余)</span><span class="pf">PFD 0.036 · B ▲</span></div></div>
+  <div class="wall leak hot" style="--eff:45%;--wc:var(--sB)"><div class="t"><span>电芯间热障(大电芯退化)</span><span class="pf">PFD 0.55 · D ▼</span></div></div>
+  <div class="wall leak" style="--eff:85%;--wc:var(--sB)"><div class="t"><span>全氟己酮灭火</span><span class="pf">PFD 0.15 · D</span></div></div>
+  <div class="wall leak" style="--eff:90%;--wc:var(--sB)"><div class="t"><span>泄爆面 NFPA 68</span><span class="pf">PFD 0.10 · C</span></div></div>
+  <div class="res">残余 C4+<span class="f">3.90×10⁻⁶</span><span style="font-size:10px;color:var(--dng)">+138% vs A</span></div>
+</div>
+
+<div class="lane">
+  <div class="src" style="background:var(--sC)">供应商C · 半固态 <span class="g gD" style="margin-top:2px;width:max-content">D</span><span class="f">4.20×10⁻⁴</span></div>
+  <div class="wall" style="--eff:95%;--wc:var(--sC)"><div class="t"><span>早期离气探测+联动</span><span class="pf">PFD 0.05 · D</span></div></div>
+  <div class="wall leak" style="--eff:90%;--wc:var(--sC)"><div class="t"><span>BMS 三级切断</span><span class="pf">PFD 0.10 · D</span></div></div>
+  <div class="wall leak" style="--eff:82%;--wc:var(--sC)"><div class="t"><span>热障(送样推断)</span><span class="pf">PFD 0.18 · D ?</span></div></div>
+  <div class="wall leak" style="--eff:85%;--wc:var(--sC)"><div class="t"><span>全氟己酮灭火</span><span class="pf">PFD 0.15 · D</span></div></div>
+  <div class="wall leak" style="--eff:90%;--wc:var(--sC)"><div class="t"><span>泄爆面 NFPA 68</span><span class="pf">PFD 0.10 · C</span></div></div>
+  <div class="res">残余 C4+<span class="f">7.1×10⁻⁷</span><span style="font-size:10px;color:var(--faint)">p95/p50 9.6×(全 D)</span></div>
+</div>
+</div>
+<div class="legend"><span><i style="background:#0f766e"></i>实心 = 拦截率(1−PFD)</span><span><i style="background:repeating-linear-gradient(45deg,#fecaca 0 4px,#fee2e2 4px 8px)"></i>斜纹 = 漏过份额</span><span>红框 = 全场最薄层(Δ 热点)</span><span>▲/▼ = 相对 A 强/弱</span><span>? = 无实测支撑</span></div>
+<div class="cmp"><b>版面即结论</b>:三家的"最薄一堵墙"都在<b>电芯间热障</b>列(红框对齐)——选谁都该把加固预算砸向热障而非再堆预警;
+B 家 BMS 冗余墙确实更厚(▲),但热障塌陷(0.55)把优势吃光。列对齐让"同类屏障跨家比"不需要任何表格。</div>
+<div class="foot">墙块 = 参考库屏障快照(点开看 grade/note/url);串联口径守卫在此可视化——就绪性⊕条件有效性的组合墙以双层描边显示,防双计。交互设想:点列头 → 三家该层参数并排 + 敏感性("此墙加厚 10× 残余各降多少")。</div>
+</div></main>
+<script>document.querySelectorAll('.wall').forEach(w=>w.onclick=()=>{
+  const col=[...w.parentElement.children].indexOf(w)
+  document.querySelectorAll('.lane').forEach(l=>{[...l.children].forEach((c,i)=>c.style.boxShadow=i===col?'0 0 0 3px #f59e0b':''); })})</script>
+</body></html>
