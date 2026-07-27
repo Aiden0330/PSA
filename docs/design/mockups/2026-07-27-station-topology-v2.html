@@ -1,0 +1,163 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>方向C′ · 站级拓扑画布(增补站级屏障+产品参数)</title><style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--dng:#dc2626;--ok:#16a34a;--sA:#0f766e;--sB:#2563eb}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:14px}header .hint{color:var(--faint);font-size:11px;margin-left:auto}
+.g{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff}
+.gB{background:var(--gB)}.gC{background:var(--gC)}.gD{background:var(--gD)}
+.kpis{display:flex;gap:10px;padding:8px 14px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:5px 11px}
+.kpi .l{font-size:10px;color:var(--faint)}.kpi .v{font-family:var(--mono);font-size:14px;font-weight:700}
+.kpi.red .v{color:var(--dng)}
+main{flex:1;display:flex;min-height:0}
+.canvas{flex:1;position:relative;overflow:auto;padding:20px 22px 8px}
+.fence{border:2.5px dashed #94a3b8;border-radius:12px;padding:16px;position:relative;width:max-content}
+.fence>.flab{position:absolute;top:-9px;left:18px;background:var(--bg);padding:0 6px;font-size:10px;color:var(--muted)}
+.zone{border:1.5px dashed #f59e0b;border-radius:9px;padding:10px;position:relative;margin-bottom:14px}
+.zone>.zlab{position:absolute;top:-8px;left:10px;background:var(--bg);padding:0 6px;font-size:9.5px;color:#b45309;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(5,106px);grid-auto-rows:56px;gap:14px 22px;position:relative;width:max-content}
+.cab{border-radius:8px;color:#fff;padding:4px 7px;font-size:10px;cursor:pointer;position:relative;box-shadow:0 1px 3px rgba(15,23,42,.18)}
+.cab .id{font-family:var(--mono);font-weight:700;font-size:10.5px}
+.cab .f{font-family:var(--mono);font-size:9px;opacity:.85}
+.cab .fw{position:absolute;right:5px;top:4px;font-size:8px;background:rgba(255,255,255,.25);border-radius:3px;padding:0 3px;font-family:var(--mono)}
+.cab.sA{background:var(--sA)}.cab.sB{background:var(--sB)}
+.cab.sel{outline:3px solid #f59e0b;outline-offset:2px}
+.cab.ccfhl{outline:3px solid #9333ea;outline-offset:2px}
+.wall{position:absolute;background:#dc2626;border-radius:2px;width:4px;cursor:pointer}
+.wall .t{position:absolute;left:50%;top:-16px;transform:translateX(-50%);background:#fff;border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:8.5px;color:var(--ink2);white-space:nowrap;font-family:var(--mono)}
+.aisle{text-align:center;font-size:9px;color:var(--faint);font-family:var(--mono);margin:2px 0 12px}
+.fac{display:flex;gap:12px;margin-top:4px}
+.fnode{border:1.5px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;font-size:10.5px;color:var(--ink2);cursor:pointer;display:flex;flex-direction:column;gap:1px}
+.fnode b{font-size:11px}.fnode .m{font-family:var(--mono);font-size:9px;color:var(--faint)}
+.fnode.spf{border-color:#dc2626}.fnode.spf b::after{content:' ⚠单点';color:#dc2626;font-size:9px}
+.fnode.sel{outline:3px solid #f59e0b;outline-offset:2px}
+.chainbar{background:#fff;border-top:1px solid var(--line);padding:7px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chainbar .t{font-size:10.5px;font-weight:700;color:var(--faint);letter-spacing:.4px;margin-right:2px}
+.chip{border:1px solid var(--line);background:var(--soft);border-radius:7px;padding:3px 9px;font-size:10.5px;color:var(--ink2);cursor:pointer;display:inline-flex;gap:5px;align-items:center}
+.chip .pf{font-family:var(--mono);font-weight:700}
+.chip .sc{font-size:9px;color:#fff;background:#64748b;border-radius:4px;padding:0 4px}
+.chip:hover,.chip.sel{outline:2px solid #f59e0b}
+.side{width:344px;background:#fff;border-left:1px solid var(--line);overflow:auto;padding:12px;flex-shrink:0}
+.side h3{font-size:12.5px;margin-bottom:6px}
+.row{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dashed #f1f5f9;font-size:11.5px;color:var(--ink2)}
+.row b{font-family:var(--mono);text-align:right}
+.sec{margin-top:11px;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:var(--faint)}
+.btn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 10px;font-size:11.5px;color:var(--ink2);cursor:pointer;margin-top:8px;margin-right:6px}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.note{font-size:10.5px;color:var(--faint);margin-top:8px;line-height:1.55}
+.derive{background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:10px;color:var(--ink2);margin-top:4px;line-height:1.7}
+.prodbar{background:#fff;border-top:1px solid var(--line);max-height:132px;overflow:auto}
+table{border-collapse:collapse;width:100%;font-size:11px}
+th{font-size:10px;color:var(--muted);text-align:left;padding:4px 10px;background:var(--soft);border-bottom:1px solid var(--line);position:sticky;top:0}
+td{padding:4px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap}
+.ccftag{font-size:9px;color:#fff;background:#9333ea;border-radius:4px;padding:0 5px;font-family:var(--mono);cursor:pointer}
+</style></head><body>
+<header><h1>站级评估 · 拓扑画布 C′(200 MWh · 40 舱,视口示 A/B 两排)</h1><span class="g" style="background:#9333ea">方向 C′ = C + 站级屏障 + 产品参数</span>
+<span class="hint">新增:防火分区/设施节点/站界(画布)· 站级屏障链(底条)· 产品配置表(底页)· 舱检视器产品参数段</span></header>
+<div class="kpis">
+  <div class="kpi"><div class="l">任一舱 C3+(/站·年)</div><div class="v">6.2×10⁻⁴</div></div>
+  <div class="kpi"><div class="l">多舱 ≥2 舱</div><div class="v">1.8×10⁻⁵</div></div>
+  <div class="kpi red"><div class="l">整排 ≥5 舱</div><div class="v">7.4×10⁻⁷</div></div>
+  <div class="kpi"><div class="l">站界外后果</div><div class="v">2.1×10⁻⁷</div></div>
+  <div class="kpi"><div class="l">跨舱 CCF 组</div><div class="v">3 组</div></div>
+  <div class="kpi"><div class="l">站级树版本</div><div class="v">#7b3aa102 <span style="font-size:9px;color:var(--faint)">工作稿</span></div></div>
+</div>
+<main>
+<div class="canvas"><div class="fence"><span class="flab">站界围栏 · 至最近敏感目标 42 m · 泄爆面朝内场(站界屏障,见底条)</span>
+
+  <div class="zone"><span class="zlab">防火分区 Z1(A 排 · 舱 1–20 · 排端墙为界)</span>
+    <div class="grid" id="gA"></div>
+  </div>
+  <div class="aisle">—— 巡检道 6 m · 对排蔓延 p=0.02(工程推断 D)——</div>
+  <div class="zone" style="border-color:#3b82f6"><span class="zlab" style="color:#1d4ed8">防火分区 Z2(B 排 · 舱 21–40)</span>
+    <div class="grid" id="gB"></div>
+  </div>
+
+  <div class="fac">
+    <div class="fnode spf" id="fPump"><b>消防泵房+水池</b><span class="m">共享全站 · 就绪性 0.26 D ⊕ η 0.047</span></div>
+    <div class="fnode"><b>PCS/升压区</b><span class="m">外短初因源 · 距最近舱 8 m</span></div>
+    <div class="fnode"><b>控制楼 · 站级监测</b><span class="m">SCADA 联动 · 双通道</span></div>
+  </div>
+</div></div>
+
+<div class="side" id="side"></div>
+</main>
+
+<div class="chainbar"><span class="t">站级屏障链</span>
+  <span class="chip" data-k="det"><span class="sc">全站</span>站级火灾探测联动 <span class="pf">PFD 0.05</span><span class="g gD">D</span></span>
+  <span class="chip" data-k="sup"><span class="sc">全站</span>站级消防(就绪⊕条件有效) <span class="pf">0.29</span><span class="g gD">D</span></span>
+  <span class="chip sel" data-k="water"><span class="sc">共享</span>消防水源(泵房+水池,单点) <span class="pf">0.08</span><span class="g gD">D</span></span>
+  <span class="chip" data-k="zone"><span class="sc">分区</span>排端防火墙 2h ×5 道 <span class="pf">0.03</span><span class="g gC">C</span></span>
+  <span class="chip" data-k="er"><span class="sc">全站</span>应急响应(SPAR-H 诊断+执行) <span class="pf">0.20</span><span class="g gD">D</span></span>
+  <span class="chip" data-k="fence"><span class="sc">站界</span>泄爆朝向+围栏距离(越界屏障) <span class="pf">0.10</span><span class="g gD">D</span></span>
+  <span style="margin-left:auto;font-size:10px;color:var(--faint)">口径:站级链与舱级/邻舱屏障串联不双计(就绪⊕条件有效);点芯片看依据与作用域</span>
+</div>
+
+<div class="prodbar">
+<table><thead><tr><th>产品配置</th><th>舱数</th><th>电芯</th><th>电芯数/舱</th><th>cell λ(/cell·yr)</th><th>舱级 IE(推导)</th><th>系统模型版本</th><th>BMS 固件(CCF 组)</th><th>UL 9540A</th></tr></thead>
+<tbody>
+<tr><td><span style="color:var(--sA);font-weight:700">供应商A</span> · EnerCube-5000</td><td class="num">24</td><td>LFP 280 Ah</td><td class="num">8 320</td><td class="num">1.0×10⁻⁷ <span class="g gC">C</span></td><td class="num">8.32×10⁻⁴</td><td class="num">v2.3 · #f488b89f</td><td class="num">FW 2.4.1 <span class="ccftag" data-g="A">CCF-A ×24</span></td><td><span class="g" style="background:#16a34a">单元级 ✓</span></td></tr>
+<tr><td><span style="color:var(--sB);font-weight:700">供应商B</span> · PowerBox-314</td><td class="num">16</td><td>LFP 314 Ah</td><td class="num">6 720</td><td class="num">1.5×10⁻⁷ <span class="g gB">B</span></td><td class="num">1.05×10⁻³ <span style="color:var(--dng)">+26%</span></td><td class="num">v1.8 · #a3c17d02</td><td class="num">FW 0.9.7 <span class="ccftag" data-g="B">CCF-B ×16</span></td><td><span class="g" style="background:#d97706">报告待补</span></td></tr>
+<tr><td colspan="9" style="color:var(--faint);font-size:10px">舱=系统项目版本的实例(哈希续接证据链);cell λ→舱级 IE 走产品维度换算(见检视器推导行);同固件即同 CCF 组(β=0.05 SOKC 联动)——换固件版本即重构组。第三组:共享消防水源(全站)。</td></tr>
+</tbody></table>
+</div>
+
+<script>
+const CABS={}
+function mkGrid(el,prefix,isB){
+  const g=document.getElementById(el)
+  for(let c=0;c<5;c++){
+    const id=prefix+'-'+String(c+1).padStart(2,'0')
+    const d=document.createElement('div')
+    d.className='cab '+(isB?'sB':'sA')+(id==='A-03'?' sel':'')
+    d.innerHTML=`<div class="id">${id}</div><div class="f">${isB?'3.7×10⁻⁵':'2.1×10⁻⁵'}</div><span class="fw">FW ${isB?'0.9.7':'2.4.1'}</span>`
+    d.onclick=()=>{document.querySelectorAll('.cab,.fnode').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');showCab(id,isB)}
+    g.appendChild(d);CABS[id]=d
+  }
+  const w=document.createElement('div');w.className='wall';w.style.cssText='left:243px;top:-4px;height:64px'
+  w.innerHTML='<span class="t">排中防火墙 2h · p 0.10→0.03 · C</span>';g.appendChild(w)
+}
+mkGrid('gA','A',false);mkGrid('gB','B',true)
+
+const side=document.getElementById('side')
+function showCab(id,isB){side.innerHTML=`
+  <h3>舱 ${id} · 供应商${isB?'B · PowerBox-314':'A · EnerCube-5000'} ${isB?'<span class="g gB">B</span>':'<span class="g gC">C</span>'}</h3>
+  <div class="sec">产品参数(实例化自系统项目,快照随舱走)</div>
+  <div class="row"><span>系统模型版本</span><b>${isB?'v1.8 · #a3c17d02':'v2.3 · #f488b89f'}</b></div>
+  <div class="row"><span>电芯 / 电芯数</span><b>LFP ${isB?'314 Ah · 6 720':'280 Ah · 8 320'}</b></div>
+  <div class="row"><span>BMS 固件(CCF 组)</span><b>FW ${isB?'0.9.7 · CCF-B':'2.4.1 · CCF-A'}</b></div>
+  <div class="row"><span>投运批次</span><b>2026-Q1</b></div>
+  <div class="sec">舱级 IE 推导(产品维度换算,口径承重)</div>
+  <div class="derive">λ_cell ${isB?'1.5×10⁻⁷':'1.0×10⁻⁷'} /cell·yr ${isB?'<span class="g gB">B</span>':'<span class="g gC">C</span>'}<br>× ${isB?'6 720':'8 320'} cells = <b>${isB?'1.05×10⁻³':'8.32×10⁻⁴'}</b> /舱·yr<br>→ 舱级 C3+ <b>${isB?'3.66×10⁻⁵':'2.08×10⁻⁵'}</b>(经系统模型屏障链)</div>
+  <div class="sec">向邻舱蔓延(边,引用参考库快照)</div>
+  <div class="row"><span>→ 同排邻舱 · 间距 3 m B_SPACING</span><b>p 0.10 <span class="g gD">D</span></b></div>
+  <div class="row"><span>→ 越排中防火墙</span><b>p 0.03 <span class="g gC">C</span></b></div>
+  <div class="row"><span>→ 对排(巡检道 6 m)</span><b>p 0.02 <span class="g gD">D</span></b></div>
+  <div class="sec">对本舱事件的站级屏障(见底条,串联不双计)</div>
+  <div class="row"><span>站级探测→消防→应急链</span><b>组合 PFD 6.1×10⁻³</b></div>
+  <button class="btn pri">打开该舱系统模型 →</button><button class="btn">编辑蔓延边</button>
+  <div class="note">改本舱供应商/固件 ⇒ CCF 组自动重构并提示重算;产品参数为版本快照——上游系统项目出新版时此处标"有更新版本"而不自动漂移(证据链口径)。</div>`}
+showCab('A-03',false)
+
+const FN={water:{t:'消防水源(泵房+水池)· 共享单点',rows:[['作用域','全站(Z1+Z2)'],['PFD(需求时刻)','0.08 <span class="g gD">D</span>'],['依据','act-suppress-readiness 0.26 分解 + 双泵冗余;共享 ⇒ 站级 CCF 组#3'],['敏感性','双水源改造 0.08→0.02 ⇒ ≥5 舱 −21%']]},
+det:{t:'站级火灾探测联动 · 全站',rows:[['作用域','全站'],['PFD','0.05 <span class="g gD">D</span>'],['依据','B_OFFGAS 站级汇聚 + SCADA 双通道'],['口径','与舱内探测不双计——此处只计舱外确认联动']]},
+sup:{t:'站级消防(就绪⊕条件有效)',rows:[['作用域','全站'],['PFD','0.29 = 0.26 ⊕ η 0.047 <span class="g gD">D</span>'],['依据','act-suppress-readiness(CEA 工厂审核外推)⊕ B_SUPPRESS 条件有效性'],['防双计','就绪性与有效性显式分解,勿再串全含条目']]},
+zone:{t:'排端防火墙 2h ×5 道 · 分区',rows:[['作用域','Z1/Z2 边界 + 排中'],['升级概率','0.03 <span class="g gC">C</span>'],['依据','UL 9540A 安装级 + 2h 耐火试验报告(附件)']]},
+er:{t:'应急响应(消防队) · 全站',rows:[['作用域','全站'],['PFD','0.20 <span class="g gD">D</span>'],['依据','hep-diagnosis/action-sparh(NUREG/CR-6883)· 夜班同班组 ⇒ 与运维人因完全相关取包络']]},
+fence:{t:'站界屏障(泄爆朝向+距离) · 站界',rows:[['作用域','越界后果支链(不嵌套舱数链)'],['PFD','0.10 <span class="g gD">D</span>'],['依据','NFPA 68 泄爆面朝内场 + 42 m 距离衰减(场址 QRA 口径)']]}}
+document.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{
+  document.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel'));ch.classList.add('sel')
+  document.querySelectorAll('.cab,.fnode').forEach(x=>x.classList.remove('sel'))
+  const f=FN[ch.dataset.k]
+  side.innerHTML=`<h3>${f.t}</h3><div class="sec">站级屏障卡(参考库快照 grade/note/url 随屏障走)</div>`+
+    f.rows.map(r=>`<div class="row"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('')+
+    `<button class="btn pri">在站级树中定位 →</button><button class="btn">查看依据 ↗</button>
+     <div class="note">站级屏障是站级树(D 骨架)里的功能事件;本画布是它的空间视图——同一数据,两个表达。</div>`})
+document.getElementById('fPump').onclick=()=>document.querySelector('[data-k="water"]').click()
+document.querySelectorAll('.ccftag').forEach(t=>t.onclick=()=>{
+  const g=t.dataset.g
+  document.querySelectorAll('.cab').forEach(c=>c.classList.toggle('ccfhl',(g==='A')===(c.classList.contains('sA'))))
+  setTimeout(()=>document.querySelectorAll('.cab').forEach(c=>c.classList.remove('ccfhl')),1800)})
+</script></body></html>
