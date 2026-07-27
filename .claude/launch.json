@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173"],
       "port": 5173
+    },
+    {
+      "name": "frontend-alt",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["PSA_BACKEND=http://127.0.0.1:8010", "npm", "--prefix", "frontend", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5273"],
+      "port": 5273
     }
   ]
 }

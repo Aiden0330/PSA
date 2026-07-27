@@ -150,6 +150,7 @@ export function ExplorerTree({ persistence, tab, setTab }: {
 
       <div className="grp" role="presentation">全局</div>
       <TreeItem className={'it' + (tab === 'portfolio' ? ' on' : '')} selected={tab === 'portfolio'} onActivate={() => onPage('portfolio')}>多项目组合总览</TreeItem>
+      <TreeItem className={'it' + (tab === 'compare' ? ' on' : '')} selected={tab === 'compare'} onActivate={() => onPage('compare')}>系统对比</TreeItem>
       <TreeItem className={'it' + (tab === 'library' ? ' on' : '')} selected={tab === 'library'} onActivate={() => onPage('library')}>参考库</TreeItem>
 
       {/* FE-09:示例参数库 / CCF —— 全局教学模型,独立于任何项目,改动不入项目版本/证据链。 */}

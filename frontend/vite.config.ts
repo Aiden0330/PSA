@@ -14,7 +14,8 @@ export default defineConfig(({ mode }) => ({
   plugins: [react()],
   base: './',
   server: {
-    proxy: { '/api': 'http://localhost:8000' },
+    // PSA_BACKEND:并行会话占用 :8000 时,备用 dev 实例可指向自己的后端(默认不变)
+    proxy: { '/api': process.env.PSA_BACKEND ?? 'http://localhost:8000' },
   },
   // 生产预览(make app):构建产物 + 同款代理——日常使用毫秒级加载,
   // 无 dev 依赖预打包(dev 服务器每次重启后的首次访问都要重打包,20-30s 由此而来)

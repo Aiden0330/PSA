@@ -13,6 +13,7 @@ export interface PaletteCommand { id: string; group: string; label: string; hint
 const TABS: [MainTab, string][] = [
   ['home', '项目总览(驾驶舱)'], ['bess', '事件树(ETA)'], ['ft', '故障树(FTA)'],
   ['params', '参数库 / CCF'], ['library', '参考库'], ['cons', '后果'], ['fmea', 'FMEA'], ['report', '报告与证据'],
+  ['compare', '系统对比(跨项目)'],
 ]
 
 /**

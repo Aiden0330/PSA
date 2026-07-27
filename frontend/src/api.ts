@@ -352,6 +352,41 @@ export interface PortfolioCase { id: number; kind: string; consequences: Record<
  *  review_state 锚定最新版本(当前模型是否签发),两者语义不同,都要。 */
 export interface PortfolioRow { uuid: string; name: string; versions: number; latest_hash: string | null; review_state: ReviewState | null; open_review: { version_id: number; version_hash: string; is_latest: boolean } | null; latest_case: PortfolioCase | null; saved_id: string | null }
 export const getPortfolio = () => jget<PortfolioRow[]>('/portfolio')
+
+// ── 系统对比(规格 2026-07-26):成员=已钉扎 report 案例,绝不现算;对齐门服务端裁定 ──
+export interface CompareFe { ref: string; label: string | null; pfd: number | null; grade: string | null; citation: string | null; url: string | null; note: string | null; category: string | null }
+export interface CompareEta { ref: string; name: string | null; init_freq: number | null; fes: CompareFe[] }
+export interface CompareMember {
+  project: { uuid: string; name: string | null }
+  case: { id: number; kind: string; created_at: string; vid: number; version_hash: string }
+  consequences: Record<string, number>
+  bands: Record<string, { p05: number; p50: number; p95: number }> | null
+  grade_mix: Record<string, number>
+  etas: CompareEta[]
+}
+export interface CompareAlignment { matched: { ref: string; structural: 'shared' | 'divergent'; fe_refs: string[][] }[]; unmatched: { member: number; ref: string }[] }
+export interface CompareAssembly { members: CompareMember[]; base: number; alignment: CompareAlignment }
+export interface CompareMemberRef { project_uuid: string; case_id: number }
+export const compareAssemble = (members: CompareMemberRef[], base: number) =>
+  jgetStatus<CompareAssembly>(`/compare/assemble?members=${members.map((m) => `${m.project_uuid}:${m.case_id}`).join(',')}&base=${base}`)
+
+export interface CompareGroup { id: number; name: string; members: CompareMemberRef[]; base_index: number; created_at: string; created_by: string; modified_at: string }
+async function jsendStatus<T>(path: string, method: string, body?: unknown): Promise<T> {
+  const r = await fetch(`${BASE}${path}`, {
+    method, headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!r.ok) {
+    let detail = ''
+    try { const d = await r.json(); detail = typeof d?.detail === 'string' ? d.detail : '' } catch { /* 保底状态码 */ }
+    throw new StatusError(r.status, detail || `${path} → ${r.status}`)
+  }
+  return r.json()
+}
+export const listCompareGroups = () => jgetStatus<CompareGroup[]>('/compare/groups')
+export const createCompareGroup = (name: string, members: CompareMemberRef[], baseIndex: number) =>
+  jsendStatus<CompareGroup>('/compare/groups', 'POST', { name, members, base_index: baseIndex })
+export const deleteCompareGroup = (gid: number) => jsendStatus<{ ok: boolean }>(`/compare/groups/${gid}`, 'DELETE')
 // FE-06:证据链读端走 jgetStatus(带 status 的 StatusError)—— 组件据此区分 401(重认证)/
 // 403(无权限)/其它(错误条),绝不把读失败渲染成"暂无数据"。/projects/* 无内置降级,
 // 语义与既有 jget 一致(都在非 2xx 上抛),只是错误从裸 Error 升级为可判定 status 的 StatusError。
