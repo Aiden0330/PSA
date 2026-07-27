@@ -647,6 +647,18 @@ def api_projects_list(_=Depends(require_authenticated)):
     from backend import store
     return store.list_projects()
 
+@app.get("/api/compare/assemble")
+def api_compare_assemble(members: str, base: int = 0, _=Depends(require_authenticated)):
+    """系统对比组装(规格 2026-07-26):成员=已钉扎 report 案例(绝不现算,组合总览
+    同信任边界);对齐门(ETA ref 配对 / FE 序列 shared|divergent / unmatched ◇)在
+    服务端裁定,前端只呈现。"""
+    from backend import compare
+    try:
+        return compare.assemble(members, base)
+    except compare.CompareError as e:
+        raise HTTPException(e.status, e.detail)
+
+
 @app.get("/api/portfolio")
 def api_portfolio(_=Depends(require_authenticated)):
     """R5 组合总览:每项目一行,数字取自已钉扎案例(证据链正确性)。只读聚合面,
