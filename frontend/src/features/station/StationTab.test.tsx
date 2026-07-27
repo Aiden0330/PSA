@@ -34,12 +34,15 @@ const Q = {
   declared: { ccf_groups: DOC.ccf_groups, simplifications: ['点值未计入跨舱 CCF(…)', 'ge5 只计排内连片…'] },
 }
 
+const updateSpy = vi.fn(() => Promise.resolve(DOC))
 vi.mock('../../api', async (orig) => ({
   ...(await orig() as object),
   listStations: () => Promise.resolve([{ id: 7, name: '试点站', modified_at: 't', created_by: 'x' }]),
   getPortfolio: () => Promise.resolve([]),
+  listProjectCases: () => Promise.resolve([{ id: 9, version_id: 3, kind: 'report', engine_version: 'x', created_at: '2026-07-17T00:00:00' }]),
   getStation: () => Promise.resolve(DOC),
   quantifyStation: () => Promise.resolve(Q),
+  updateStation: (...a: unknown[]) => updateSpy(...a as []),
 }))
 
 import { StationTab } from './StationTab'
@@ -79,5 +82,14 @@ describe('站级页', () => {
     act(() => { cab.click() })
     expect(host!.textContent).toContain('ffffffff')          // 版本哈希短码
     expect(host!.textContent).toContain('chain5')
+    // 报障 2026-07-27:打开必须回填向导(否则"不能保存"),保存修改走 updateStation
+    const intra = host!.querySelector('[data-testid="intra-p"]') as HTMLInputElement
+    expect(intra.value).toBe('0.1')                          // 来自 DOC.edge_defaults(回填)
+    const save = host!.querySelector('[data-testid="save-changes"]') as HTMLButtonElement
+    expect(save).toBeTruthy()
+    act(() => { save.click() })
+    await act(async () => { await new Promise((r) => setTimeout(r, 60)) })
+    expect(updateSpy).toHaveBeenCalledTimes(1)
+    expect((updateSpy.mock.calls[0] as unknown[])[0]).toBe(7)
   })
 })

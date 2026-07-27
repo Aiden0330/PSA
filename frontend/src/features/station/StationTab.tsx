@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import {
   StatusError, createStation, deleteStation, getStation, getPortfolio, listProjectCases,
-  listStations, quantifyStation,
+  listStations, quantifyStation, updateStation,
 } from '../../api'
 import type { CaseInfo, PortfolioRow, StationDoc, StationQuantify } from '../../api'
 
@@ -64,13 +64,25 @@ export function StationTab() {
       setDoc(d)
       setQ(await quantifyStation(sid))
       setSelCab('')
+      // 报障 2026-07-27:打开只载结果不回填表单 ⇒ 用户以为"不能保存",每次点创建又生
+      // 一个新站型。打开 = 完整回填,配合「保存修改」构成编辑闭环。
+      setName(d.name)
+      setWps(d.products.map((pp) => ({ key: pp.key, project_uuid: pp.project_uuid, case_id: pp.case_id })))
+      d.products.forEach((pp) => loadCases(pp.project_uuid))
+      setWrows(d.rows.map((r) => ({ id: r.id, product: r.cabins[0]?.product ?? d.products[0]?.key ?? 'A',
+        count: r.cabins.length, walls: (r.walls ?? []).join(',') })))
+      setIntraP(String(d.edge_defaults.intra_p))
+      setWallP(String(d.edge_defaults.wall_p))
+      setInterP(String(d.edge_defaults.inter_row_p))
+      setSupPfd(String(d.station_barriers.find((b) => b.key === 'sup')?.pfd ?? 1))
+      setErPfd(String(d.station_barriers.find((b) => b.key === 'er')?.pfd ?? 1))
+      setFenceP(String(d.offsite.p_fence))
     } catch (e) { setErr(e instanceof StatusError ? e.message : String((e as Error)?.message ?? e)) }
   }
 
-  const build = async () => {
-    setErr('')
-    if (wps.some((p) => !p.project_uuid || p.case_id == null)) { setErr('每个产品都要选定项目与 report 案例。'); return }
-    const body: StationDoc = {
+  const buildDoc = (): StationDoc | null => {
+    if (wps.some((p) => !p.project_uuid || p.case_id == null)) { setErr('每个产品都要选定项目与 report 案例。'); return null }
+    return {
       name,
       products: wps.map((p) => ({ key: p.key, project_uuid: p.project_uuid, case_id: p.case_id as number })),
       rows: wrows.map((r) => ({
@@ -87,11 +99,34 @@ export function StationTab() {
       ccf_groups: wps.map((p) => ({ key: `fw-${p.key}`, label: `产品${p.key} BMS 固件`, member_products: [p.key], beta: 0.05, basis: '同 OTA 批次(申报,v1 不入值)' })),
       offsite: { p_fence: Number(fenceP), basis: '泄爆朝向+站界距离' },
     }
+  }
+
+  const create = async () => {
+    setErr('')
+    const body = buildDoc()
+    if (!body) return
+    // 同名知情确认(保存双胞胎病,同 onSaveWorkspace 守卫)
+    if (stations.some((st) => st.name === body.name) &&
+        !window.confirm(`已存在同名站型「${body.name}」。继续将创建第二份(列表以 #id 区分)。确定?建议改名或用「保存修改」更新已打开的站型。`)) return
     setBusy(true)
     try {
       const created = await createStation(body)
       setStations((p) => [{ id: created.id!, name: created.name, modified_at: '', created_by: '' }, ...p])
       await openStation(created.id!)
+    } catch (e) { setErr(e instanceof StatusError ? e.message : String((e as Error)?.message ?? e)) }
+    finally { setBusy(false) }
+  }
+
+  const saveChanges = async () => {
+    if (doc?.id == null) return
+    setErr('')
+    const body = buildDoc()
+    if (!body) return
+    setBusy(true)
+    try {
+      await updateStation(doc.id, body)
+      setStations((p) => p.map((st) => (st.id === doc.id ? { ...st, name: body.name } : st)))
+      await openStation(doc.id)
     } catch (e) { setErr(e instanceof StatusError ? e.message : String((e as Error)?.message ?? e)) }
     finally { setBusy(false) }
   }
@@ -172,7 +207,11 @@ export function StationTab() {
             <div style={{ display: 'flex', gap: 8 }}>
               {wps.length < 4 && <button className="psa-btn" onClick={() => setWps((x) => [...x, { key: String.fromCharCode(65 + x.length), project_uuid: '', case_id: null }])}>＋产品</button>}
               <button className="psa-btn" onClick={() => setWrows((x) => [...x, { id: `Z${x.length + 1}`, product: wps[0]?.key ?? 'A', count: 5, walls: '' }])}>＋排</button>
-              <button data-testid="build" className="psa-btn psa-btn--primary" disabled={busy} onClick={() => void build()}>{busy ? '建模中…' : '创建并量化'}</button>
+              <button data-testid="build" className="psa-btn psa-btn--primary" disabled={busy} onClick={() => void create()}>{busy ? '建模中…' : '新建站型并量化'}</button>
+              {doc?.id != null && (
+                <button data-testid="save-changes" className="psa-btn psa-btn--dark" disabled={busy} onClick={() => void saveChanges()}
+                  title={`把上方表单保存回站型「${doc.name}」#${doc.id} 并重算`}>保存修改并重算</button>
+              )}
               {doc?.id != null && <button className="psa-btn psa-btn--danger" onClick={() => { if (window.confirm(`删除站型「${doc.name}」?`)) void deleteStation(doc.id!).then(() => { setDoc(null); setQ(null); setStations((p) => p.filter((s) => s.id !== doc.id)) }) }}>删除站型</button>}
             </div>
           </div>
