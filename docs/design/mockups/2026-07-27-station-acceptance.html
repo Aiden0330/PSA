@@ -1,0 +1,83 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>方向L · 站级验收仪表盘</title><style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--dng:#dc2626;--ok:#16a34a;--sA:#0f766e;--sB:#2563eb}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:14px}header .hint{color:var(--faint);font-size:11px;margin-left:auto}
+.g{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff}
+.gC{background:var(--gC)}.gD{background:var(--gD)}
+main{padding:14px;max-width:1150px;margin:0 auto;display:grid;grid-template-columns:1.1fr .9fr;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ch{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;font-size:12.5px}
+.ch .meta{margin-left:auto;font-weight:400;color:var(--faint);font-size:11px}
+table{border-collapse:collapse;width:100%;font-size:11.5px}
+th{font-size:11px;color:var(--muted);text-align:left;padding:6px 10px;background:var(--soft);border-bottom:1px solid var(--line)}
+td{padding:6px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+.chip{font-size:10px;border-radius:5px;padding:1px 8px;font-weight:700}
+.pass{background:#dcfce7;color:#166534}.warn{background:#fef3c7;color:#92400e}.fail{background:#fee2e2;color:#991b1b}
+.grid{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;padding:12px}
+.tile{height:34px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;color:#fff;cursor:pointer}
+.tile.hot{outline:2.5px solid var(--dng);outline-offset:1px}
+.legend{display:flex;gap:12px;padding:0 12px 10px;font-size:10.5px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.sig{display:flex;gap:10px;padding:10px 12px;border-top:1px dashed var(--line);align-items:center;font-size:11.5px;color:var(--ink2)}
+.foot{padding:8px 12px;color:var(--faint);font-size:10.5px;border-top:1px solid var(--line)}
+.big{padding:14px 12px;display:flex;gap:12px;align-items:center}
+.verdict{font-size:20px;font-weight:800}
+.sub{font-size:11px;color:var(--muted)}
+</style></head><body>
+<header><h1>站级评估 · 验收仪表盘(业主/审批视角)</h1><span class="g" style="background:#dc2626">方向 L</span>
+<span class="hint">赌注:审批人要的是"对准则通过/不通过 + 谁签的字",探索留给别的页</span></header>
+<main>
+
+<div class="card">
+<div class="ch">风险验收准则判定(准则集 v1.2,版本化入证据链)<span class="meta">数字源:站级树 v0.9 · #7b3aa102 · 工作稿</span></div>
+<table><thead><tr><th>指标</th><th>限值(依据)</th><th>现值(p50)</th><th>p95</th><th>判定</th></tr></thead><tbody>
+<tr><td>任一舱 C3+ /站·年</td><td class="num">≤ 1×10⁻³ <span class="sub">业主准则 §3.1</span></td><td class="num">6.2×10⁻⁴</td><td class="num">2.1×10⁻³</td><td><span class="chip warn">p50 过 · p95 超</span></td></tr>
+<tr><td>多舱事件 ≥2 舱 /站·年</td><td class="num">≤ 2×10⁻⁵ <span class="sub">业主准则 §3.2</span></td><td class="num">1.8×10⁻⁵</td><td class="num">6.4×10⁻⁵</td><td><span class="chip warn">p50 过 · p95 超</span></td></tr>
+<tr><td>整排蔓延 ≥5 舱 /站·年</td><td class="num">≤ 1×10⁻⁶ <span class="sub">类比 IAEA 大量释放</span></td><td class="num">7.4×10⁻⁷</td><td class="num">3.0×10⁻⁶</td><td><span class="chip warn">p50 过 · p95 超</span></td></tr>
+<tr><td>站界外后果 /站·年</td><td class="num">≤ 1×10⁻⁶ <span class="sub">场址 QRA 惯例</span></td><td class="num">2.1×10⁻⁷</td><td class="num">8.8×10⁻⁷</td><td><span class="chip pass">通过(含 p95)</span></td></tr>
+</tbody></table>
+<div class="big">
+  <div><div class="verdict" style="color:#92400e">有条件通过</div><div class="sub">判定规则:p50 全过 + p95 超限 ⇒ 须列不确定性收窄计划(补 B 级厂商数据 / 现场贝叶斯更新)——拿均值讲故事在本页被判定规则本身禁止。</div></div>
+</div>
+<div class="sig"><span>分析:______</span><span>评审:______</span><span>批准:______</span>
+<span style="margin-left:auto" class="g" style="background:#6b7280">工作稿 · 未签发</span></div>
+<div class="foot">签发走既有评审状态机(送审→签发),签发后本页页脚落"签发人+时间+版本哈希"——与报告页同一条证据链,不另起炉灶。</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:14px">
+<div class="card">
+<div class="ch">规范符合性(确定论,与概率判定并列不混算)</div>
+<table><tbody>
+<tr><td>NFPA 855 舱间距 ≥ 914 mm</td><td class="num">3 000 mm</td><td><span class="chip pass">符合</span></td></tr>
+<tr><td>UL 9540A 单元级(两家电芯)</td><td>A ✓ · B <b>报告缺失</b></td><td><span class="chip fail">B 待补</span></td></tr>
+<tr><td>NFPA 69 抑爆(泄爆面朝向站界)</td><td>朝向内场</td><td><span class="chip pass">符合</span></td></tr>
+<tr><td>GB/T 36276 电芯准入</td><td>A ✓ · B ✓</td><td><span class="chip pass">符合</span></td></tr>
+</tbody></table>
+<div class="foot">符合性证据(试验报告文件)挂附件入证据链;概率与规范两栏**并列呈现、绝不互相折算**。</div>
+</div>
+
+<div class="card">
+<div class="ch">逐舱小倍数(40 舱 · C3+ /舱·年)<span class="meta">红框 = 超均值 1.5×(点击下钻该舱系统模型)</span></div>
+<div class="grid" id="tiles"></div>
+<div class="legend"><span><i style="background:var(--sA)"></i>供应商A ×24</span><span><i style="background:var(--sB)"></i>供应商B ×16</span><span>色深 ∝ 频率</span></div>
+<div class="foot">异常舱(如 B-03:老固件批次未 OTA)在此一眼可见——舱不是同质的,均值会骗人。</div>
+</div>
+</div>
+</main>
+<script>
+const G=document.getElementById('tiles')
+for(let i=0;i<40;i++){
+  const isB=i>=24, hot=(i===26)
+  const f=isB?(hot?'6.1e-5':'3.7e-5'):'2.1e-5'
+  const el=document.createElement('div')
+  el.className='tile'+(hot?' hot':'')
+  el.style.background=isB?(hot?'#1d4ed8':'#3b82f6'):'#0f766e'
+  el.style.opacity=isB?1:.85
+  el.textContent=(isB?'B-':'A-')+String(i%24+1).padStart(2,'0')
+  el.title=`${el.textContent} · C3+ ${f}/舱·年${hot?'(超均值:老固件批次未 OTA)':''}`
+  G.appendChild(el)
+}
+</script></body></html>

@@ -1,0 +1,61 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>方向J · 站级纵深漏斗</title><style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--dng:#dc2626;--ok:#16a34a}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:14px}header .hint{color:var(--faint);font-size:11px;margin-left:auto}
+.g{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff}
+.gC{background:var(--gC)}.gD{background:var(--gD)}
+main{padding:14px;max-width:1050px;margin:0 auto;display:grid;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ch{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;font-size:12.5px}
+.ch .meta{margin-left:auto;font-weight:400;color:var(--faint);font-size:11px}
+.funnel{padding:20px 16px;overflow-x:auto}
+.chain{display:flex;align-items:center;gap:0;min-width:940px}
+.stage{flex:1;text-align:center}
+.stage .bar{margin:0 auto;background:linear-gradient(180deg,#0f766e,#0d9488);border-radius:8px;color:#fff;display:flex;flex-direction:column;justify-content:center;min-width:96px;box-shadow:0 2px 6px rgba(15,23,42,.18)}
+.stage .f{font-family:var(--mono);font-size:13px;font-weight:800}
+.stage .n{font-size:10.5px;opacity:.9}
+.stage .per{font-size:9.5px;color:var(--faint);margin-top:5px;font-family:var(--mono)}
+.gate{width:118px;flex-shrink:0;text-align:center;position:relative;padding:0 4px}
+.gate .arrow{height:2px;background:#cbd5e1;position:relative;margin:0 2px}
+.gate .arrow::after{content:'';position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left-color:#cbd5e1}
+.gate .lab{font-size:9.5px;color:var(--ink2);background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:3px 5px;margin-top:6px;line-height:1.4}
+.gate .pf{font-family:var(--mono);font-weight:700;color:var(--dng)}
+.offsite{margin:16px 16px 0;border:1.5px dashed #f59e0b;border-radius:8px;padding:10px 12px;font-size:11.5px;color:#92400e;background:#fffbeb}
+.ccf{padding:10px 12px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--ink2);line-height:1.7}
+.ccf b{color:var(--dng)}
+.foot{padding:8px 12px;color:var(--faint);font-size:10.5px;border-top:1px solid var(--line)}
+.sw{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;margin-left:8px;vertical-align:middle}
+.sw span{padding:2px 9px;font-size:11px;cursor:pointer;color:var(--ink2)}
+.sw span.on{background:var(--acc);color:#fff}
+</style></head><body>
+<header><h1>站级评估 · 纵深防御漏斗(200 MWh · 40 舱)</h1><span class="g" style="background:#16a34a">方向 J</span>
+<span class="hint">赌注:整站的故事就是一条链上的 5 个数——先给结论链,细节都是下钻</span></header>
+<main>
+<div class="card">
+<div class="ch">舱数升级链(/站·年,对数尺度缩放)
+<span class="meta">跨舱 CCF:<span class="sw" id="sw"><span class="on" data-m="on">计入</span><span data-m="off">忽略</span></span></span></div>
+<div class="funnel"><div class="chain">
+  <div class="stage"><div class="bar" style="height:150px"><span class="f" data-on="6.2×10⁻⁴" data-off="6.2×10⁻⁴">6.2×10⁻⁴</span><span class="n">任一舱 C3+ 起火</span></div><div class="per">= Σ 40 舱(承接各系统模型)</div></div>
+  <div class="gate"><div class="arrow"></div><div class="lab">舱级灭火 ⊕ 邻舱屏障<br><span class="pf">通过率 ~2.9%</span><br>间距3m 0.10 <span class="g gD">D</span> · 防火墙 0.03 <span class="g gC">C</span></div></div>
+  <div class="stage"><div class="bar" style="height:104px"><span class="f" data-on="1.8×10⁻⁵" data-off="1.1×10⁻⁵">1.8×10⁻⁵</span><span class="n">≥2 舱受累</span></div><div class="per">多舱事件 · 保险/停机口径锚点</div></div>
+  <div class="gate"><div class="arrow"></div><div class="lab">二级间距 ⊕ 站级消防<br><span class="pf">通过率 ~4.1%</span><br>就绪性 0.26 ⊕ 条件有效 η</div></div>
+  <div class="stage"><div class="bar" style="height:66px"><span class="f" data-on="7.4×10⁻⁷" data-off="4.2×10⁻⁷">7.4×10⁻⁷</span><span class="n">≥5 舱 / 整排</span></div><div class="per">排端防火墙为界</div></div>
+  <div class="gate"><div class="arrow"></div><div class="lab">排间距 ⊕ 应急响应<br><span class="pf">通过率 ~8%</span><br>SPAR-H 0.20 <span class="g gD">D</span></div></div>
+  <div class="stage"><div class="bar" style="height:36px;background:linear-gradient(180deg,#b91c1c,#dc2626)"><span class="f" data-on="5.9×10⁻⁸" data-off="3.1×10⁻⁸">5.9×10⁻⁸</span><span class="n">全站级</span></div><div class="per">≥半站容量受累</div></div>
+</div></div>
+<div class="offsite">⚠ <b>站界外后果(2.1×10⁻⁷ /站·年)不嵌套在这条舱数链里</b>——单舱爆燃/毒气羽即可越界,不必先"烧半个站"。
+它单列一条支链(源:任一舱 C4+ × 泄爆朝向 × 站界距离),防止漏斗的嵌套观感造成"越界一定是大事故之后"的误读。</div>
+<div class="ccf">切「忽略」看独立假设的低估:≥2 舱 <b>+64%</b>、≥5 舱 <b>+76%</b>、全站 <b>+90%</b> 来自
+<b>同厂 BMS 固件跨舱 CCF(β=0.05)</b> + 共享消防水源 + 同一运维班组(SPAR-H 依赖包络)——与核电多机组 PSA 结论同构:跨单元依赖主导多单元后果。</div>
+<div class="foot">每道"闸"可点开 = 该级屏障组(参考库快照 grade 随边走);每个数字可下钻到 D 方向的站级序列表。
+本图即报告「站级评估」章的首图;右上口径徽章与不确定带(p95)在实现时随行。</div>
+</div>
+</main>
+<script>
+document.querySelectorAll('#sw span').forEach(s=>s.onclick=()=>{
+  document.querySelectorAll('#sw span').forEach(x=>x.classList.remove('on'));s.classList.add('on')
+  document.querySelectorAll('[data-on]').forEach(c=>{c.textContent=c.dataset[s.dataset.m]})})
+</script></body></html>

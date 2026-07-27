@@ -1,0 +1,94 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>方向K · 站型配置工作台</title><style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--dng:#dc2626;--ok:#16a34a;--sA:#0f766e;--sB:#2563eb}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:14px}header .hint{color:var(--faint);font-size:11px;margin-left:auto}
+.g{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff}
+.warnbar{background:#fffbeb;border-bottom:1px solid #fde68a;color:#92400e;padding:6px 14px;font-size:11.5px}
+main{padding:14px;max-width:1160px;margin:0 auto;display:grid;grid-template-columns:340px 1fr;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ch{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;font-size:12.5px}
+.ch .meta{margin-left:auto;font-weight:400;color:var(--faint);font-size:11px}
+.ctl{padding:12px;display:flex;flex-direction:column;gap:12px}
+.ctl label{font-size:11.5px;color:var(--ink2);display:flex;flex-direction:column;gap:4px}
+.ctl .v{font-family:var(--mono);font-weight:700;color:var(--acc)}
+input[type=range]{accent-color:var(--acc)}
+select{border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:12px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.kpi .l{font-size:10px;color:var(--faint)}.kpi .v{font-family:var(--mono);font-size:15px;font-weight:800}
+.kpi .d{font-size:10px;font-family:var(--mono)}
+.up{color:var(--dng)}.dn{color:var(--ok)}
+.kpi.bad{border-color:#fecaca;background:#fef2f2}
+table{border-collapse:collapse;width:100%;font-size:11.5px}
+th{font-size:11px;color:var(--muted);text-align:left;padding:6px 10px;background:var(--soft);border-bottom:1px solid var(--line)}
+td{padding:6px 10px;border-bottom:1px solid #f1f5f9}
+.chip{font-size:10px;border-radius:5px;padding:1px 7px;font-weight:700}
+.pass{background:#dcfce7;color:#166534}.fail{background:#fee2e2;color:#991b1b}
+.foot{padding:8px 12px;color:var(--faint);font-size:10.5px;border-top:1px solid var(--line)}
+.btn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 10px;font-size:12px;color:var(--ink2);cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+</style></head><body>
+<header><h1>站级评估 · 站型配置工作台(what-if)</h1><span class="g" style="background:#b45309">方向 K</span>
+<span class="hint">赌注:站级页的真实任务是设计决策——间距 vs 防火墙 vs 供应商配比的权衡,配置本身是一等公民</span></header>
+<div class="warnbar">⚠ mockup 的联动为示意直算;真实实现 = 改配置 → D 方向站级树重算(引擎精确)→ 新配置存为<b>站型版本</b>(可对比、可钉扎、可进报告)。</div>
+<main>
+<div class="card">
+<div class="ch">站型参数</div>
+<div class="ctl">
+  <label>舱数(5 MWh/舱)<span class="v" id="vN">40</span><input id="N" type="range" min="20" max="60" step="4" value="40"></label>
+  <label>供应商配比 A : B <span class="v" id="vMix">24 : 16</span><input id="mix" type="range" min="0" max="100" value="60"></label>
+  <label>排内间距<select id="gap"><option value="0.10">3 m(NFPA 855 最低,升级 p=0.10 D)</option><option value="0.05">4.5 m(p=0.05 推断)</option><option value="0.02">6 m(p=0.02 推断)</option></select></label>
+  <label>防火墙密度<select id="wall"><option value="8">每 8 舱一道(现设计)</option><option value="4">每 4 舱一道(+12 道墙)</option><option value="2">每 2 舱一道(+28 道墙)</option></select></label>
+  <label>站级消防<select id="sup"><option value="0.29">常规(就绪 0.26 ⊕ η)</option><option value="0.15">加强巡检+双水源(0.15)</option></select></label>
+  <div style="display:flex;gap:8px"><button class="btn pri">重算(站级树)</button><button class="btn">存为站型版本</button></div>
+</div>
+<div class="foot">供应商配比联动功能①:A/B 的舱级频率取各自系统模型钉扎案例;跨舱 CCF 组随配比自动重构(同厂舱共享固件)。</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:14px">
+<div class="card">
+<div class="ch">站级指标(实时)<span class="meta">基线 = 现设计(40 舱 · 24A16B · 3m · 每8舱墙)</span></div>
+<div class="kpis">
+  <div class="kpi"><div class="l">任一舱 C3+ /站·年</div><div class="v" id="k1">6.2×10⁻⁴</div><div class="d" id="d1">基线</div></div>
+  <div class="kpi"><div class="l">≥2 舱 /站·年</div><div class="v" id="k2">1.8×10⁻⁵</div><div class="d" id="d2">基线</div></div>
+  <div class="kpi" id="kpi3"><div class="l">≥5 舱(整排)/站·年</div><div class="v" id="k3">7.4×10⁻⁷</div><div class="d" id="d3">基线</div></div>
+  <div class="kpi"><div class="l">验收限值 ≥2 舱 ≤ 2×10⁻⁵</div><div class="v"><span class="chip pass" id="pass">通过</span></div><div class="d">口径:业主准则 v1</div></div>
+</div>
+</div>
+<div class="card">
+<div class="ch">已存站型对比(与功能①同一张对比机制)<span class="meta">每行 = 一个站型版本(钉扎)</span></div>
+<table><thead><tr><th>站型</th><th>配置摘要</th><th>≥2 舱</th><th>≥5 舱</th><th>增量造价(示意)</th><th>判定</th></tr></thead><tbody>
+<tr><td><b>现设计</b></td><td>40舱 · 24A16B · 3m · 每8舱墙</td><td class="num">1.8×10⁻⁵</td><td class="num">7.4×10⁻⁷</td><td class="num">—</td><td><span class="chip pass">通过</span></td></tr>
+<tr><td>加严间距</td><td>同上 · 4.5m</td><td class="num">9.6×10⁻⁶ <span class="dn">−47%</span></td><td class="num">2.9×10⁻⁷ <span class="dn">−61%</span></td><td class="num">+占地 8%</td><td><span class="chip pass">通过</span></td></tr>
+<tr><td>密墙方案</td><td>3m · 每4舱墙</td><td class="num">1.2×10⁻⁵ <span class="dn">−33%</span></td><td class="num">1.8×10⁻⁷ <span class="dn">−76%</span></td><td class="num">+¥ 240 万</td><td><span class="chip pass">通过</span></td></tr>
+<tr><td>纯 B 供应商</td><td>40×B · 3m · 每8舱墙</td><td class="num">3.1×10⁻⁵ <span class="up">+72%</span></td><td class="num">1.6×10⁻⁶ <span class="up">+116%</span></td><td class="num">−¥ 180 万</td><td><span class="chip fail">超限</span></td></tr>
+</tbody></table>
+<div class="foot">造价列为占位示意(本工具不做成本模型,仅并排呈现用户填报值);判定 = 对业主验收准则,准则本身版本化入证据链。</div>
+</div>
+</div>
+</main>
+<script>
+const B={c2:1.8e-5,c5:7.4e-7,gap:0.10,wall:8,sup:0.29,mixA:.6,N:40}
+const fmt=v=>{const e=Math.floor(Math.log10(v));const m=v/10**e;return m.toFixed(1)+'×10'+(''+e).replace('-','⁻').replace(/(\d)/g,d=>'⁰¹²³⁴⁵⁶⁷⁸⁹'[d])}
+function recalc(){
+  const N=+document.getElementById('N').value, mixA=+document.getElementById('mix').value/100
+  const gap=+document.getElementById('gap').value, wall=+document.getElementById('wall').value, sup=+document.getElementById('sup').value
+  document.getElementById('vN').textContent=N
+  document.getElementById('vMix').textContent=Math.round(N*mixA)+' : '+(N-Math.round(N*mixA))
+  const perCab=(mixA*2.08e-5+(1-mixA)*3.66e-5), c1=N*perCab
+  const c2=c1*(gap/B.gap)*(1.8e-5/6.2e-4)*(0.6+0.4*(wall/8))
+  const c5=c2*(7.4e-7/1.8e-5)*(sup/B.sup)*(wall/8)
+  document.getElementById('k1').textContent=fmt(c1)
+  document.getElementById('k2').textContent=fmt(c2)
+  document.getElementById('k3').textContent=fmt(c5)
+  const d=(v,b,el)=>{const p=((v-b)/b*100);document.getElementById(el).innerHTML=Math.abs(p)<1?'基线':`<span class="${p>0?'up':'dn'}">${p>0?'+':''}${p.toFixed(0)}% vs 基线</span>`}
+  d(c1,6.2e-4,'d1');d(c2,B.c2,'d2');d(c5,B.c5,'d3')
+  const pass=c2<=2e-5
+  const chip=document.getElementById('pass');chip.textContent=pass?'通过':'超限';chip.className='chip '+(pass?'pass':'fail')
+  document.getElementById('kpi3').classList.toggle('bad',c5>1e-6)
+}
+document.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',recalc));recalc()
+</script></body></html>

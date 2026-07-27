@@ -1,0 +1,92 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>方向I · 蔓延矩阵</title><style>
+:root{--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--soft:#f8fafc;--ink:#0f172a;--ink2:#334155;--muted:#64748b;--faint:#94a3b8;
+--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--gB:#2563eb;--gC:#d97706;--gD:#6b7280;--acc:#0f766e;--dng:#dc2626;--sA:#0f766e;--sB:#2563eb}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--ink);font:12px/1.45 -apple-system,'PingFang SC',sans-serif}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:14px}header .hint{color:var(--faint);font-size:11px;margin-left:auto}
+.g{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;color:#fff}
+.gC{background:var(--gC)}.gD{background:var(--gD)}
+main{padding:14px;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:1.35fr .65fr;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ch{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:700;font-size:12.5px}
+.ch .meta{margin-left:auto;font-weight:400;color:var(--faint);font-size:11px}
+.mx{padding:12px;overflow-x:auto}
+table{border-collapse:collapse}
+th{font-size:9.5px;color:var(--muted);padding:3px 5px;font-family:var(--mono);font-weight:600}
+td{padding:0}
+.cell{width:44px;height:30px;border-radius:4px;margin:1.5px;display:flex;align-items:center;justify-content:center;
+font-family:var(--mono);font-size:8.5px;cursor:pointer;color:#1e293b}
+.cell:hover{outline:2px solid #f59e0b}
+.diag{color:#fff;font-weight:700}
+.sum{font-family:var(--mono);font-size:9px;color:var(--ink2);padding:0 6px;white-space:nowrap}
+.sum b{color:var(--dng)}
+.legend{display:flex;gap:12px;padding:0 12px 10px;font-size:10.5px;color:var(--muted);flex-wrap:wrap}
+.legend i{display:inline-block;width:12px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.side .row{display:flex;justify-content:space-between;padding:5px 12px;border-bottom:1px dashed #f1f5f9;font-size:11.5px;color:var(--ink2)}
+.side .row b{font-family:var(--mono)}
+.sec{padding:8px 12px 2px;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:var(--faint)}
+.edge{padding:8px 12px;font-size:11.5px;color:var(--ink2);line-height:1.6;border-top:1px dashed var(--line)}
+.foot{padding:8px 12px;color:var(--faint);font-size:10.5px;border-top:1px solid var(--line)}
+.btn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 10px;font-size:12px;color:var(--ink2);cursor:pointer;margin:8px 12px}
+</style></head><body>
+<header><h1>站级评估 · 蔓延矩阵(行=火源舱,列=受体舱)</h1><span class="g" style="background:#0e7490">方向 I</span>
+<span class="hint">赌注:矩阵在 40+ 舱时仍可读——地图会糊,矩阵不会;行/列求和即"最危险源/最暴露受体"排名</span></header>
+<main>
+<div class="card">
+<div class="ch">蔓延概率矩阵(示 A 排 ×5 + B 排 ×5;全站 40×40 可滚动/分块)<span class="meta">单元格 = 该边升级概率(间距/墙/道综合)· 点格编辑边</span></div>
+<div class="mx"><table id="mx"></table></div>
+<div class="legend"><span><i style="background:#0f766e"></i>对角线 = 该舱 C3+ 起火频率(承接系统模型)</span>
+<span><i style="background:#fee2e2"></i>≤0.02</span><span><i style="background:#fecaca"></i>0.03–0.06</span><span><i style="background:#f87171"></i>≥0.10(弱边)</span>
+<span><i style="background:#f1f5f9"></i>非邻接(不可直接蔓延)</span></div>
+<div class="foot">矩阵即模型:每个非空格 = 一条舱间屏障边(引用参考库 B_SPACING/防火墙,快照 grade 随边走);对称性不强加——
+风向/朝向可使 A→B ≠ B→A(注记说明)。行求和 × 该舱起火频率 = 它作为源的年均"输出",列求和 = 暴露度。</div>
+</div>
+
+<div class="card side">
+<div class="ch">排名(全站 40 舱)<span class="meta">由矩阵求和自动生成</span></div>
+<div class="sec">最危险火源 TOP3(行和 × 对角频率)</div>
+<div class="row"><span>A-07(排中位 · 三邻接 · 无墙)</span><b>3.4×10⁻⁶ /yr</b></div>
+<div class="row"><span>A-08(同上)</span><b>3.3×10⁻⁶</b></div>
+<div class="row"><span>B-03(大电芯 + 排端无墙)</span><b>3.1×10⁻⁶</b></div>
+<div class="sec">最暴露受体 TOP3(列和)</div>
+<div class="row"><span>A-08 ← A-07/A-09/B-08</span><b>Σp 0.22</b></div>
+<div class="row"><span>B-08 ← 三邻接</span><b>Σp 0.20</b></div>
+<div class="row"><span>A-06 ← 两邻接+端部</span><b>Σp 0.13</b></div>
+<div class="sec">选中边</div>
+<div class="edge" id="edge">A-07 → A-08 · 间距 3 m(无墙)<br>
+升级概率 <b class="num">0.10</b> <span class="g gD">D</span>(B_SPACING 工程假设)<br>
+敏感性:此边加防火墙(0.10→0.03)⇒ 整排蔓延 ≥5 舱 <b class="num">−34%</b></div>
+<button class="btn">把 TOP3 弱边加固方案写入报告 →</button>
+<div class="foot">排名回答加固预算砸哪里;每格可反查出处——矩阵是 D 方向站级树的**边编辑器**,不是另一套模型。</div>
+</div>
+</main>
+<script>
+const A=['A-05','A-06','A-07','A-08','A-09'],B=['B-05','B-06','B-07','B-08','B-09'],CABS=[...A,...B]
+const diag={ 'A-05':'2.1e-5','A-06':'2.1e-5','A-07':'2.1e-5','A-08':'2.1e-5','A-09':'2.1e-5','B-05':'3.7e-5','B-06':'3.7e-5','B-07':'3.7e-5','B-08':'3.7e-5','B-09':'3.7e-5'}
+function p(i,j){
+  const a=CABS[i],b=CABS[j]
+  if(i===j) return null
+  const sameRow=a[0]===b[0], di=Math.abs(i%5-j%5)
+  if(sameRow&&di===1) return (a==='A-06'&&b==='A-05')||(a==='A-05'&&b==='A-06')?0.03:0.10   // 端部有墙
+  if(!sameRow&&i%5===j%5) return 0.02                                                        // 对排巡检道 6m
+  return 0
+}
+const T=document.getElementById('mx')
+let h='<tr><th></th>'+CABS.map(c=>`<th>${c}</th>`).join('')+'<th style="text-align:left;padding-left:8px">行和(作为源)</th></tr>'
+CABS.forEach((r,i)=>{
+  h+=`<tr><th>${r}</th>`
+  let s=0
+  CABS.forEach((c,j)=>{
+    const v=p(i,j)
+    if(i===j){h+=`<td><div class="cell diag" style="background:${r[0]==='A'?'var(--sA)':'var(--sB)'}" title="${r} C3+ 起火频率 /yr">${diag[r]}</div></td>`}
+    else if(v===0){h+=`<td><div class="cell" style="background:#f1f5f9;color:#cbd5e1">·</div></td>`}
+    else{s+=v
+      const bg=v>=0.10?'#f87171':v>=0.03?'#fecaca':'#fee2e2'
+      h+=`<td><div class="cell" data-e="${r}→${c}·p=${v}" style="background:${bg}" title="${r} → ${c} 升级概率 ${v}(点击编辑该边屏障)">${v.toFixed(2)}</div></td>`}
+  })
+  h+=`<td class="sum">Σ ${s.toFixed(2)}${s>=0.2?' <b>◀ 弱源</b>':''}</td></tr>`
+})
+T.innerHTML=h
+T.addEventListener('click',e=>{const d=e.target.closest('[data-e]');if(d)document.getElementById('edge').innerHTML=d.dataset.e.replace('·p=',' · 升级概率 <b class="num">')+'</b>(mockup:点击已联动)'})
+</script></body></html>
