@@ -384,6 +384,35 @@ async function jsendStatus<T>(path: string, method: string, body?: unknown): Pro
   return r.json()
 }
 export const listCompareGroups = () => jgetStatus<CompareGroup[]>('/compare/groups')
+
+// ── 站级评估(规格 2026-07-27-station-model):舱=钉扎案例实例;标签绑定铁律:
+//    「≥5 舱」只许绑 metrics.ge5,「整排」只许绑 metrics.ge_row(评审 BLOCKING-1)──
+export interface StationRow { id: string; label?: string; cabins: { id: string; product: string }[]; walls: number[] }
+export interface StationDoc {
+  id?: number; name: string
+  products: { key: string; label?: string; project_uuid: string; case_id: number }[]
+  rows: StationRow[]
+  edge_defaults: { intra_p: number; wall_p: number; inter_row_p: number; refs?: Record<string, string> }
+  edge_overrides: { from: string; to: string; p: number; note?: string }[]
+  station_barriers: { key: string; label: string; pfd: number; grade?: string; scope?: string; basis?: string }[]
+  ccf_groups: { key: string; label: string; member_products: string[]; beta: number; basis?: string }[]
+  offsite: { p_fence: number; basis?: string }
+}
+export interface StationQuantify {
+  metrics: { any: number; ge2: number; ge5: number; ge_row: number; offsite: number }
+  rows: { id: string; k: number }[]
+  per_cabin: { id: string; product: string; row: string; f: number; f4: number; esc: number; chain_row: number; chain5: number; source_rank_value: number }[]
+  per_source_rank: { id: string; value: number }[]
+  products: { key: string; label: string | null; project: { uuid: string; name: string | null }; case: { id: number; vid: number; created_at: string; version_hash: string }; f: number; f4: number }[]
+  gates: { g_sup: number; g_er: number }
+  declared: { ccf_groups: StationDoc['ccf_groups']; simplifications: string[] }
+}
+export const listStations = () => jgetStatus<{ id: number; name: string; modified_at: string; created_by: string }[]>('/station')
+export const getStation = (sid: number) => jgetStatus<StationDoc>(`/station/${sid}`)
+export const createStation = (doc: StationDoc) => jsendStatus<StationDoc>('/station', 'POST', doc)
+export const updateStation = (sid: number, doc: StationDoc) => jsendStatus<StationDoc>(`/station/${sid}`, 'PUT', doc)
+export const deleteStation = (sid: number) => jsendStatus<{ ok: boolean }>(`/station/${sid}`, 'DELETE')
+export const quantifyStation = (sid: number) => jgetStatus<StationQuantify>(`/station/${sid}/quantify`)
 export const createCompareGroup = (name: string, members: CompareMemberRef[], baseIndex: number) =>
   jsendStatus<CompareGroup>('/compare/groups', 'POST', { name, members, base_index: baseIndex })
 export const deleteCompareGroup = (gid: number) => jsendStatus<{ ok: boolean }>(`/compare/groups/${gid}`, 'DELETE')

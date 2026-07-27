@@ -26,6 +26,7 @@ import { useAuthStore } from './stores/authStore'
 
 const PortfolioTab = lazy(() => import('./features/portfolio/PortfolioTab').then((m) => ({ default: m.PortfolioTab })))
 const CompareTab = lazy(() => import('./features/compare/CompareTab').then((m) => ({ default: m.CompareTab })))
+const StationTab = lazy(() => import('./features/station/StationTab').then((m) => ({ default: m.StationTab })))
 
 // 启动关键路径(总览/ETA)不携带重库:FTA(reactflow)、参数库/FMEA(ag-grid)、
 // 结果图(echarts)等页签按需分块加载 —— 新窗口只解析 ETA 所需代码(性能报障修复 2026-07-09)
@@ -174,6 +175,8 @@ function AppShell() {
           <PortfolioTab persistence={persistence} setTab={setTab} />
         ) : tab === 'compare' ? (
           <CompareTab />
+        ) : tab === 'station' ? (
+          <StationTab />
         ) : tab === 'ft' ? (
           <FtaWorkbench lib={lib} ai={ai} persistence={persistence} example={example} />
         ) : tab === 'params' ? (

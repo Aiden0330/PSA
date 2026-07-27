@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
-export type MainTab = 'home' | 'ft' | 'bess' | 'params' | 'library' | 'cons' | 'fmea' | 'report' | 'portfolio' | 'compare'
+export type MainTab = 'home' | 'ft' | 'bess' | 'params' | 'library' | 'cons' | 'fmea' | 'report' | 'portfolio' | 'compare' | 'station'
 export type FtEditTarget =
   | { src: 'model' }
   | { src: 'eta'; etaKey: string; name: string }

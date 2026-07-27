@@ -5,7 +5,7 @@ import { useProjectStore } from '../../stores/projectStore'
 const TAB_NAME: Record<MainTab, string> = {
   home: '项目总览', bess: '事件树（ETA）', ft: '故障树（FTA）', params: '参数库 / CCF',
   library: '参考库', cons: '后果', fmea: 'FMEA', report: '报告与证据链', portfolio: '多项目组合总览',
-  compare: '系统对比',
+  compare: '系统对比', station: '站级评估',
 }
 
 /** Explorer 壳(R3)状态栏:真实信息(活动项目名/项目数/版本哈希/离线)——不放假指标。 */
