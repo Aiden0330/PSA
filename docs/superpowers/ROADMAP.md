@@ -714,3 +714,20 @@ fe **491** · py **300**(backend)· bundle 2.90MB。
 同步加载);新增「保存修改并重算」(updateStation,doc.id 在时可见);「创建并量化」
 更名「新建站型并量化」并加同名知情确认(保存双胞胎守卫同款)。锁测扩展(回填值 +
 updateStation 调用)。fe 491。
+
+## 2026-07-27 · 站级案例钉扎 + Word 报告章节(证据链出口,ST-4)
+
+**语义**:导出必经钉扎(与项目报告 auto-pin 同律)。`station_cases` 冻结站型文档
+(剥 id/时间戳,sorted-keys 紧凑 JSON)+ sha256 `doc_hash` + 量化结果 + 引擎版本,
+审计 `station.case.pin`;站型后续改名/改参不追溯已钉案例(锁测:改 intra_p 0.10→0.5
+后已钉案例逐位不动)。
+**后端**:`store.pin_station_case/list_station_cases/get_station_case`(读回必须在
+事务提交后——事务内另开连接读不到未提交行,已踩);`report_export.station_report_docx`
+(标签绑定在文档里同样成立:「≥5 舱(排内连片)」只配 ge5、「整排蔓延(k=排长)」只配
+ge_row,逐排 k 注记;产品表带版本哈希短码;口径申报逐字入文含「点值未计入跨舱 CCF」;
+站级签发通道未建 ⇒ 恒工作稿 + 诚实声明;免责句与参考库同源)。路由:POST
+`/api/station/{sid}/pin` · GET `/cases` · GET `/case/{cid}` · GET `/case/{cid}/report.docx`
+(openxml 媒体型,404 响亮含悬空成员 case_id)。py 锁 3(冻结+审计 / docx 内容与
+标签绑定 / 404)。
+**前端**:站页「钉扎并导出报告(Word)」(pin → 下载链接),锁测扩展。
+py **693** · fe **491** · bundle 2.90MB。

@@ -35,6 +35,7 @@ const Q = {
 }
 
 const updateSpy = vi.fn(() => Promise.resolve(DOC))
+const pinSpy = vi.fn(() => Promise.resolve({ id: 42, station_id: 7, doc_hash: 'h'.repeat(64), engine_version: 'x', created_at: 't', actor: 'a' }))
 vi.mock('../../api', async (orig) => ({
   ...(await orig() as object),
   listStations: () => Promise.resolve([{ id: 7, name: '试点站', modified_at: 't', created_by: 'x' }]),
@@ -43,6 +44,7 @@ vi.mock('../../api', async (orig) => ({
   getStation: () => Promise.resolve(DOC),
   quantifyStation: () => Promise.resolve(Q),
   updateStation: (...a: unknown[]) => updateSpy(...a as []),
+  pinStation: (...a: unknown[]) => pinSpy(...a as []),
 }))
 
 import { StationTab } from './StationTab'
@@ -91,5 +93,11 @@ describe('站级页', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 60)) })
     expect(updateSpy).toHaveBeenCalledTimes(1)
     expect((updateSpy.mock.calls[0] as unknown[])[0]).toBe(7)
+    // 证据链出口:钉扎并导出(pin → 下载链接指向案例 docx)
+    const pin = host!.querySelector('[data-testid="pin-report"]') as HTMLButtonElement
+    expect(pin).toBeTruthy()
+    act(() => { pin.click() })
+    await act(async () => { await new Promise((r) => setTimeout(r, 60)) })
+    expect(pinSpy).toHaveBeenCalledTimes(1)
   })
 })

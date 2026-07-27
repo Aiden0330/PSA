@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import {
   StatusError, createStation, deleteStation, getStation, getPortfolio, listProjectCases,
-  listStations, quantifyStation, updateStation,
+  listStations, pinStation, quantifyStation, stationCaseReportUrl, updateStation,
 } from '../../api'
 import type { CaseInfo, PortfolioRow, StationDoc, StationQuantify } from '../../api'
 
@@ -211,6 +211,18 @@ export function StationTab() {
               {doc?.id != null && (
                 <button data-testid="save-changes" className="psa-btn psa-btn--dark" disabled={busy} onClick={() => void saveChanges()}
                   title={`把上方表单保存回站型「${doc.name}」#${doc.id} 并重算`}>保存修改并重算</button>
+              )}
+              {doc?.id != null && q && (
+                <button data-testid="pin-report" className="psa-btn" disabled={busy}
+                  title="钉扎站级案例(冻结站型文档+量化结果+doc_hash,入审计)并下载 Word 报告——导出必经钉扎,可复现"
+                  onClick={() => { void (async () => {
+                    try {
+                      const c = await pinStation(doc.id!)
+                      const a = document.createElement('a')
+                      a.href = stationCaseReportUrl(c.id); a.download = `station-case-${c.id}.docx`
+                      document.body.appendChild(a); a.click(); a.remove()
+                    } catch (e) { setErr(`钉扎/导出失败:${String((e as Error)?.message ?? e)}`) }
+                  })() }}>钉扎并导出报告(Word)</button>
               )}
               {doc?.id != null && <button className="psa-btn psa-btn--danger" onClick={() => { if (window.confirm(`删除站型「${doc.name}」?`)) void deleteStation(doc.id!).then(() => { setDoc(null); setQ(null); setStations((p) => p.filter((s) => s.id !== doc.id)) }) }}>删除站型</button>}
             </div>

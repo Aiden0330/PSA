@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS station_models(
   name TEXT NOT NULL,
   doc_json TEXT NOT NULL,
   created_at TEXT NOT NULL, created_by TEXT NOT NULL, modified_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS station_cases(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  station_id INTEGER NOT NULL,
+  doc_json TEXT NOT NULL, doc_hash TEXT NOT NULL,
+  results_json TEXT NOT NULL,
+  engine_version TEXT NOT NULL,
+  created_at TEXT NOT NULL, actor TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS compare_groups(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -669,6 +676,46 @@ def delete_station(sid: int) -> bool:
         cx.execute("DELETE FROM station_models WHERE id=?", (sid,))
         record_audit(cx, "station.delete", details={"station_id": sid, "name": r["name"]})
         return True
+
+
+def pin_station_case(station_id: int, doc: dict, results: dict) -> dict:
+    """站级案例钉扎(功能② 证据链出口):冻结「站型文档 + 量化结果」,doc_hash =
+    文档规范序 sha256——站型后续修改不追溯已钉案例(不可变性锁测把守)。"""
+    import hashlib
+    frozen = {k: v for k, v in doc.items()
+              if k not in ("id", "created_at", "created_by", "modified_at")}
+    blob = json.dumps(frozen, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    doc_hash = hashlib.sha256(blob.encode("utf-8")).hexdigest()
+    with _conn() as cx:
+        cur = cx.execute(
+            "INSERT INTO station_cases(station_id,doc_json,doc_hash,results_json,engine_version,created_at,actor)"
+            " VALUES(?,?,?,?,?,?,?)",
+            (station_id, blob, doc_hash,
+             json.dumps(results, ensure_ascii=False), engine_version(), _now(), actor()))
+        cid = cur.lastrowid
+        record_audit(cx, "station.case.pin",
+                     details={"station_id": station_id, "case_id": cid, "doc_hash": doc_hash})
+    # 读回必须在事务提交之后(with 退出即提交)——事务内另开连接读不到未提交行
+    return get_station_case(cid)  # type: ignore[return-value]
+
+
+def list_station_cases(station_id: int) -> list[dict]:
+    with _conn() as cx:
+        return [{"id": r["id"], "station_id": r["station_id"], "doc_hash": r["doc_hash"],
+                 "engine_version": r["engine_version"], "created_at": r["created_at"], "actor": r["actor"]}
+                for r in cx.execute("SELECT * FROM station_cases WHERE station_id=? ORDER BY id DESC",
+                                    (station_id,))]
+
+
+def get_station_case(cid: int) -> Optional[dict]:
+    with _conn() as cx:
+        r = cx.execute("SELECT * FROM station_cases WHERE id=?", (cid,)).fetchone()
+        if r is None:
+            return None
+        d = dict(r)
+        d["doc"] = json.loads(d.pop("doc_json"))
+        d["results"] = json.loads(d.pop("results_json"))
+        return d
 
 
 def list_cases(puuid: str) -> list[dict]:

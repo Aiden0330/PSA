@@ -413,6 +413,9 @@ export const createStation = (doc: StationDoc) => jsendStatus<StationDoc>('/stat
 export const updateStation = (sid: number, doc: StationDoc) => jsendStatus<StationDoc>(`/station/${sid}`, 'PUT', doc)
 export const deleteStation = (sid: number) => jsendStatus<{ ok: boolean }>(`/station/${sid}`, 'DELETE')
 export const quantifyStation = (sid: number) => jgetStatus<StationQuantify>(`/station/${sid}/quantify`)
+export interface StationCase { id: number; station_id: number; doc_hash: string; engine_version: string; created_at: string; actor: string }
+export const pinStation = (sid: number) => jsendStatus<StationCase>(`/station/${sid}/pin`, 'POST')
+export const stationCaseReportUrl = (cid: number) => `${BASE}/station/case/${cid}/report.docx`
 export const createCompareGroup = (name: string, members: CompareMemberRef[], baseIndex: number) =>
   jsendStatus<CompareGroup>('/compare/groups', 'POST', { name, members, base_index: baseIndex })
 export const deleteCompareGroup = (gid: number) => jsendStatus<{ ok: boolean }>(`/compare/groups/${gid}`, 'DELETE')

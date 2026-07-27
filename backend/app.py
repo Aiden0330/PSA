@@ -789,6 +789,50 @@ def api_station_delete(sid: int, _=Depends(require_authenticated)):
     return {"ok": True}
 
 
+@app.post("/api/station/{sid}/pin")
+def api_station_pin(sid: int, _=Depends(require_authenticated)):
+    """站级案例钉扎:量化 + 冻结(文档+结果+doc_hash+引擎版本)。导出必经此处——
+    与项目报告 auto-pin 同律,可复现性是站级数字进文档的前提。"""
+    from backend import compare, station, store
+    s = store.get_station(sid)
+    if s is None:
+        raise HTTPException(404, f"no station {sid}")
+    try:
+        results = station.quantify(s)
+    except compare.CompareError as e:
+        raise HTTPException(e.status, e.detail)
+    return store.pin_station_case(sid, s, results)
+
+
+@app.get("/api/station/{sid}/cases")
+def api_station_cases(sid: int, _=Depends(require_authenticated)):
+    from backend import store
+    if store.get_station(sid) is None:
+        raise HTTPException(404, f"no station {sid}")
+    return store.list_station_cases(sid)
+
+
+@app.get("/api/station/case/{cid}")
+def api_station_case_get(cid: int, _=Depends(require_authenticated)):
+    from backend import store
+    c = store.get_station_case(cid)
+    if c is None:
+        raise HTTPException(404, f"no station case {cid}")
+    return c
+
+
+@app.get("/api/station/case/{cid}/report.docx")
+def api_station_case_report(cid: int, _=Depends(require_authenticated)):
+    from backend import report_export, store
+    c = store.get_station_case(cid)
+    if c is None:
+        raise HTTPException(404, f"no station case {cid}")
+    body = report_export.station_report_docx(c)
+    return Response(content=body,
+                    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    headers={"Content-Disposition": f'attachment; filename="station-case-{cid}.docx"'})
+
+
 @app.get("/api/station/{sid}/quantify")
 def api_station_quantify(sid: int, _=Depends(require_authenticated)):
     """站级量化(规格 2026-07-27 §2):舱级频率直读产品钉扎案例;站层组合公式见

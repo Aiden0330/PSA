@@ -540,3 +540,80 @@ def report_pdf(data: dict, scenario_name: str, tree_png: bytes | None,
         story += [Spacer(1, 4), Paragraph(_evidence_line(evidence), nm)]
     doc.build(story)
     return buf.getvalue()
+
+
+# ── 站级评估报告(功能② 证据链出口;规格 2026-07-27-station-model)────────────
+# 从**钉扎站级案例**生成(导出必经钉扎,项目报告 auto-pin 同律)。标签绑定铁律在文档
+# 里同样成立:「≥5 舱(排内连片)」只配 ge5,「整排蔓延(k=排长)」只配 ge_row(评审
+# BLOCKING-1);口径申报逐字入文,不许摘要化。站级签发通道未建 ⇒ 恒工作稿 + 诚实声明。
+
+_ST_KPI = [
+    ("any", "任一舱 C3+"), ("ge2", "多舱 ≥2 舱"),
+    ("ge5", "≥5 舱(排内连片)"), ("ge_row", "整排蔓延(k=排长)"), ("offsite", "站界外后果"),
+]
+
+
+def station_report_docx(case: dict) -> bytes:
+    from docx import Document
+    sdoc, res = case["doc"], case["results"]
+    d = Document()
+    d.add_heading(f"站级评估报告 · {sdoc.get('name', '站型')}", level=0)
+    d.add_paragraph(f"⚠ {_WORKING_MARK}(站级签发通道尚未建立,本报告恒为工作稿)")
+    d.add_paragraph(
+        f"评价依据:站级案例 #{case['id']} · 站型文档哈希 doc_hash {case['doc_hash'][:8]}"
+        f"({case['doc_hash']}) · 引擎 bess-psa {case['engine_version']}"
+        f" · {case['created_at']} · {case['actor']}")
+
+    d.add_heading("站级指标(/站·年)", level=1)
+    t = d.add_table(rows=1, cols=2); t.style = "Table Grid"
+    t.rows[0].cells[0].text = "指标"; t.rows[0].cells[1].text = "点值"
+    for key, label in _ST_KPI:
+        cells = t.add_row().cells
+        cells[0].text = label
+        cells[1].text = f"{res['metrics'].get(key, 0):.2e}"
+    ks = "、".join(f"{r['id']}:k={r['k']}" for r in res.get("rows", []))
+    if ks:
+        d.add_paragraph(f"逐排 k(整排指标的排长):{ks}")
+
+    d.add_heading("产品配置(舱 = 系统项目钉扎案例的版本快照实例)", level=1)
+    pt = d.add_table(rows=1, cols=5); pt.style = "Table Grid"
+    for i, h in enumerate(["产品", "舱级 C3+", "舱级 C4+", "模型版本哈希", "分析案例"]):
+        pt.rows[0].cells[i].text = h
+    for p in res.get("products", []):
+        cells = pt.add_row().cells
+        cells[0].text = f"{p['key']} · {p.get('label') or ''}"
+        cells[1].text = f"{p['f']:.2e}"; cells[2].text = f"{p['f4']:.2e}"
+        cells[3].text = f"v{p['case']['vid']} · {p['case']['version_hash'][:8]}"
+        cells[4].text = f"#{p['case']['id']} · {p['case']['created_at'][:10]}"
+
+    d.add_heading("站拓扑与蔓延参数", level=1)
+    ed = sdoc.get("edge_defaults", {})
+    d.add_paragraph(f"排内升级 p={ed.get('intra_p')} · 墙 p={ed.get('wall_p')}(衰减边,不截断)"
+                    f" · 跨排 p={ed.get('inter_row_p')} · 站界 p={sdoc.get('offsite', {}).get('p_fence')}")
+    for row in sdoc.get("rows", []):
+        walls = row.get("walls") or []
+        d.add_paragraph(f"排 {row['id']}:{len(row.get('cabins', []))} 舱"
+                        + (f",墙位 {walls}" if walls else ",无墙"), style="List Bullet")
+    bt = d.add_table(rows=1, cols=4); bt.style = "Table Grid"
+    for i, h in enumerate(["站级屏障", "PFD", "置信", "作用域/依据"]):
+        bt.rows[0].cells[i].text = h
+    for b in sdoc.get("station_barriers", []):
+        cells = bt.add_row().cells
+        cells[0].text = b.get("label", b.get("key", ""))
+        cells[1].text = str(b.get("pfd")); cells[2].text = b.get("grade") or "—"
+        cells[3].text = f"{b.get('scope', '')} · {b.get('basis', '')}"
+
+    d.add_heading("跨舱共因申报(v1 只申报,不入点值)", level=1)
+    for g in res.get("declared", {}).get("ccf_groups", []):
+        d.add_paragraph(f"{g.get('label', g.get('key'))} · β={g.get('beta')} · {g.get('basis', '')}",
+                        style="List Bullet")
+
+    d.add_heading("口径申报(逐字,随结果发布)", level=1)
+    for s in res.get("declared", {}).get("simplifications", []):
+        d.add_paragraph(s, style="List Bullet")
+
+    d.add_paragraph("")
+    d.add_paragraph("数据免责:内置数值为公开来源的参考量级,用于演示与初步筛查;"
+                    "正式工程分析必须结合项目实际数据校核替换,并由具备资质的工程师审核。")
+    buf = io.BytesIO(); d.save(buf)
+    return buf.getvalue()
