@@ -8,9 +8,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import {
   StatusError, compareAssemble, createCompareGroup, getPortfolio, listCompareGroups,
-  listProjectCases,
+  listProjectCases, listSaved,
 } from '../../api'
-import type { CompareAssembly, CompareGroup, CompareMemberRef, CaseInfo, PortfolioRow } from '../../api'
+import type { CompareAssembly, CompareGroup, CompareMemberRef, CaseInfo, PortfolioRow, SavedItem } from '../../api'
 import { FREQ_BANDS, SEVERITY_LABELS, CELLS, ZONE_COLORS, zoneOf, freqBandOf, C_TO_LEVEL } from '../../riskmatrix'
 import { RADAR_AXES, buildCsv, consPlus, deltaPct, radarScores } from './compareCalc'
 
@@ -44,11 +44,13 @@ export function CompareTab() {
   const [baseIdx, setBaseIdx] = useState(0)
   const [asm, setAsm] = useState<CompareAssembly | null>(null)
   const [groups, setGroups] = useState<CompareGroup[]>([])
+  const [savedList, setSavedList] = useState<SavedItem[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
   useEffect(() => {
     getPortfolio().then(setRows).catch((e) => setErr(`项目列表读取失败:${e?.message ?? e}`))
+    listSaved().then(setSavedList).catch(() => { /* 存档列表失败只影响幽灵行提示 */ })
     listCompareGroups().then(setGroups).catch(() => { /* 组列表失败不阻塞主流程 */ })
   }, [])
 
@@ -112,13 +114,21 @@ export function CompareTab() {
   // 同名缀 #uuid 短码;无案例项目禁选并在案例下拉给出生成路径提示。
   const pickable = useMemo(() => {
     const kept = rows.filter((r) => r.saved_id != null || r.latest_case != null)
-    kept.sort((x, y) => x.name.localeCompare(y.name, 'zh') || x.uuid.localeCompare(y.uuid))
-    const dup = (n: string) => kept.filter((r) => r.name === n).length > 1
-    return kept.map((r) => ({
+    // 报障 2026-07-27 第二轮:ADR-2 前的老存档从未双写入版本库 → portfolio 无行,
+    // 在下拉里整个消失(连灰条都没有)。并入"树里有、版本库没有"的幽灵存档,禁选 +
+    // 指明入库路径,保证树中可见者在此必可见。
+    const inStore = new Set(kept.map((r) => r.saved_id).filter(Boolean))
+    const phantoms = savedList.filter((w) => !inStore.has(w.id))
+      .map((w) => ({ uuid: `saved:${w.id}`, name: w.name, latest_case: null, phantom: true as const }))
+    const all = [...kept.map((r) => ({ ...r, phantom: false as const })), ...phantoms]
+    all.sort((x, y) => x.name.localeCompare(y.name, 'zh') || x.uuid.localeCompare(y.uuid))
+    const dup = (n: string) => all.filter((r) => r.name === n).length > 1
+    return all.map((r) => ({
       ...r,
-      optionLabel: `${r.name}${dup(r.name) ? ` #${r.uuid.slice(0, 4)}` : ''}${r.latest_case ? '' : '(无案例)'}`,
+      optionLabel: `${r.name}${dup(r.name) ? ` #${r.uuid.replace('saved:', '').slice(0, 4)}` : ''}${
+        r.phantom ? '(未入版本库)' : r.latest_case ? '' : '(无案例)'}`,
     }))
-  }, [rows])
+  }, [rows, savedList])
   const slotsReady = slots.length >= 2 && slots.every((s) => s.project_uuid && s.case_id != null)
 
   return (
@@ -158,7 +168,9 @@ export function CompareTab() {
                     <option value="">选择项目…</option>
                     {pickable.map((r) => (
                       <option key={r.uuid} value={r.uuid} disabled={!r.latest_case}
-                        title={r.latest_case ? undefined : '该项目尚无分析案例——先在其「报告与证据链」页导出报告(自动钉扎)'}>
+                        title={r.latest_case ? undefined
+                          : r.phantom ? '老存档尚未入版本库——打开该项目保存一次,再导出报告即可参与对比'
+                          : '该项目尚无分析案例——先在其「报告与证据链」页导出报告(自动钉扎)'}>
                         {r.optionLabel}
                       </option>
                     ))}
@@ -185,7 +197,7 @@ export function CompareTab() {
               )
             })}
             <div style={{ fontSize: 10.5, color: 'var(--psa-faint)' }}>
-              列表 = 项目树存档 ∪ 已有分析案例的钉扎项目(同名以 #id 区分);灰色「(无案例)」= 先到该项目「报告与证据链」页导出一次报告(自动钉扎)即可参与对比。
+              列表 = 项目树存档 ∪ 已有分析案例的钉扎项目(同名以 #id 区分;含已删存档但保留案例的项目——证据不随存档删除)。灰「(无案例)」= 到该项目报告页导出一次(自动钉扎);灰「(未入版本库)」= 老存档,打开保存一次再导出。
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {slots.length < 4 && (

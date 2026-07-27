@@ -24,6 +24,11 @@ const ROWS = [
 vi.mock('../../api', async (orig) => ({
   ...(await orig() as object),
   getPortfolio: () => Promise.resolve(ROWS),
+  // 幽灵存档:树里有(listSaved),版本库没有(portfolio 无 saved_id 对应行)——ADR-2 前老存档
+  listSaved: () => Promise.resolve([
+    { id: 's1', name: '供应商A', saved_at: 't' },
+    { id: 's-ghost', name: '默认热失控级联', saved_at: 't' },
+  ]),
   listCompareGroups: () => Promise.resolve([]),
   listProjectCases: (uuid: string) => Promise.resolve(uuid === 'u-arch-nocase' ? [] : [
     { id: 9, version_id: 3, kind: 'report', engine_version: 'x', created_at: '2026-07-17T00:00:00' },
@@ -65,6 +70,13 @@ describe('对比页选择器', () => {
     const noCaseOpt = [...sel.options].find((o) => o.value === 'u-arch-nocase')!
     expect(noCaseOpt.disabled).toBe(true)
     expect(noCaseOpt.textContent).toContain('(无案例)')
+    // 幽灵存档(未入版本库)必须可见且禁选——树中可见者在此必可见
+    const ghost = [...sel.options].find((o) => /默认热失控级联/.test(o.textContent || ''))!
+    expect(ghost).toBeTruthy()
+    expect(ghost.disabled).toBe(true)
+    expect(ghost.textContent).toContain('(未入版本库)')
+    // 已在版本库的存档(供应商A)不重复出现幽灵行
+    expect([...sel.options].filter((o) => /供应商A/.test(o.textContent || ''))).toHaveLength(1)
   })
 
   it('选中无案例项目 ⇒ 案例下拉禁用 + 生成路径提示;选满前运行禁用', async () => {
