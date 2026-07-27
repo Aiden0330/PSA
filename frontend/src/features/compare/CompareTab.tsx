@@ -107,6 +107,20 @@ export function CompareTab() {
 
   const names = useMemo(() => (asm ? asm.members.map((m) => m.project.name ?? m.project.uuid.slice(0, 8)) : []), [asm])
 
+  // 报障 2026-07-27:portfolio 是版本库全量(含自动钉扎/已删存档残留/测试残渣),与项目树
+  // 观感不一致且同名成堆。可选集收敛为「树中可见(有存档)∨ 已有分析案例」,名称字典序,
+  // 同名缀 #uuid 短码;无案例项目禁选并在案例下拉给出生成路径提示。
+  const pickable = useMemo(() => {
+    const kept = rows.filter((r) => r.saved_id != null || r.latest_case != null)
+    kept.sort((x, y) => x.name.localeCompare(y.name, 'zh') || x.uuid.localeCompare(y.uuid))
+    const dup = (n: string) => kept.filter((r) => r.name === n).length > 1
+    return kept.map((r) => ({
+      ...r,
+      optionLabel: `${r.name}${dup(r.name) ? ` #${r.uuid.slice(0, 4)}` : ''}${r.latest_case ? '' : '(无案例)'}`,
+    }))
+  }, [rows])
+  const slotsReady = slots.length >= 2 && slots.every((s) => s.project_uuid && s.case_id != null)
+
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--exp-bg)', padding: 16, boxSizing: 'border-box' }}>
       <div style={{ maxWidth: 1150, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -142,14 +156,24 @@ export function CompareTab() {
                     onChange={(e) => { setSlot(i, { project_uuid: e.target.value, case_id: null }); loadCases(e.target.value) }}
                     style={{ minWidth: 220, fontSize: 12 }}>
                     <option value="">选择项目…</option>
-                    {rows.map((r) => <option key={r.uuid} value={r.uuid}>{r.name}{r.versions ? '' : '(无版本)'}</option>)}
+                    {pickable.map((r) => (
+                      <option key={r.uuid} value={r.uuid} disabled={!r.latest_case}
+                        title={r.latest_case ? undefined : '该项目尚无分析案例——先在其「报告与证据链」页导出报告(自动钉扎)'}>
+                        {r.optionLabel}
+                      </option>
+                    ))}
                   </select>
                   <select data-testid={`slot-case-${i}`} value={s.case_id ?? ''}
                     onChange={(e) => setSlot(i, { case_id: e.target.value ? Number(e.target.value) : null })}
-                    style={{ minWidth: 240, fontSize: 12 }} disabled={!s.project_uuid}>
-                    <option value="">选择 report 案例…</option>
+                    style={{ minWidth: 240, fontSize: 12 }} disabled={!s.project_uuid || cs.length === 0}>
+                    <option value="">{s.project_uuid && cases[s.project_uuid] && cs.length === 0 ? '该项目暂无 report 案例' : '选择 report 案例…'}</option>
                     {cs.map((c) => <option key={c.id} value={c.id}>#{c.id} · v{c.version_id} · {c.created_at.slice(0, 10)}</option>)}
                   </select>
+                  {s.project_uuid && cases[s.project_uuid] && cs.length === 0 && (
+                    <span data-testid={`slot-nocase-${i}`} style={{ fontSize: 11, color: '#92400e', background: '#fef3c7', borderRadius: 5, padding: '2px 8px' }}>
+                      无 report 案例——到该项目「报告与证据链」页导出一次报告(自动钉扎)即可参与对比
+                    </span>
+                  )}
                   <label style={{ fontSize: 11.5, color: 'var(--psa-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <input type="radio" name="cmp-base" checked={baseIdx === i} onChange={() => setBaseIdx(i)} />基准
                   </label>
@@ -160,11 +184,16 @@ export function CompareTab() {
                 </div>
               )
             })}
+            <div style={{ fontSize: 10.5, color: 'var(--psa-faint)' }}>
+              列表 = 项目树存档 ∪ 已有分析案例的钉扎项目(同名以 #id 区分);灰色「(无案例)」= 先到该项目「报告与证据链」页导出一次报告(自动钉扎)即可参与对比。
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {slots.length < 4 && (
                 <button className="psa-btn" onClick={() => setSlots((p) => [...p, { project_uuid: '', case_id: null }])}>＋添加对比列</button>
               )}
-              <button className="psa-btn psa-btn--primary" disabled={busy} onClick={() => void run()}>{busy ? '组装中…' : '运行对比'}</button>
+              <button className="psa-btn psa-btn--primary" disabled={busy || !slotsReady}
+                title={slotsReady ? undefined : '每列都需选定项目与 report 案例后才能运行'}
+                onClick={() => void run()}>{busy ? '组装中…' : '运行对比'}</button>
               {asm && <button className="psa-btn" onClick={exportCsv}>导出 CSV</button>}
             </div>
           </div>
