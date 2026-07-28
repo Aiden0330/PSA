@@ -342,3 +342,55 @@ def quantify(doc: dict) -> dict:
         "declared": {"ccf_groups": doc.get("ccf_groups") or [],
                      "simplifications": _SIMPLIFICATIONS},
     }
+
+
+# ── ST-8 站型对比(纯装配:成员 = 已钉扎站级案例;绝不现算) ──────────────
+
+def compare_station_cases(ids: list[int]) -> dict:
+    """2–4 个钉扎案例并排:指标直读冻结 results;Δ = 成员/基准(首位)比值,基准
+    指标为 0 ⇒ ratio null(响亮示不可比,不 inf);配置摘要读冻结 doc;引擎版本
+    混排 ⇒ note 披露(可比性声明)。"""
+    if not 2 <= len(ids) <= 4:
+        raise CompareError(422, f"对比成员须为 2–4 个钉扎站级案例,实得 {len(ids)}")
+    members: list[dict] = []
+    for cid in ids:
+        c = store.get_station_case(cid)
+        if c is None:
+            raise CompareError(404, f"站级案例 {cid} 不存在(对比只认已钉扎案例)")
+        doc, res = c["doc"], c["results"]
+        rows = doc.get("rows") or []
+        ed = doc.get("edge_defaults") or {}
+        bars = {b["key"]: b for b in doc.get("station_barriers") or []}
+        ar = res.get("acceptance_results") or []
+        members.append({
+            "case_id": c["id"], "name": doc.get("name"), "doc_hash": c["doc_hash"],
+            "engine_version": c["engine_version"], "created_at": c["created_at"], "actor": c["actor"],
+            "metrics": res["metrics"], "bands": res.get("bands"),
+            "config": {
+                "n_rows": len(rows),
+                "n_cabins": sum(len(r.get("cabins") or []) for r in rows),
+                "n_walls": sum(len(r.get("walls") or []) for r in rows),
+                "intra_p": ed.get("intra_p"), "wall_p": ed.get("wall_p"),
+                "inter_row_p": ed.get("inter_row_p"),
+                "p_fence": (doc.get("offsite") or {}).get("p_fence"),
+                "g_sup": bars.get("sup", {}).get("pfd"), "g_er": bars.get("er", {}).get("pfd"),
+                "products": [{"key": p["key"], "label": p.get("label"),
+                              "version_hash": p["case"]["version_hash"]}
+                             for p in res.get("products") or []],
+                "n_acceptance": len(ar),
+                "n_fail": sum(1 for x in ar if x.get("verdict") == "fail"),
+            }})
+    base = members[0]
+    deltas = []
+    for m in members[1:]:
+        ratios = {}
+        for k in _METRICS:
+            b = float(base["metrics"].get(k, 0.0))
+            v = float(m["metrics"].get(k, 0.0))
+            ratios[k] = (v / b) if b > 0.0 else None
+        deltas.append({"case_id": m["case_id"], "ratios": ratios})
+    notes: list[str] = []
+    evs = {m["engine_version"] for m in members}
+    if len(evs) > 1:
+        notes.append(f"引擎版本混排({'、'.join(sorted(evs))})——数值可比性以各自钉扎时语义为准,升级后建议重钉基准")
+    return {"members": members, "deltas": deltas, "notes": notes}

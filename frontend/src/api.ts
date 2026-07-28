@@ -428,6 +428,20 @@ export const deleteStation = (sid: number) => jsendStatus<{ ok: boolean }>(`/sta
 export const quantifyStation = (sid: number) => jgetStatus<StationQuantify>(`/station/${sid}/quantify`)
 export interface StationCase { id: number; station_id: number; doc_hash: string; engine_version: string; created_at: string; actor: string }
 export const pinStation = (sid: number) => jsendStatus<StationCase>(`/station/${sid}/pin`, 'POST')
+export const listStationCases = (sid: number) => jgetStatus<StationCase[]>(`/station/${sid}/cases`)
+export interface StationCompareMember {
+  case_id: number; name: string; doc_hash: string; engine_version: string; created_at: string; actor: string
+  metrics: StationQuantify['metrics']; bands: StationQuantify['bands']
+  config: { n_rows: number; n_cabins: number; n_walls: number; intra_p: number; wall_p: number; inter_row_p: number | null
+            p_fence: number; g_sup: number; g_er: number; products: { key: string; label: string | null; version_hash: string }[]
+            n_acceptance: number; n_fail: number }
+}
+export interface StationCompare {
+  members: StationCompareMember[]
+  deltas: { case_id: number; ratios: Record<StationMetricKey, number | null> }[]
+  notes: string[]
+}
+export const compareStationCases = (ids: number[]) => jgetStatus<StationCompare>(`/station/compare?cases=${ids.join(',')}`)
 export const stationCaseReportUrl = (cid: number) => `${BASE}/station/case/${cid}/report.docx`
 export const createCompareGroup = (name: string, members: CompareMemberRef[], baseIndex: number) =>
   jsendStatus<CompareGroup>('/compare/groups', 'POST', { name, members, base_index: baseIndex })

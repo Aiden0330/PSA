@@ -8,10 +8,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import {
-  StatusError, createStation, deleteStation, getStation, getPortfolio, listProjectCases,
-  listStations, pinStation, quantifyStation, stationCaseReportUrl, updateStation,
+  StatusError, compareStationCases, createStation, deleteStation, getStation, getPortfolio,
+  listProjectCases, listStationCases, listStations, pinStation, quantifyStation,
+  stationCaseReportUrl, updateStation,
 } from '../../api'
-import type { StationMetricKey, CaseInfo, PortfolioRow, StationDoc, StationQuantify } from '../../api'
+import type { StationCase, StationCompare, StationMetricKey, CaseInfo, PortfolioRow, StationDoc, StationQuantify } from '../../api'
 
 const PCOLORS = ['#0f766e', '#2563eb', '#9333ea', '#b45309']
 const fmtE = (v: number | null | undefined) => (v == null ? '—' : v.toExponential(2))
@@ -20,6 +21,7 @@ const METRIC_LABEL: Record<string, string> = {
   ge_row: '整排蔓延(k=排长)', offsite: '站界外后果',
 }
 interface WizAcc { metric: string; limit: string; eval_basis: 'point' | 'p95'; basis: string; label: string }
+type StationCompareMemberT = StationCompare['members'][number]
 
 const th: CSSProperties = { fontSize: 11, color: 'var(--psa-muted)', textAlign: 'left', padding: '5px 10px', background: 'var(--psa-soft)', borderBottom: '1px solid var(--psa-line-2)' }
 const td: CSSProperties = { padding: '5px 10px', borderBottom: '1px solid var(--psa-line-2)', fontSize: 11.5 }
@@ -47,6 +49,16 @@ export function StationTab() {
   const [erPfd, setErPfd] = useState('0.20')
   const [fenceP, setFenceP] = useState('0.10')
   const [acc, setAcc] = useState<WizAcc[]>([])
+  // ST-8 对比态:槽位 = (站型, 钉扎案例);成员只认钉扎案例(证据链同律)
+  const [cmpSlots, setCmpSlots] = useState<{ sid: number | null; cid: number | null }[]>([
+    { sid: null, cid: null }, { sid: null, cid: null }])
+  const [stCases, setStCases] = useState<Record<number, StationCase[]>>({})
+  const [cmp, setCmp] = useState<StationCompare | null>(null)
+  const loadStCases = (sid: number) => {
+    if (stCases[sid]) return
+    listStationCases(sid).then((cs) => setStCases((p) => ({ ...p, [sid]: cs })))
+      .catch((e) => setErr(`站级案例列表读取失败:${e?.message ?? e}`))
+  }
 
   useEffect(() => {
     listStations().then(setStations).catch((e) => setErr(`站型列表读取失败:${e?.message ?? e}`))
@@ -419,6 +431,80 @@ export function StationTab() {
             </div>
           </>
         )}
+
+        {/* ── ST-8 站型对比(成员 = 已钉扎站级案例;Δ vs 基准 = 首位) ── */}
+        <div className="psa-panel">
+          <div className="psa-ch"><span className="t">站型对比</span>
+            <span className="meta">选 2–4 个钉扎案例并排;首位为基准;比值对基准指标为 0 的项显 —</span></div>
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 11.5 }}>
+              {cmpSlots.map((sl, i) => (
+                <span key={i} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                  {i === 0 ? '基准' : `成员${i + 1}`}
+                  <select data-testid={`cmp-station-${i}`} value={sl.sid ?? ''} style={{ fontSize: 11.5 }}
+                    onChange={(e) => { const v = Number(e.target.value) || null; setCmpSlots((x) => x.map((y, j) => j === i ? { sid: v, cid: null } : y)); if (v) loadStCases(v) }}>
+                    <option value="">站型…</option>
+                    {stations.map((st) => <option key={st.id} value={st.id}>{st.name} #{st.id}</option>)}
+                  </select>
+                  <select data-testid={`cmp-case-${i}`} value={sl.cid ?? ''} style={{ fontSize: 11.5 }}
+                    onChange={(e) => { const v = Number(e.target.value) || null; setCmpSlots((x) => x.map((y, j) => j === i ? { ...y, cid: v } : y)) }}>
+                    <option value="">钉扎案例…</option>
+                    {(sl.sid != null ? stCases[sl.sid] ?? [] : []).map((c) => (
+                      <option key={c.id} value={c.id}>#{c.id} · {c.created_at.slice(0, 10)} · {c.doc_hash.slice(0, 8)}</option>))}
+                  </select>
+                </span>
+              ))}
+              {cmpSlots.length < 4 && <button className="psa-btn" style={{ fontSize: 11 }}
+                onClick={() => setCmpSlots((x) => [...x, { sid: null, cid: null }])}>+ 成员</button>}
+              {cmpSlots.length > 2 && <button className="psa-btn" style={{ fontSize: 11 }}
+                onClick={() => setCmpSlots((x) => x.slice(0, -1))}>− 成员</button>}
+              <button className="psa-btn psa-btn--dark" data-testid="cmp-run" style={{ fontSize: 11.5 }}
+                disabled={busy || cmpSlots.some((sl) => sl.cid == null)}
+                onClick={() => { void (async () => {
+                  setErr(''); setBusy(true)
+                  try { setCmp(await compareStationCases(cmpSlots.map((sl) => sl.cid as number))) }
+                  catch (e) { setErr(e instanceof StatusError ? e.message : String((e as Error)?.message ?? e)) }
+                  finally { setBusy(false) }
+                })() }}>对比</button>
+              <span style={{ fontSize: 10.5, color: 'var(--psa-faint)' }}>没有案例?先在上方「钉扎并导出报告」生成钉扎案例。</span>
+            </div>
+            {cmp && (
+              <div style={{ overflowX: 'auto' }}>
+                {cmp.notes.map((n, i) => <div key={i} style={{ fontSize: 11, color: '#b45309' }}>⚠ {n}</div>)}
+                <table data-testid="cmp-table" style={{ borderCollapse: 'collapse', minWidth: 560 }}><thead>
+                  <tr><th style={th}>指标(/站·年)</th>
+                    {cmp.members.map((m, i) => (
+                      <th key={m.case_id} style={th}>{m.name} · 案例#{m.case_id}
+                        <span style={{ fontFamily: 'var(--psa-font-mono)', fontWeight: 400 }}> {m.doc_hash.slice(0, 8)}</span>
+                        {i === 0 && <span style={{ marginLeft: 4, fontSize: 9.5, background: '#e0e7ff', color: '#3730a3', borderRadius: 4, padding: '1px 4px' }}>基准</span>}
+                      </th>))}
+                  </tr></thead><tbody>
+                  {(Object.entries(METRIC_LABEL) as [StationMetricKey, string][]).map(([mk, ml]) => (
+                    <tr key={mk}>
+                      <td style={td}>{ml}</td>
+                      {cmp.members.map((m, i) => {
+                        const r = i === 0 ? null : cmp.deltas[i - 1]?.ratios[mk]
+                        return (
+                          <td key={m.case_id} style={td} className="psa-num">
+                            <span style={{ fontFamily: 'var(--psa-font-mono)' }}>{fmtE(m.metrics[mk])}</span>
+                            {i > 0 && <span style={{ marginLeft: 6, fontSize: 10.5,
+                              color: r == null ? 'var(--psa-faint)' : r > 1 ? '#b91c1c' : r < 1 ? '#15803d' : 'var(--psa-faint)' }}>
+                              {r == null ? '—' : `×${r.toFixed(2)}`}</span>}
+                          </td>)
+                      })}
+                    </tr>))}
+                  {([['舱数', (m: StationCompareMemberT) => m.config.n_cabins], ['排数', (m: StationCompareMemberT) => m.config.n_rows],
+                     ['墙数', (m: StationCompareMemberT) => m.config.n_walls], ['排内 p', (m: StationCompareMemberT) => m.config.intra_p],
+                     ['站界 p', (m: StationCompareMemberT) => m.config.p_fence],
+                     ['FAIL 准则', (m: StationCompareMemberT) => `${m.config.n_fail}/${m.config.n_acceptance}`]] as const).map(([l, get]) => (
+                    <tr key={l}><td style={td}>{l}</td>
+                      {cmp.members.map((m) => <td key={m.case_id} style={td} className="psa-num">{String(get(m))}</td>)}
+                    </tr>))}
+                </tbody></table>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

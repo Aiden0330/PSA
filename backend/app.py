@@ -764,6 +764,21 @@ def api_station_list(_=Depends(require_authenticated)):
     return store.list_stations()
 
 
+@app.get("/api/station/compare")
+def api_station_compare(cases: str, _=Depends(require_authenticated)):
+    """ST-8 站型对比(成员 = 钉扎站级案例 id 逗号串)。注意:须注册在 /station/{sid}
+    之前——FastAPI 按定义序匹配,后定义会被 {sid} 把 'compare' 当 id 吞掉(已踩)。"""
+    from backend import compare, station
+    try:
+        ids = [int(x) for x in cases.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(422, f"cases 须为逗号分隔的案例 id:{cases!r}")
+    try:
+        return station.compare_station_cases(ids)
+    except compare.CompareError as e:
+        raise HTTPException(e.status, e.detail)
+
+
 @app.get("/api/station/{sid}")
 def api_station_get(sid: int, _=Depends(require_authenticated)):
     from backend import store

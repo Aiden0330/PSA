@@ -43,6 +43,19 @@ const Q = {
 
 const updateSpy = vi.fn(() => Promise.resolve(DOC))
 const pinSpy = vi.fn(() => Promise.resolve({ id: 42, station_id: 7, doc_hash: 'h'.repeat(64), engine_version: 'x', created_at: 't', actor: 'a' }))
+const CMP = {
+  members: [
+    { case_id: 41, name: '试点站', doc_hash: 'a'.repeat(64), engine_version: 'x', created_at: '2026-07-27T00:00:00', actor: 'u',
+      metrics: { any: 2.2e-4, ge2: 3.3e-6, ge5: 0, ge_row: 2.0e-11, offsite: 1.1e-6 }, bands: null,
+      config: { n_rows: 1, n_cabins: 2, n_walls: 0, intra_p: 0.1, wall_p: 0.03, inter_row_p: 0.02, p_fence: 0.1, g_sup: 0.29, g_er: 0.2, products: [], n_acceptance: 2, n_fail: 1 } },
+    { case_id: 42, name: '试点站', doc_hash: 'b'.repeat(64), engine_version: 'x', created_at: '2026-07-27T00:00:00', actor: 'u',
+      metrics: { any: 2.2e-4, ge2: 6.6e-6, ge5: 0, ge_row: 8.0e-11, offsite: 1.1e-6 }, bands: null,
+      config: { n_rows: 1, n_cabins: 2, n_walls: 0, intra_p: 0.2, wall_p: 0.03, inter_row_p: 0.02, p_fence: 0.1, g_sup: 0.29, g_er: 0.2, products: [], n_acceptance: 2, n_fail: 0 } },
+  ],
+  deltas: [{ case_id: 42, ratios: { any: 1.0, ge2: 2.0, ge5: null, ge_row: 4.0, offsite: 1.0 } }],
+  notes: [],
+}
+const cmpSpy = vi.fn(() => Promise.resolve(CMP))
 vi.mock('../../api', async (orig) => ({
   ...(await orig() as object),
   listStations: () => Promise.resolve([{ id: 7, name: '试点站', modified_at: 't', created_by: 'x' }]),
@@ -52,6 +65,11 @@ vi.mock('../../api', async (orig) => ({
   quantifyStation: () => Promise.resolve(Q),
   updateStation: (...a: unknown[]) => updateSpy(...a as []),
   pinStation: (...a: unknown[]) => pinSpy(...a as []),
+  listStationCases: () => Promise.resolve([
+    { id: 41, station_id: 7, doc_hash: 'a'.repeat(64), engine_version: 'x', created_at: '2026-07-27T00:00:00', actor: 'u' },
+    { id: 42, station_id: 7, doc_hash: 'b'.repeat(64), engine_version: 'x', created_at: '2026-07-27T00:00:00', actor: 'u' },
+  ]),
+  compareStationCases: (...a: unknown[]) => cmpSpy(...a as []),
 }))
 
 import { StationTab } from './StationTab'
@@ -117,5 +135,25 @@ describe('站级页', () => {
     expect(host!.querySelector('[data-testid="acc-chip-0"]')?.textContent).toContain('PASS')
     expect(host!.querySelector('[data-testid="acc-chip-1"]')?.textContent).toContain('FAIL')
     expect(host!.querySelector('[data-testid="acc-fail-banner"]')?.textContent).toContain('未通过')
+    // ST-8:对比面板——两槽选钉扎案例 → 对比 → 表格值 + Δ 比值(null → —)
+    const setSel = (tid: string, v: string) => {
+      const el = host!.querySelector(`[data-testid="${tid}"]`) as HTMLSelectElement
+      const proto = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!
+      proto.set!.call(el, v)
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    act(() => { setSel('cmp-station-0', '7') })
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)) })
+    act(() => { setSel('cmp-case-0', '41') })
+    act(() => { setSel('cmp-station-1', '7') })
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)) })
+    act(() => { setSel('cmp-case-1', '42') })
+    act(() => { (host!.querySelector('[data-testid="cmp-run"]') as HTMLButtonElement).click() })
+    await act(async () => { await new Promise((r) => setTimeout(r, 60)) })
+    expect(cmpSpy).toHaveBeenCalledWith([41, 42])
+    const tbl = host!.querySelector('[data-testid="cmp-table"]')
+    expect(tbl?.textContent).toContain('×4.00')              // ge_row 比值
+    expect(tbl?.textContent).toContain('基准')
+    expect(tbl?.textContent).toContain('1/2')                // FAIL 准则 1/2
   })
 })
