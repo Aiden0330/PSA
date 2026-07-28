@@ -398,12 +398,16 @@ export interface StationDoc {
   ccf_groups: { key: string; label: string; member_products: string[]; beta: number; basis?: string }[]
   offsite: { p_fence: number; basis?: string }
 }
+export interface StationBand { p05: number; p50: number; p95: number }
 export interface StationQuantify {
   metrics: { any: number; ge2: number; ge5: number; ge_row: number; offsite: number }
+  // ST-6:同分位合成带(全联动包络);全产品无带时为 null,band_notes 说明空缺
+  bands: { any: StationBand; ge2: StationBand; ge5: StationBand; ge_row: StationBand; offsite: StationBand } | null
+  band_notes: string[]
   rows: { id: string; k: number }[]
   per_cabin: { id: string; product: string; row: string; f: number; f4: number; esc: number; chain_row: number; chain5: number; source_rank_value: number }[]
   per_source_rank: { id: string; value: number }[]
-  products: { key: string; label: string | null; project: { uuid: string; name: string | null }; case: { id: number; vid: number; created_at: string; version_hash: string }; f: number; f4: number }[]
+  products: { key: string; label: string | null; project: { uuid: string; name: string | null }; case: { id: number; vid: number; created_at: string; version_hash: string }; f: number; f4: number; band_status: 'full' | 'partial' | 'none'; f_band: StationBand | null }[]
   gates: { g_sup: number; g_er: number }
   declared: { ccf_groups: StationDoc['ccf_groups']; simplifications: string[] }
 }

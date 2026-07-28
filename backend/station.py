@@ -167,22 +167,12 @@ def validate_station(doc: dict) -> None:
             raise CompareError(422, f"产品 '{p.get('key')}' 案例 {p['case_id']} 无 consequences——不得以 0 频率静默入站(评审 R-6)")
 
 
-def quantify(doc: dict) -> dict:
-    validate_station(doc)
-    prods: dict[str, dict] = {}
-    for p in doc["products"]:
-        case = _load_case(p["project_uuid"], int(p["case_id"]))
-        res = json.loads(case.get("results_json") or "{}")
-        cons = res.get("consequences") or {}
-        proj = store.get_project(p["project_uuid"]) or {}
-        prods[p["key"]] = {
-            "key": p["key"], "label": p.get("label") or proj.get("name"),
-            "project": {"uuid": p["project_uuid"], "name": proj.get("name")},
-            "case": {"id": case["id"], "vid": case["version_id"],
-                     "created_at": case["created_at"], "version_hash": case["content_hash"]},
-            "f": _tail(cons, ("C3", "C4", "C5")),
-            "f4": _tail(cons, ("C4", "C5")),
-        }
+_QS = ("p05", "p50", "p95")
+
+
+def _eval_metrics(doc: dict, fmap: dict[str, tuple[float, float]]) -> tuple[dict, list, list, dict]:
+    """五指标 + per_cabin + row_meta;fmap: 产品键 → (f, f4)。点值与带走同一条代码路
+    (规格 ST-6 §4:点/带永不分叉;点值调用即 v1 原算式原顺序,逐位不变有锁)。"""
     barriers = {b["key"]: b for b in doc.get("station_barriers") or []}
     g_sup = float(barriers.get("sup", {}).get("pfd", 1.0))
     g_er = float(barriers.get("er", {}).get("pfd", 1.0))
@@ -202,8 +192,8 @@ def quantify(doc: dict) -> dict:
     for row in rows:
         cabs = row["cabins"]
         edges = _row_edges(row, defaults, overrides)
-        fs = [prods[c["product"]]["f"] for c in cabs]
-        f4s = [prods[c["product"]]["f4"] for c in cabs]
+        fs = [fmap[c["product"]][0] for c in cabs]
+        f4s = [fmap[c["product"]][1] for c in cabs]
         esc = esc_per_cabin(edges, inter_p, n_other)
         chain_row = chain_per_cabin(edges, k=len(cabs)) if len(cabs) >= 2 else [0.0] * len(cabs)
         chain5 = chain_per_cabin(edges, k=5) if len(cabs) >= 5 else [0.0] * len(cabs)
@@ -218,14 +208,101 @@ def quantify(doc: dict) -> dict:
                               "f": f, "f4": f4v, "esc": e, "chain_row": ch, "chain5": c5,
                               "source_rank_value": f * c5})
     offsite = f_offsite(all_f4, float((doc.get("offsite") or {}).get("p_fence", 0.0)))
+    metrics = {"any": f_any(all_f), "ge2": ge2, "ge5": ge5, "ge_row": ge_row, "offsite": offsite}
+    return metrics, per_cabin, row_meta, {"g_sup": g_sup, "g_er": g_er}
+
+
+def _chk_case_bands(pkey: str, bands: dict) -> None:
+    """带健全性:C3/C4/C5 出现即须三分位齐、数值、≥0、p05≤p50≤p95(倒挂带喂出
+    倒挂站级带 = 静默胡说,422 点名产品与箱)。C1/C2 不参与不校验。"""
+    for k in ("C3", "C4", "C5"):
+        if k not in bands:
+            continue
+        b = bands[k]
+        try:
+            vs = [float(b[q]) for q in _QS]
+        except (KeyError, TypeError, ValueError):
+            raise CompareError(422, f"产品 {pkey} 箱 {k} 带残缺/非数值:{b!r}")
+        if any(v < 0 for v in vs) or not vs[0] <= vs[1] <= vs[2]:
+            raise CompareError(422, f"产品 {pkey} 箱 {k} 带倒挂或越界:p05={vs[0]} p50={vs[1]} p95={vs[2]}")
+
+
+def _product_tail_bands(pkey: str, cons: dict, bands: dict) -> tuple[str, dict | None, list[str]]:
+    """尾和分位(规格 §2):tail_q = Σ 箱 band[q](有带)或点值(无带退化)。
+    返回 (band_status, {q: (f_q, f4_q)} | None, notes)。"""
+    participating = [k for k in ("C3", "C4", "C5") if float(cons.get(k, 0.0)) > 0.0]
+    have = [k for k in participating if k in bands]
+    notes: list[str] = []
+    if not have and participating:
+        return "none", None, [f"产品 {pkey} 无不确定带,以点值参与全部分位"]
+    status = "full" if len(have) == len(participating) else "partial"
+    for k in participating:
+        if k not in bands:
+            notes.append(f"产品 {pkey}:箱 {k} 点值>0 无带,以点值参与全部分位")
+    tails = {}
+    for q in _QS:
+        def _t(keys: tuple[str, ...]) -> float:
+            return sum(float(bands[k][q]) if k in bands else float(cons.get(k, 0.0)) for k in keys)
+        tails[q] = (_t(("C3", "C4", "C5")), _t(("C4", "C5")))
+    return status, tails, notes
+
+
+def quantify(doc: dict) -> dict:
+    validate_station(doc)
+    prods: dict[str, dict] = {}
+    cons_by_key: dict[str, dict] = {}
+    bands_by_key: dict[str, dict] = {}
+    for p in doc["products"]:
+        case = _load_case(p["project_uuid"], int(p["case_id"]))
+        res = json.loads(case.get("results_json") or "{}")
+        cons = res.get("consequences") or {}
+        cons_by_key[p["key"]] = cons
+        bands_by_key[p["key"]] = res.get("bands") or {}
+        _chk_case_bands(p["key"], bands_by_key[p["key"]])
+        proj = store.get_project(p["project_uuid"]) or {}
+        prods[p["key"]] = {
+            "key": p["key"], "label": p.get("label") or proj.get("name"),
+            "project": {"uuid": p["project_uuid"], "name": proj.get("name")},
+            "case": {"id": case["id"], "vid": case["version_id"],
+                     "created_at": case["created_at"], "version_hash": case["content_hash"]},
+            "f": _tail(cons, ("C3", "C4", "C5")),
+            "f4": _tail(cons, ("C4", "C5")),
+        }
+    fmap_point = {k: (p["f"], p["f4"]) for k, p in prods.items()}
+    metrics, per_cabin, row_meta, gates = _eval_metrics(doc, fmap_point)
+
+    # ── 站级带(规格 ST-6:同分位代入 = 全联动包络;绝不现算,只合成已存分位)──
+    band_notes: list[str] = []
+    tails_by_key: dict[str, dict | None] = {}
+    for k in prods:
+        status, tails, notes = _product_tail_bands(k, cons_by_key[k], bands_by_key[k])
+        prods[k]["band_status"] = status
+        prods[k]["f_band"] = ({q: tails[q][0] for q in _QS} if tails else None)
+        tails_by_key[k] = tails
+        band_notes.extend(notes)
+    if all(t is None for t in tails_by_key.values()):
+        bands = None
+        band_notes.append("全部产品案例无不确定带(bands)——站级带不可合成;需在系统项目跑不确定性并重新钉扎")
+    else:
+        bands = {m: {} for m in metrics}
+        for q in _QS:
+            fmap_q = {k: (tails_by_key[k][q] if tails_by_key[k] else fmap_point[k]) for k in prods}
+            m_q, _, _, _ = _eval_metrics(doc, fmap_q)
+            for m in metrics:
+                bands[m][q] = m_q[m]
+        band_notes.append("带口径:同分位代入=认知全联动包络(同产品跨舱为精确 SOKC;跨产品同分位为保守包络);"
+                          "站级参数(边概率/站级屏障 PFD/围栏)以点值参与,不贡献带宽")
+
     rank = sorted(per_cabin, key=lambda c: c["source_rank_value"], reverse=True)[:5]
     return {
-        "metrics": {"any": f_any(all_f), "ge2": ge2, "ge5": ge5, "ge_row": ge_row, "offsite": offsite},
+        "metrics": metrics,
+        "bands": bands,
+        "band_notes": band_notes,
         "rows": row_meta,
         "per_cabin": per_cabin,
         "per_source_rank": [{"id": r["id"], "value": r["source_rank_value"]} for r in rank],
         "products": list(prods.values()),
-        "gates": {"g_sup": g_sup, "g_er": g_er},
+        "gates": gates,
         "declared": {"ccf_groups": doc.get("ccf_groups") or [],
                      "simplifications": _SIMPLIFICATIONS},
     }

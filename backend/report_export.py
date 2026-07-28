@@ -565,15 +565,24 @@ def station_report_docx(case: dict) -> bytes:
         f" · {case['created_at']} · {case['actor']}")
 
     d.add_heading("站级指标(/站·年)", level=1)
-    t = d.add_table(rows=1, cols=2); t.style = "Table Grid"
-    t.rows[0].cells[0].text = "指标"; t.rows[0].cells[1].text = "点值"
+    bands = res.get("bands")                      # ST-6:钉扎案例带 bands 时增三列;旧案例原版式
+    ncols = 5 if bands else 2
+    t = d.add_table(rows=1, cols=ncols); t.style = "Table Grid"
+    heads = ["指标", "点值"] + (["P05", "P50", "P95"] if bands else [])
+    for i, h in enumerate(heads):
+        t.rows[0].cells[i].text = h
     for key, label in _ST_KPI:
         cells = t.add_row().cells
         cells[0].text = label
         cells[1].text = f"{res['metrics'].get(key, 0):.2e}"
+        if bands:
+            for i, q in enumerate(("p05", "p50", "p95")):
+                cells[2 + i].text = f"{bands.get(key, {}).get(q, 0):.2e}"
     ks = "、".join(f"{r['id']}:k={r['k']}" for r in res.get("rows", []))
     if ks:
         d.add_paragraph(f"逐排 k(整排指标的排长):{ks}")
+    for n in res.get("band_notes", []):            # 带口径与部分带记账,随表落文(不可省略)
+        d.add_paragraph(n, style="List Bullet")
 
     d.add_heading("产品配置(舱 = 系统项目钉扎案例的版本快照实例)", level=1)
     pt = d.add_table(rows=1, cols=5); pt.style = "Table Grid"

@@ -745,3 +745,18 @@ mf−(m−1)βf ⇒ any/offsite 微降、多舱指标大增(夹具站 ge2 ×1.70
 门控 R-0..R-6(1 passed 7 skipped)。纯入口 `quantify_pure(doc, freqs)` 契约
 入规格——锚点免建库直测。数值全部由规格公式独立推导,未过 engine-reviewer
 (用户裁定跳过);实现时按 §8 锁迁移清单执行。
+
+## 2026-07-27 · 站级不确定带(ST-6)——同分位合成,绝不现算
+
+**语义**([规格](specs/2026-07-27-station-bands.md)):站级五指标对舱级频率单调
+递增 ⇒ 各产品尾和 q 分位代入 = 认知全联动假设下输出的精确 q 分位(有定理的包络,
+非拼凑)。同产品跨舱 = 精确 SOKC;跨产品同分位 = 申报的保守包络;尾和分位 =
+Σ 箱 band[q];站级参数点值参与(申报)。点值>0 无带的箱以点值参与并响亮记账
+(partial);全无带 ⇒ bands null + note;倒挂/残缺带 422 点名产品与箱。
+**实现**:v1 行循环抽成 `_eval_metrics(doc, fmap)` 单代码路径——点值调用即原算
+式原顺序(逐位不变,闭式锁在案),带调用同函数换 fmap,点/带永不分叉。响应增
+`bands`/`band_notes`/产品 `band_status`+`f_band`。docx KPI 表带 bands 时增
+P05/P50/P95 三列 + notes 段(旧钉扎案例原版式,向后兼容)。KPI 卡点值下带行
+(p05–p95 + p50 括注),band_notes 进不可隐藏申报区。锚点 4(合成手算值/带序/
+点值通道不变/status/notes · null+note · 422 · docx 带列)+ fe 锁。
+py **695** · fe **491** · bundle 2.90MB。

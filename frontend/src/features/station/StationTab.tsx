@@ -233,12 +233,18 @@ export function StationTab() {
           <>
             {/* ── KPI(标签绑定铁律:≥5 舱 ↔ ge5;整排 ↔ ge_row) ── */}
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {([['任一舱 C3+', q.metrics.any, ''], ['多舱 ≥2 舱', q.metrics.ge2, ''],
-                 ['≥5 舱(排内连片)', q.metrics.ge5, 'kpi-ge5'], ['整排蔓延(k=排长)', q.metrics.ge_row, 'kpi-gerow'],
-                 ['站界外后果', q.metrics.offsite, '']] as const).map(([l, v, tid]) => (
+              {([['任一舱 C3+', q.metrics.any, '', 'any'], ['多舱 ≥2 舱', q.metrics.ge2, '', 'ge2'],
+                 ['≥5 舱(排内连片)', q.metrics.ge5, 'kpi-ge5', 'ge5'], ['整排蔓延(k=排长)', q.metrics.ge_row, 'kpi-gerow', 'ge_row'],
+                 ['站界外后果', q.metrics.offsite, '', 'offsite']] as const).map(([l, v, tid, mk]) => (
                 <div key={l} data-testid={tid || undefined} style={{ border: '1px solid var(--psa-line)', borderRadius: 8, padding: '6px 12px', background: 'var(--psa-surface)' }}>
                   <div style={{ fontSize: 10, color: 'var(--psa-faint)' }}>{l}(/站·年)</div>
                   <div className="psa-num" style={{ fontFamily: 'var(--psa-font-mono)', fontSize: 15, fontWeight: 700 }}>{fmtE(v)}</div>
+                  {q.bands && (
+                    <div data-testid={tid ? `${tid}-band` : undefined} style={{ fontSize: 9.5, color: 'var(--psa-faint)', fontFamily: 'var(--psa-font-mono)' }}
+                      title="不确定带:同分位合成(全联动包络);p50 为 MC 中位数,与解析点值可不同">
+                      {fmtE(q.bands[mk].p05)} – {fmtE(q.bands[mk].p95)}(p50 {fmtE(q.bands[mk].p50)})
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -349,6 +355,7 @@ export function StationTab() {
             <div data-testid="simplifications" style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', borderRadius: 8, padding: '9px 13px', fontSize: 11.5, lineHeight: 1.7 }}>
               <b>口径申报(随结果发布,不可隐藏)</b>
               {q.declared.simplifications.map((s, i) => <div key={i}>· {s}</div>)}
+              {q.band_notes?.map((s, i) => <div key={`b${i}`}>◦ {s}</div>)}
             </div>
           </>
         )}

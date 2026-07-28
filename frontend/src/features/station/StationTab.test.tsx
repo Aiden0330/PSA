@@ -21,15 +21,18 @@ const DOC = {
   ccf_groups: [{ key: 'fw-A', label: 'A 固件', member_products: ['A'], beta: 0.05 }],
   offsite: { p_fence: 0.1 },
 }
+const _B = (m: number) => ({ p05: m / 3, p50: m, p95: m * 3 })
 const Q = {
   metrics: { any: 2.2e-4, ge2: 3.3e-6, ge5: 4.7e-8, ge_row: 2.0e-11, offsite: 1.1e-6 },
+  bands: { any: _B(2.2e-4), ge2: _B(3.3e-6), ge5: _B(4.7e-8), ge_row: _B(2.0e-11), offsite: _B(1.1e-6) },
+  band_notes: ['产品 A:箱 C3 点值>0 无带,以点值参与全部分位'],
   rows: [{ id: 'Z1', k: 2 }],
   per_cabin: [
     { id: 'Z1-01', product: 'A', row: 'Z1', f: 1.1e-4, f4: 1.1e-5, esc: 0.03, chain_row: 0.03, chain5: 0.0, source_rank_value: 0 },
     { id: 'Z1-02', product: 'A', row: 'Z1', f: 1.1e-4, f4: 1.1e-5, esc: 0.03, chain_row: 0.03, chain5: 0.0, source_rank_value: 0 },
   ],
   per_source_rank: [],
-  products: [{ key: 'A', label: '供应商A', project: { uuid: 'u1', name: '供应商A' }, case: { id: 9, vid: 3, created_at: '2026-07-17T00:00:00', version_hash: 'f'.repeat(64) }, f: 1.1e-4, f4: 1.1e-5 }],
+  products: [{ key: 'A', label: '供应商A', project: { uuid: 'u1', name: '供应商A' }, case: { id: 9, vid: 3, created_at: '2026-07-17T00:00:00', version_hash: 'f'.repeat(64) }, f: 1.1e-4, f4: 1.1e-5, band_status: 'partial', f_band: _B(1.1e-4) }],
   gates: { g_sup: 0.29, g_er: 1 },
   declared: { ccf_groups: DOC.ccf_groups, simplifications: ['点值未计入跨舱 CCF(…)', 'ge5 只计排内连片…'] },
 }
@@ -99,5 +102,11 @@ describe('站级页', () => {
     act(() => { pin.click() })
     await act(async () => { await new Promise((r) => setTimeout(r, 60)) })
     expect(pinSpy).toHaveBeenCalledTimes(1)
+    // ST-6:带行渲染在 ge5 卡内(p05–p95 + p50),band_notes 进不可隐藏申报区
+    const band = host!.querySelector('[data-testid="kpi-ge5-band"]')
+    expect(band?.textContent).toContain('1.57e-8')           // 4.7e-8/3 → toExponential(2)
+    expect(band?.textContent).toContain('1.41e-7')           // 4.7e-8×3
+    const simp = host!.querySelector('[data-testid="simplifications"]')
+    expect(simp?.textContent).toContain('无带,以点值参与全部分位')
   })
 })
