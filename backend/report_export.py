@@ -584,6 +584,29 @@ def station_report_docx(case: dict) -> bytes:
     for n in res.get("band_notes", []):            # 带口径与部分带记账,随表落文(不可省略)
         d.add_paragraph(n, style="List Bullet")
 
+    ar = res.get("acceptance_results") or []
+    if ar:                                        # ST-7:判定章(判据口径/basis 逐条落文;FAIL 章首声明)
+        d.add_heading("验收准则判定", level=1)
+        kmap = dict(_ST_KPI)
+        if any(x["verdict"] == "fail" for x in ar):
+            d.add_paragraph("⚠ 存在未通过准则(FAIL)——见下表。本报告为工作稿,判定不构成签发结论。")
+        at = d.add_table(rows=1, cols=7); at.style = "Table Grid"
+        for i, h in enumerate(["准则", "指标", "判据口径", "限值", "取值", "判定", "裕度(取值/限值)"]):
+            at.rows[0].cells[i].text = h
+        _V = {"pass": "PASS", "fail": "FAIL", "indeterminate": "无带不可判"}
+        for x in ar:
+            cells = at.add_row().cells
+            cells[0].text = x.get("label") or x["metric"]
+            cells[1].text = kmap.get(x["metric"], x["metric"])
+            cells[2].text = "点值" if x["eval_basis"] == "point" else "P95(保守)"
+            cells[3].text = f"{x['limit']:.2e}"
+            cells[4].text = "—" if x["value"] is None else f"{x['value']:.2e}"
+            cells[5].text = _V[x["verdict"]]
+            cells[6].text = "—" if x["margin"] is None else f"{x['margin']:.2f}×"
+        for x in ar:
+            d.add_paragraph(f"{x.get('label') or x['metric']} · 限值依据:{x['basis']}"
+                            + (f" · {x['reason']}" if x.get("reason") else ""), style="List Bullet")
+
     d.add_heading("产品配置(舱 = 系统项目钉扎案例的版本快照实例)", level=1)
     pt = d.add_table(rows=1, cols=5); pt.style = "Table Grid"
     for i, h in enumerate(["产品", "舱级 C3+", "舱级 C4+", "模型版本哈希", "分析案例"]):

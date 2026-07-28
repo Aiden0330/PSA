@@ -397,6 +397,14 @@ export interface StationDoc {
   station_barriers: { key: string; label: string; pfd: number; grade?: string; scope?: string; basis?: string }[]
   ccf_groups: { key: string; label: string; member_products: string[]; beta: number; basis?: string }[]
   offsite: { p_fence: number; basis?: string }
+  // ST-7:验收准则(eval_basis 显式必填——判据口径是监管声明,禁隐式缺省)
+  acceptance?: { metric: StationMetricKey; limit: number; eval_basis: 'point' | 'p95'; basis: string; label?: string }[]
+}
+export type StationMetricKey = 'any' | 'ge2' | 'ge5' | 'ge_row' | 'offsite'
+export interface AcceptanceResult {
+  metric: StationMetricKey; label: string | null; limit: number; eval_basis: 'point' | 'p95'
+  value: number | null; verdict: 'pass' | 'fail' | 'indeterminate'; margin: number | null
+  basis: string; reason: string | null
 }
 export interface StationBand { p05: number; p50: number; p95: number }
 export interface StationQuantify {
@@ -404,6 +412,7 @@ export interface StationQuantify {
   // ST-6:同分位合成带(全联动包络);全产品无带时为 null,band_notes 说明空缺
   bands: { any: StationBand; ge2: StationBand; ge5: StationBand; ge_row: StationBand; offsite: StationBand } | null
   band_notes: string[]
+  acceptance_results: AcceptanceResult[]
   rows: { id: string; k: number }[]
   per_cabin: { id: string; product: string; row: string; f: number; f4: number; esc: number; chain_row: number; chain5: number; source_rank_value: number }[]
   per_source_rank: { id: string; value: number }[]

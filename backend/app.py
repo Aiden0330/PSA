@@ -739,6 +739,7 @@ class StationIn(BaseModel):
     station_barriers: list[dict] = []
     ccf_groups: list[dict] = []
     offsite: dict = {}
+    acceptance: list[dict] = []          # ST-7 验收准则(校验在 validate_station)
 
 
 def _station_doc(body: StationIn) -> dict:

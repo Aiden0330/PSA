@@ -26,6 +26,10 @@ const Q = {
   metrics: { any: 2.2e-4, ge2: 3.3e-6, ge5: 4.7e-8, ge_row: 2.0e-11, offsite: 1.1e-6 },
   bands: { any: _B(2.2e-4), ge2: _B(3.3e-6), ge5: _B(4.7e-8), ge_row: _B(2.0e-11), offsite: _B(1.1e-6) },
   band_notes: ['产品 A:箱 C3 点值>0 无带,以点值参与全部分位'],
+  acceptance_results: [
+    { metric: 'ge5', label: null, limit: 1e-6, eval_basis: 'point', value: 4.7e-8, verdict: 'pass', margin: 0.047, basis: 'NFPA 855 场址目标(示例)', reason: null },
+    { metric: 'ge2', label: '多舱目标', limit: 1e-6, eval_basis: 'point', value: 3.3e-6, verdict: 'fail', margin: 3.3, basis: '内部准则(示例)', reason: null },
+  ],
   rows: [{ id: 'Z1', k: 2 }],
   per_cabin: [
     { id: 'Z1-01', product: 'A', row: 'Z1', f: 1.1e-4, f4: 1.1e-5, esc: 0.03, chain_row: 0.03, chain5: 0.0, source_rank_value: 0 },
@@ -108,5 +112,10 @@ describe('站级页', () => {
     expect(band?.textContent).toContain('1.41e-7')           // 4.7e-8×3
     const simp = host!.querySelector('[data-testid="simplifications"]')
     expect(simp?.textContent).toContain('无带,以点值参与全部分位')
+    // ST-7:判定 chips(标签绑定 + PASS/FAIL)+ FAIL 总横幅
+    expect(host!.querySelector('[data-testid="acc-chip-0"]')?.textContent).toContain('≥5 舱(排内连片)')
+    expect(host!.querySelector('[data-testid="acc-chip-0"]')?.textContent).toContain('PASS')
+    expect(host!.querySelector('[data-testid="acc-chip-1"]')?.textContent).toContain('FAIL')
+    expect(host!.querySelector('[data-testid="acc-fail-banner"]')?.textContent).toContain('未通过')
   })
 })

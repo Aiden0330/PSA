@@ -120,6 +120,9 @@ def _chk01(v: Any, what: str) -> float:
     return f
 
 
+_METRICS = ("any", "ge2", "ge5", "ge_row", "offsite")
+
+
 def validate_station(doc: dict) -> None:
     products = doc.get("products") or []
     if not 1 <= len(products) <= 4:
@@ -165,6 +168,22 @@ def validate_station(doc: dict) -> None:
         cons = (json.loads(case.get("results_json") or "{}")).get("consequences") or {}
         if not cons:
             raise CompareError(422, f"产品 '{p.get('key')}' 案例 {p['case_id']} 无 consequences——不得以 0 频率静默入站(评审 R-6)")
+    # ST-7 验收准则(监管口径:判据显式、限值带依据;结构性校验,不需案例数据)
+    from math import isfinite
+    for i, a in enumerate(doc.get("acceptance") or []):
+        m = a.get("metric")
+        if m not in _METRICS:
+            raise CompareError(422, f"acceptance[{i}].metric 未知:{m!r}(合法:{'/'.join(_METRICS)})")
+        try:
+            lim = float(a.get("limit"))
+        except (TypeError, ValueError):
+            raise CompareError(422, f"acceptance[{i}].limit 非数值:{a.get('limit')!r}")
+        if not isfinite(lim) or lim <= 0:
+            raise CompareError(422, f"acceptance[{i}].limit 须为有限正数(/站·年),实得 {lim}")
+        if not str(a.get("basis") or "").strip():
+            raise CompareError(422, f"acceptance[{i}].basis 必填——限值出处(法规/业主目标/内部准则)是数据出处铁律")
+        if a.get("eval_basis") not in ("point", "p95"):
+            raise CompareError(422, f"acceptance[{i}].eval_basis 必填且 ∈ {{point,p95}}——判据口径必须显式,禁隐式缺省")
 
 
 _QS = ("p05", "p50", "p95")
@@ -293,11 +312,28 @@ def quantify(doc: dict) -> dict:
         band_notes.append("带口径:同分位代入=认知全联动包络(同产品跨舱为精确 SOKC;跨产品同分位为保守包络);"
                           "站级参数(边概率/站级屏障 PFD/围栏)以点值参与,不贡献带宽")
 
+    # ── ST-7 验收准则判定(pass ⇔ value ≤ limit;p95 无带 ⇒ 响亮 indeterminate)──
+    acceptance_results: list[dict] = []
+    for a in doc.get("acceptance") or []:
+        m = a["metric"]
+        lim = float(a["limit"])
+        base = {"metric": m, "label": a.get("label"), "limit": lim,
+                "eval_basis": a["eval_basis"], "basis": a["basis"], "reason": None}
+        if a["eval_basis"] == "p95" and bands is None:
+            acceptance_results.append({**base, "value": None, "verdict": "indeterminate", "margin": None,
+                                       "reason": "无带不可判:产品案例无不确定带,p95 判据不可评(绝不静默降级为点值判)"})
+            continue
+        value = metrics[m] if a["eval_basis"] == "point" else bands[m]["p95"]
+        acceptance_results.append({**base, "value": value,
+                                   "verdict": "pass" if value <= lim else "fail",
+                                   "margin": value / lim})
+
     rank = sorted(per_cabin, key=lambda c: c["source_rank_value"], reverse=True)[:5]
     return {
         "metrics": metrics,
         "bands": bands,
         "band_notes": band_notes,
+        "acceptance_results": acceptance_results,
         "rows": row_meta,
         "per_cabin": per_cabin,
         "per_source_rank": [{"id": r["id"], "value": r["source_rank_value"]} for r in rank],

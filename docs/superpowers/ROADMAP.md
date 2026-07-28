@@ -760,3 +760,19 @@ P05/P50/P95 三列 + notes 段(旧钉扎案例原版式,向后兼容)。KPI 卡�
 (p05–p95 + p50 括注),band_notes 进不可隐藏申报区。锚点 4(合成手算值/带序/
 点值通道不变/status/notes · null+note · 422 · docx 带列)+ fe 锁。
 py **695** · fe **491** · bundle 2.90MB。
+
+## 2026-07-27 · 站级验收准则判定(ST-7,mockup L 主视图)
+
+**语义**([规格](specs/2026-07-27-station-acceptance.md)):判定 = 监管口径声明。
+三铁律:判据口径 `eval_basis ∈ {point,p95}` **显式必填**(禁隐式缺省);限值
+`basis` 必填(数据出处铁律);p95 判据遇无带 ⇒ 响亮 `indeterminate` 附因,
+**绝不静默降级点值判**。pass ⇔ value ≤ limit;margin = value/limit(占用比)。
+**后端**:doc `acceptance[]`(StationIn 白名单曾剥字段——空结果静默病,红测抓出);
+校验 V-A..V-D 422 点名;`acceptance_results` 随 quantify 入响应,钉扎/报告自动
+携带。docx 新章「验收准则判定」:七列表(准则/指标/判据口径/限值/取值/判定/裕度)
++ FAIL 章首声明 + 逐条 basis 落文 + canonical 标签绑定。锚 5(pass/fail/margin/
+顺序 · p95 带值 · 无带 indeterminate · 422×4 · docx 章)。
+**前端**:向导「验收准则」编辑器(指标下拉用 canonical 标签/限值/口径下拉/依据
+必填提示);KPI 下判定 chips(绿 PASS/红 FAIL/灰 无带不可判,悬浮显依据);任一
+FAIL ⇒ 顶部红色总横幅(不可隐藏)。fe 锁扩展。
+py **700** · fe **491** · bundle 2.90MB。

@@ -11,10 +11,15 @@ import {
   StatusError, createStation, deleteStation, getStation, getPortfolio, listProjectCases,
   listStations, pinStation, quantifyStation, stationCaseReportUrl, updateStation,
 } from '../../api'
-import type { CaseInfo, PortfolioRow, StationDoc, StationQuantify } from '../../api'
+import type { StationMetricKey, CaseInfo, PortfolioRow, StationDoc, StationQuantify } from '../../api'
 
 const PCOLORS = ['#0f766e', '#2563eb', '#9333ea', '#b45309']
 const fmtE = (v: number | null | undefined) => (v == null ? '—' : v.toExponential(2))
+const METRIC_LABEL: Record<string, string> = {
+  any: '任一舱 C3+', ge2: '多舱 ≥2 舱', ge5: '≥5 舱(排内连片)',
+  ge_row: '整排蔓延(k=排长)', offsite: '站界外后果',
+}
+interface WizAcc { metric: string; limit: string; eval_basis: 'point' | 'p95'; basis: string; label: string }
 
 const th: CSSProperties = { fontSize: 11, color: 'var(--psa-muted)', textAlign: 'left', padding: '5px 10px', background: 'var(--psa-soft)', borderBottom: '1px solid var(--psa-line-2)' }
 const td: CSSProperties = { padding: '5px 10px', borderBottom: '1px solid var(--psa-line-2)', fontSize: 11.5 }
@@ -41,6 +46,7 @@ export function StationTab() {
   const [supPfd, setSupPfd] = useState('0.29')
   const [erPfd, setErPfd] = useState('0.20')
   const [fenceP, setFenceP] = useState('0.10')
+  const [acc, setAcc] = useState<WizAcc[]>([])
 
   useEffect(() => {
     listStations().then(setStations).catch((e) => setErr(`站型列表读取失败:${e?.message ?? e}`))
@@ -77,6 +83,8 @@ export function StationTab() {
       setSupPfd(String(d.station_barriers.find((b) => b.key === 'sup')?.pfd ?? 1))
       setErPfd(String(d.station_barriers.find((b) => b.key === 'er')?.pfd ?? 1))
       setFenceP(String(d.offsite.p_fence))
+      setAcc((d.acceptance ?? []).map((a) => ({ metric: a.metric, limit: String(a.limit),
+        eval_basis: a.eval_basis, basis: a.basis, label: a.label ?? '' })))
     } catch (e) { setErr(e instanceof StatusError ? e.message : String((e as Error)?.message ?? e)) }
   }
 
@@ -98,6 +106,8 @@ export function StationTab() {
       ],
       ccf_groups: wps.map((p) => ({ key: `fw-${p.key}`, label: `产品${p.key} BMS 固件`, member_products: [p.key], beta: 0.05, basis: '同 OTA 批次(申报,v1 不入值)' })),
       offsite: { p_fence: Number(fenceP), basis: '泄爆朝向+站界距离' },
+      acceptance: acc.map((a) => ({ metric: a.metric as StationMetricKey, limit: Number(a.limit),
+        eval_basis: a.eval_basis, basis: a.basis, ...(a.label ? { label: a.label } : {}) })),
     }
   }
 
@@ -174,6 +184,33 @@ export function StationTab() {
               应急 PFD <input value={erPfd} onChange={(e) => setErPfd(e.target.value)} style={{ width: 52 }} className="psa-num" />
               站界 p <input value={fenceP} onChange={(e) => setFenceP(e.target.value)} style={{ width: 52 }} className="psa-num" title="必填——隐式缺省被后端拒绝(零默认=风险抹除)" />
             </div>
+            {/* ── ST-7 验收准则(可选;判据口径显式必填,限值必须带依据) ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 11, color: 'var(--psa-faint)' }}>
+                验收准则(可选)——判据口径与限值依据必填,判定随结果钉扎入报告
+                <button className="psa-btn" data-testid="acc-add" style={{ marginLeft: 8, fontSize: 11 }}
+                  onClick={() => setAcc((x) => [...x, { metric: 'ge5', limit: '1e-6', eval_basis: 'point', basis: '', label: '' }])}>+ 加准则</button>
+              </div>
+              {acc.map((a, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5 }}>
+                  <select value={a.metric} data-testid={`acc-metric-${i}`} style={{ fontSize: 11.5 }}
+                    onChange={(e) => setAcc((x) => x.map((y, j) => j === i ? { ...y, metric: e.target.value } : y))}>
+                    {Object.entries(METRIC_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                  </select>
+                  ≤ <input value={a.limit} className="psa-num" style={{ width: 64 }} title="限值(/站·年)"
+                    onChange={(e) => setAcc((x) => x.map((y, j) => j === i ? { ...y, limit: e.target.value } : y))} />
+                  <select value={a.eval_basis} title="判据口径:点值判 or P95 保守判(监管声明,必须显式)" style={{ fontSize: 11.5 }}
+                    onChange={(e) => setAcc((x) => x.map((y, j) => j === i ? { ...y, eval_basis: e.target.value as 'point' | 'p95' } : y))}>
+                    <option value="point">点值判</option><option value="p95">P95 保守判</option>
+                  </select>
+                  <input value={a.basis} placeholder="限值依据(法规/业主目标)——必填" style={{ width: 200 }}
+                    onChange={(e) => setAcc((x) => x.map((y, j) => j === i ? { ...y, basis: e.target.value } : y))} />
+                  <input value={a.label} placeholder="名称(可选)" style={{ width: 110 }}
+                    onChange={(e) => setAcc((x) => x.map((y, j) => j === i ? { ...y, label: e.target.value } : y))} />
+                  <button className="psa-btn" style={{ fontSize: 11 }} onClick={() => setAcc((x) => x.filter((_, j) => j !== i))}>移除</button>
+                </div>
+              ))}
+            </div>
             {wps.map((p, i) => {
               const cs = cases[p.project_uuid] ?? []
               return (
@@ -231,6 +268,11 @@ export function StationTab() {
 
         {q && doc && (
           <>
+            {q.acceptance_results?.some((a) => a.verdict === 'fail') && (
+              <div data-testid="acc-fail-banner" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '8px 13px', fontSize: 12.5, fontWeight: 600 }}>
+                ⚠ 存在未通过的验收准则(FAIL)——见下方判定条与报告章节;本判定不构成签发结论。
+              </div>
+            )}
             {/* ── KPI(标签绑定铁律:≥5 舱 ↔ ge5;整排 ↔ ge_row) ── */}
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {([['任一舱 C3+', q.metrics.any, '', 'any'], ['多舱 ≥2 舱', q.metrics.ge2, '', 'ge2'],
@@ -248,6 +290,24 @@ export function StationTab() {
                 </div>
               ))}
             </div>
+            {(q.acceptance_results?.length ?? 0) > 0 && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {q.acceptance_results.map((a, i) => {
+                  const c = a.verdict === 'pass' ? ['#f0fdf4', '#bbf7d0', '#15803d'] : a.verdict === 'fail' ? ['#fef2f2', '#fecaca', '#b91c1c'] : ['#f4f4f5', '#d4d4d8', '#52525b']
+                  return (
+                    <div key={i} data-testid={`acc-chip-${i}`} title={`依据:${a.basis}${a.reason ? ' · ' + a.reason : ''}`}
+                      style={{ background: c[0], border: `1px solid ${c[1]}`, color: c[2], borderRadius: 8, padding: '5px 10px', fontSize: 11.5 }}>
+                      <b>{a.verdict === 'pass' ? 'PASS' : a.verdict === 'fail' ? 'FAIL' : '无带不可判'}</b>
+                      {' '}{a.label || METRIC_LABEL[a.metric]} · {a.eval_basis === 'point' ? '点值' : 'P95'}{' '}
+                      <span className="psa-num" style={{ fontFamily: 'var(--psa-font-mono)' }}>
+                        {a.value == null ? '—' : fmtE(a.value)} ≤ {fmtE(a.limit)}
+                      </span>
+                      {a.margin != null && <span> · 占用 {(a.margin * 100).toFixed(0)}%</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 330px', gap: 14 }}>
               {/* ── 画布(行=分区;墙=红条) ── */}
