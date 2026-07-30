@@ -10,6 +10,7 @@ import { gradeLabel } from '../../eventtree'
 import { formatEtaNumber, formatEtaRate } from '../../etaNumberFormat'
 import { C_COLOR } from '../../riskmatrix'
 import { useViewStore } from '../../stores/viewStore'
+import { useProjectStore } from '../../stores/projectStore'
 import { useActiveEta } from '../../stores/useActiveEta'
 import { useAuthStore } from '../../stores/authStore'
 import { useEvidenceGuard } from '../report/evidenceGuard'
@@ -71,6 +72,15 @@ export function ProjectCockpit(
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => setTab('bess')} className="psa-btn psa-btn--primary"><Icon name="bolt" size={14} />进入 ETA 画布</button>
           <button onClick={persistence.onSaveWorkspace} className="psa-btn psa-btn--dark"><Icon name="save" size={14} />保存项目</button>
+          <button data-testid="duplicate-project" className="psa-btn"
+            title="以当前项目为底创建新项目(深拷贝内容;新项目为未存档草稿,首次保存开新档案与新证据链——源项目的版本历史/审计不随副本)"
+            onClick={() => {
+              const dn = useProjectStore.getState().identity.displayName || projName
+              const name = window.prompt('新项目名称:', `${dn === '未命名项目' ? projName : dn} 副本`)
+              if (name === null) return
+              useProjectStore.getState().duplicateActiveProject(name.trim() || undefined)
+            }}>
+            <Icon name="copy" size={14} />复制项目</button>
           <button onClick={persistence.onDeleteSaved} disabled={!persistence.savedId} className="psa-btn psa-btn--danger"
             title={persistence.savedId ? '删除当前项目存档(有确认;版本库历史保留)' : '草稿尚未存档,无可删除的存档'}>
             <Icon name="trash" size={14} />删除项目</button>

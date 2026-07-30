@@ -84,6 +84,10 @@ export interface ProjectStore {
   openProject: (wid: string, init: { etas: ProjectEta[]; activeKey: string; checkedKeys: Record<string, boolean>; userFts?: ModelJson; identity: ProjectIdentity; fmeaRows?: FmeaRow[]; fmeaMapping?: MappingConfig }) => void
   switchProject: (wid: string) => void
   closeProject: (wid: string) => void
+  /** 复制活动项目为新草稿槽(规格 2026-07-29-project-duplicate):深克隆文档 +
+   *  身份三清零(savedId/projectUuid/lastVersionHash)——首存开新档案新证据链,
+   *  绝无覆写源档;派生 PFD 物化进副本;撤销历史不带(新文档谱系)。 */
+  duplicateActiveProject: (name?: string) => void
 
   /** 整体载入(读档/导入/初始场景):替换内容并清空历史。 */
   load: (etas: ProjectEta[], activeKey: string, checkedKeys: Record<string, boolean>, userFts?: ModelJson) => void
@@ -248,6 +252,33 @@ export const useProjectStore = create<ProjectStore>()((set) => {
           past: [], present: initialDoc, future: [], activeKey: '', checkedKeys: {}, pfds: {},
           identity: EMPTY_IDENTITY, workspaceId: freshWid, parked: {}, openOrder: [freshWid],
           fmeaRows: [], fmeaMapping: freshMapping(),
+        }
+      }),
+
+    duplicateActiveProject: (name) =>
+      set((s) => {
+        const wid = nextDraftId()
+        // 深克隆(house 惯例 JSON 往返);克隆前把活动侧表派生 PFD 物化进各 ETA
+        // 静态 pfds(副本打开即显当前派生值;派生缓存,重量化再生)
+        const clone: ProjectDoc = JSON.parse(JSON.stringify({
+          etas: s.present.etas.map((e) => ({ ...e, pfds: { ...(e.pfds ?? {}), ...(s.pfds[e.key] ?? {}) } })),
+          userFts: s.present.userFts,
+        }))
+        const parked = { ...s.parked, [s.workspaceId]: packActive(s) }
+        return {
+          past: [], future: [],
+          present: clone,
+          activeKey: s.activeKey,
+          checkedKeys: JSON.parse(JSON.stringify(s.checkedKeys)),
+          pfds: pfdsOf(clone.etas),
+          // 身份三清零:副本从零开始自己的证据链;lastVersionHash 不带(CAS 基线
+          // 跨项目泄漏 = 用源项目基线做副本的乐观并发判断)
+          identity: { savedId: '', projectUuid: '', displayName: name ?? `${s.identity.displayName} 副本` },
+          fmeaRows: JSON.parse(JSON.stringify(s.fmeaRows)),
+          fmeaMapping: JSON.parse(JSON.stringify(s.fmeaMapping)),
+          workspaceId: wid, parked,
+          openOrder: [...s.openOrder.filter((w) => w !== s.workspaceId), s.workspaceId, wid]
+            .filter((w, i, a) => a.indexOf(w) === i),
         }
       }),
 
