@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  withDerivedPfds,
   newBlankEta, normalizeEta, defaultConsequences, consEntries, consLevel, consText,
   addConsequence, updateConsequence, delConsequence, consequenceTotals, toEngineRequest,
   setInitFreqSource, setProduct, computeProductFreq, setConsequence,
@@ -233,5 +234,21 @@ describe('typed params ride the engine request (F3 收口二轮 F-2b)', () => {
   it('stray keys on typed params never enter the request (whitelist emission)', () => {
     const req = toEngineRequest(withLink(), linked as any)
     expect('note' in req.parameters.R1).toBe(false)
+  })
+})
+
+
+describe('withDerivedPfds(闪变修复 2026-07-30)', () => {
+  it('挂链屏障被侧表覆写;未挂链绝不被残值覆写;无变化返回原引用', () => {
+    let m = newBlankEta('x')
+    m = { ...m, functionalEvents: [
+      { id: 'FE1', label: 'a', failProb: 0.7, linkFt: 'FE1' },
+      { id: 'FE2', label: 'b', failProb: 0.3 },
+    ] }
+    const out = withDerivedPfds(m, { FE1: 0.01, FE2: 0.9 })
+    expect(out.functionalEvents[0].failProb).toBe(0.01)      // 挂链 → 派生覆写
+    expect(out.functionalEvents[1].failProb).toBe(0.3)       // 未挂链 → 残值不覆写
+    expect(withDerivedPfds(m, undefined)).toBe(m)            // 无侧表 → 原引用
+    expect(withDerivedPfds(m, { FE1: 0.7 })).toBe(m)         // 同值 → 原引用(memo 友好)
   })
 })

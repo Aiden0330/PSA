@@ -369,6 +369,22 @@ export interface EtLayoutNode {
   successCol?: number; failureCol?: number
 }
 /** 叶按 DFS(成功优先)分行;分支 y=两子中点。列:分支=自身 feIndex,叶=父 feIndex+1(根叶=0)。 */
+/** 显示/预览用有效模型(闪变修复 2026-07-30 ④):挂载 FTA 的屏障以派生 PFD(侧表)
+ *  覆写 failProb——前端积式预览与引擎实际输入同源,量化前后数值不再两套。
+ *  未挂载屏障**绝不**被侧表残值覆写(解除挂载后手改优先);无覆写时返回原引用。 */
+export function withDerivedPfds(m: EventTreeModel, pfds?: Record<string, number>): EventTreeModel {
+  if (!pfds) return m
+  let changed = false
+  const fes = m.functionalEvents.map((fe) => {
+    const d = fe.linkFt ? pfds[fe.id] : undefined
+    if (d == null || d === fe.failProb) return fe
+    changed = true
+    return { ...fe, failProb: Math.max(0, Math.min(1, d)) }
+  })
+  return changed ? { ...m, functionalEvents: fes } : m
+}
+
+
 export function layout(m: EventTreeModel, rowH: number, headerH: number) {
   let row = 0
   const nodes: EtLayoutNode[] = []

@@ -25,9 +25,8 @@ const mono = 'var(--psa-font-mono)'
  * 一起缩放/平移,不再需要单独的冻结表头图层。
  */
 export function EtCanvas(
-  { model, pfds, seqRows, sel, onSelect, onChange, svgRef }: {
+  { model, seqRows, sel, onSelect, onChange, svgRef }: {
     model: EventTreeModel
-    pfds?: Record<string, number>
     seqRows: SeqRow[]
     sel: string[] | null
     onSelect: (path: string[] | null) => void
@@ -70,14 +69,23 @@ export function EtCanvas(
     <>
       {model.functionalEvents.slice(0, maxDepth).map((fe, d) => {
         const nm = fe.label || fe.id
-        const p = Math.max(0, Math.min(1, pfds?.[fe.id] ?? fe.failProb ?? 0))
+        const p = Math.max(0, Math.min(1, fe.failProb ?? 0))
+        // 长名两行换行(报障 2026-07-30 ②):11 字一行,>23 字第二行截断 + title 全名
+        const two = nm.length > 11
+        const line2 = two ? nm.slice(11, 23) + (nm.length > 23 ? '…' : '') : null
         return (
           <g key={d}>
-            <text x={colX(d)} y={28} fontSize={11.5} fontWeight={600} textAnchor="middle" fill="var(--psa-ink-2)">
-              {nm.length > 11 ? nm.slice(0, 11) + '…' : nm}
+            <text x={colX(d)} y={two ? 20 : 28} fontSize={11.5} fontWeight={600} textAnchor="middle" fill="var(--psa-ink-2)">
+              {two ? nm.slice(0, 11) : nm}
               <title>{nm}（{fe.id}）</title>
             </text>
-            <text x={colX(d)} y={44} fontSize={9.5} fill="var(--psa-faint)" textAnchor="middle" fontFamily={mono}>PFD {formatEtaNumber(p)}</text>
+            {line2 && (
+              <text x={colX(d)} y={33} fontSize={11.5} fontWeight={600} textAnchor="middle" fill="var(--psa-ink-2)">
+                {line2}
+                <title>{nm}（{fe.id}）</title>
+              </text>
+            )}
+            <text x={colX(d)} y={two ? 46 : 44} fontSize={9.5} fill="var(--psa-faint)" textAnchor="middle" fontFamily={mono}>PFD {formatEtaNumber(p)}</text>
           </g>
         )
       })}
@@ -87,7 +95,8 @@ export function EtCanvas(
 
   return (
     <div ref={wrapRef} style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', backgroundImage: 'radial-gradient(circle at 1px 1px,var(--psa-line) 1.2px,transparent 0)', backgroundSize: '20px 20px' }}>
-      <svg ref={svgRef} width={width} height={height}
+      <svg ref={svgRef} width="100%" height="100%"
+        data-content-w={width} data-content-h={height}
         onPointerDown={onCanvasPointerDown} onPointerMove={zoom.onPointerMove} onPointerUp={zoom.onPointerUp} onPointerCancel={zoom.onPointerUp}
         onDoubleClick={() => zoom.fit()}
         style={{ display: 'block', fontFamily: '"IBM Plex Sans","Noto Sans SC",sans-serif', cursor: 'grab', touchAction: 'none' }}>
@@ -115,7 +124,7 @@ export function EtCanvas(
             const xs = colX(b.successCol ?? b.depth + 1)
             const xf = colX(b.failureCol ?? b.depth + 1)
             const fe = model.functionalEvents[b.depth]
-            const pfd = Math.max(0, Math.min(1, pfds?.[fe?.id ?? ''] ?? fe?.failProb ?? 0))
+            const pfd = Math.max(0, Math.min(1, fe?.failProb ?? 0))
             return (
               <g key={'b' + i}>
                 <line x1={x} y1={b.successY} x2={x} y2={b.failureY} stroke="var(--psa-faint)" strokeWidth={1.4} />

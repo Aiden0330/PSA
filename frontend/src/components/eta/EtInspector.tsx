@@ -197,9 +197,17 @@ export function EtInspector(
             {model.functionalEvents.map((fe, d) => (
               <div key={fe.id} style={{ display: 'flex', gap: 5, alignItems: 'center', marginBottom: 4 }}>
                 <span style={{ width: 30, fontSize: 10, color: 'var(--psa-faint)', fontFamily: mono, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fe.id}>{fe.id}</span>
-                <input value={fe.label} onChange={(e) => { const v = e.target.value; onChange((prev) => renameFe(prev, d, v)) }} style={{ width: 96, fontSize: 12 }} />
-                <input type="number" step="0.01" min={0} max={1} value={fe.failProb}
-                  onChange={(e) => { const v = +e.target.value; onChange((prev) => setFailProb(prev, d, v)) }} style={{ width: 54, fontSize: 12 }} />
+                <input value={fe.label} onChange={(e) => { const v = e.target.value; onChange((prev) => renameFe(prev, d, v)) }}
+                  title={fe.label} style={{ flex: 1, minWidth: 80, fontSize: 12 }} />
+                {fe.linkFt ? (
+                  <span className="psa-num" title={`PFD 由挂载 FTA「${fe.linkFt}」派生(引擎权威)——此处手改不会进入引擎量化。改数值请在选中节点面板进 FTA 编辑基本事件,或解除挂载后手改。`}
+                    style={{ width: 72, fontSize: 11, fontFamily: mono, background: 'var(--psa-soft)', border: '1px solid var(--psa-line-2)', borderRadius: 4, padding: '3px 4px', textAlign: 'right', flexShrink: 0, color: 'var(--psa-ink-2)' }}>
+                    {formatEtaNumber(pfds?.[fe.id] ?? fe.failProb)}<span style={{ fontSize: 8, color: 'var(--psa-faint)' }}> FT</span>
+                  </span>
+                ) : (
+                  <input type="number" step="0.01" min={0} max={1} value={fe.failProb}
+                    onChange={(e) => { const v = +e.target.value; onChange((prev) => setFailProb(prev, d, v)) }} style={{ width: 54, fontSize: 12, flexShrink: 0 }} />
+                )}
                 <button title="上移" disabled={d === 0} onClick={() => onMoveFe(d, -1)} style={{ ...moveBtn, opacity: d === 0 ? 0.4 : 1 }}>↑</button>
                 <button title="下移" disabled={d === model.functionalEvents.length - 1} onClick={() => onMoveFe(d, 1)} style={{ ...moveBtn, opacity: d === model.functionalEvents.length - 1 ? 0.4 : 1 }}>↓</button>
                 <button title="删除屏障" onClick={() => {

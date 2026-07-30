@@ -4,7 +4,7 @@ import { buildAnalysisRequest } from '../features/analysis/buildRequest'
 import { makeStaleGuard } from '../features/analysis/staleGuard'
 import {
   addFe, layout, CONSEQUENCES,
-  consequenceTotals, consLevel, consDef, reorderFe, isCascade, gradeLabel,
+  consequenceTotals, consLevel, consDef, reorderFe, isCascade, gradeLabel, withDerivedPfds,
 } from '../eventtree'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { RiskMatrix } from './RiskMatrix'
@@ -40,6 +40,11 @@ export interface EtaSummary { key: string; name: string; leafCount: number; wors
 function prepareCanvasForExport(svg: SVGSVGElement): SVGSVGElement {
   const clone = svg.cloneNode(true) as SVGSVGElement
   clone.querySelector(`[${ETA_CANVAS_CONTENT_ATTR}]`)?.removeAttribute('transform')
+  // svg 元素在屏上以 100% 撑满容器(大屏适配 2026-07-30 ①);导出克隆须回填内容真实
+  // 尺寸——否则脱离 DOM 的克隆 clientWidth=0,栅格化得 NaN 画布。
+  const w = svg.getAttribute('data-content-w')
+  const h = svg.getAttribute('data-content-h')
+  if (w && h) { clone.setAttribute('width', w); clone.setAttribute('height', h) }
   return clone
 }
 
@@ -154,7 +159,10 @@ export function EventTreeEditor(
     e.preventDefault()
   }
 
-  const { nodes, leafCount } = layout(model, 46, 64)   // 与 EtCanvas 同参 → 同一 DFS 叶序
+  // 闪变修复 2026-07-30 ④:显示/预览一律走有效模型(挂载 FTA 的屏障以派生 PFD 覆写)
+  // ——前端积式与引擎输入同源;编辑写回仍作用于真实 model(onChange 函数式更新)。
+  const effModel = withDerivedPfds(model, pfds)
+  const { nodes, leafCount } = layout(effModel, 46, 64)   // 与 EtCanvas 同参 → 同一 DFS 叶序
   const selKey = sel ? sel.join('/') : ' '
 
   const onEngineQuantify = async () => {
@@ -166,6 +174,9 @@ export function EventTreeEditor(
       if (!quantGuard.isCurrent(tok)) return
       setEngineSeq(res.sequences)
       setEngineMeta(res.method === 'integrated' ? { method: res.method, ieFrequency: res.ie_frequency ?? null } : null)
+      // 量化后刷新各挂载屏障的派生 PFD(onFtEdited 即 FTA 页写回同一条通道)——
+      // 画布标签/前端积式预览随之与引擎输入收敛,消除"点量化数值变、再点又变回"的闪变。
+      model.functionalEvents.filter((fe) => fe.linkFt).forEach((fe) => { void onFtEdited?.(fe.id) })
     }
     catch (e: any) { setQErr(String(e?.message ?? e)) }
     finally { setQBusy(false) }
@@ -222,10 +233,10 @@ export function EventTreeEditor(
 
   // ── 末态序列（叶按 DFS 成功优先 = 引擎 L0..Ln 同序）──
   const leaves = nodes.filter((n) => n.kind === 'leaf')
-  const sevIdx = (c?: string) => CONSEQUENCES.indexOf(consLevel(model, c ?? 'C1'))
+  const sevIdx = (c?: string) => CONSEQUENCES.indexOf(consLevel(effModel, c ?? 'C1'))
   const barrierPath = (path: string[]) => {
     const out: { feId: string; outcome: 'success' | 'failure' }[] = []
-    let n = model.root
+    let n = effModel.root
     for (const step of path) {
       if (n.kind !== 'branch') break
       out.push({ feId: n.feId, outcome: step as 'success' | 'failure' })
@@ -255,7 +266,7 @@ export function EventTreeEditor(
   ]
 
   // 多 ETA 汇总(由 App 传入;独立使用时回退到当前 ETA)
-  const aggTotals = aggregateTotals ?? consequenceTotals(model)
+  const aggTotals = aggregateTotals ?? consequenceTotals(effModel)
   const aggSevere = (aggTotals.C4 ?? 0) + (aggTotals.C5 ?? 0)
   const aggCount = etaSummaries.filter((s) => s.checked).length
 
@@ -274,10 +285,14 @@ export function EventTreeEditor(
               <span className="psa-chip"><span className="sq" style={{ background: 'var(--psa-c1)', width: 18, height: 3, borderRadius: 2 }} />成功</span>
               <span className="psa-chip"><span className="sq" style={{ background: 'var(--psa-danger)', width: 18, height: 3, borderRadius: 2 }} />失效</span>
             </div>
-            <span className="meta">{leafCount} 序列 · {engineSeq ? '引擎精确' : '前端积式'}</span>
+            <span className="meta">{leafCount} 序列 · {engineSeq ? '引擎精确' : '前端积式'}
+              {engineSeq && seqRows.some((r) => r.diff) && (
+                <span style={{ color: '#b45309' }} title="引擎精确值与前端积式预览不一致:挂载 FTA 的屏障以引擎(FTA 顶事件派生)为准;若刚编辑过 FTA/PFD,再点一次量化即收敛。编辑树结构后显示恢复前端积式预览。">
+                  {' '}· ⚠ 与前端积式有差(以引擎为准)</span>
+              )}</span>
           </div>
           <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-            <EtCanvas model={model} pfds={pfds} seqRows={seqRows} sel={sel} onSelect={setSel} onChange={onChange} svgRef={svgRef} />
+            <EtCanvas model={effModel} seqRows={seqRows} sel={sel} onSelect={setSel} onChange={onChange} svgRef={svgRef} />
           </div>
         </section>
 
