@@ -25,7 +25,15 @@ def build_model_from_request(req: dict) -> Model:
                 {"id": fid + "_E", "basic": True, "param_ref": fid},
                 {"id": fid, "op": "null", "args": [fid + "_E"]}]})
         fes.append({"id": fid, "link_ft": fid})
+    manual_fe_ids = {fe["id"] for fe in req["functional_events"] if not fe.get("link_ft")}
     for pid, spec in req.get("parameters", {}).items():
+        # 影蔽守卫(2026-07-30,与 ie 块守卫 ed90116 F3 同族):未挂载功能事件已按手输
+        # pfd 写入同 id 参数——请求参数再撞同 id 会"后写胜出"静默改值(场景残留参数曾
+        # 把 UI 的 0.7 覆成 0.01)。一律响亮拒绝,绝不静默仲裁。
+        if pid in manual_fe_ids:
+            raise ValueError(
+                f"请求参数 '{pid}' 与未挂载功能事件的手输 PFD 同 id——参数会静默覆写 pfd。"
+                f"请勿转发未被纳入树引用的参数(前端已过滤;若见此错,检查请求构造)")
         # EB-08:带 kind 键的类型化参数(canonical v2 反构的 Q(t):rate/weibull/glm/…)
         # 透传 kind 与全部类型字段,replay 重建精确不可用度;不带 kind 的旧形状(前端
         # {value} 或裸标量)维持 probability 强转,逐位零扰动。

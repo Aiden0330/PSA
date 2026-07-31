@@ -483,7 +483,17 @@ export function toEngineRequest(
   for (const fe of m.functionalEvents) {
     if (fe.linkFt && ftByName.has(fe.linkFt)) fault_trees[fe.id] = ftByName.get(fe.linkFt)
   }
-  for (const p of linked?.parameters ?? []) parameters[p.id] = engineParamJson(p)
+  // 影蔽修复 2026-07-30:只转发**被纳入请求的树实际引用**的参数。场景模板把同名树/
+  // 参数留在页签 fts 里(B_OFFGAS=0.01…),未挂载时无条件转发会在引擎侧与 fe 的
+  // pfd 参数同 id 相撞、后写胜出——UI 显示 0.7 引擎却算 0.01(用户存档 5d6520ef 实锤)。
+  // ie 树(__init__)的参数分流由 withIeFaultTree 从 linked.parameters 直取,不经此表。
+  const includedRefs = new Set<string>()
+  for (const f of Object.values(fault_trees)) {
+    for (const n of (f as any).nodes ?? []) if (n?.basic) includedRefs.add(n.param_ref ?? n.id)
+  }
+  for (const p of linked?.parameters ?? []) {
+    if (includedRefs.has(p.id)) parameters[p.id] = engineParamJson(p)
+  }
   return {
     init_event: m.initEvent, init_frequency: m.initFreq, functional_events, fault_trees, parameters, sequences, consequence_bins,
     // 4a1:挂载工作区带 CCF 组时透传(合并 PDAG 上展开;空缺省略保持既有请求形状)
@@ -512,11 +522,12 @@ export function withIeFaultTree(
   const trees = linked?.fault_trees ?? []
   const ie = trees.find((f: any) => f.name === '__init__')
   if (!ie) return req
-  // 屏障侧(除 __init__ 外所有树)引用的参数 id:必须留在无类型映射(共享事件正是要留下)。
+  // 屏障侧引用的参数 id:必须留在无类型映射(共享事件正是要留下)。
+  // 影蔽修复 2026-07-30:按**请求内已纳入的屏障树**计算,而非 linked 全部树——
+  // 未纳入量化的场景残留树不构成共享方(其参数已被 toEngineRequest 过滤)。
   const barrierRefs = new Set<string>()
-  for (const f of trees) {
-    if (!f || f.name === '__init__') continue
-    for (const n of f.nodes ?? []) if (n?.basic) barrierRefs.add(n.param_ref ?? n.id)
+  for (const f of Object.values(req.fault_trees ?? {})) {
+    for (const n of (f as any).nodes ?? []) if (n?.basic) barrierRefs.add(n.param_ref ?? n.id)
   }
   const paramById = new Map<string, any>((linked?.parameters ?? []).map((p: any) => [p.id, p]))
   const parameters: Record<string, any> = { ...req.parameters }

@@ -67,3 +67,53 @@ describe('buildAnalysisRequest — 单一请求构造(FE-01)', () => {
     expect(withOpts.boundary_condition_set).toBe('维护工况')
   })
 })
+
+
+describe('参数影蔽修复(报障 2026-07-30:场景残留参数覆写手输 PFD)', () => {
+  // 复刻用户存档 5d6520ef 形态:linkFt 全空 + 页签 fts 带同名树与参数(B_OFFGAS=0.01…)
+  const scenarioModel = {
+    initEvent: 'IE_COOLANT', initFreq: 1e-3, initFreqSource: 'manual',
+    functionalEvents: [
+      { id: 'B_OFFGAS', label: '早期离气探测+联动', failProb: 0.7 },
+      { id: 'B_BMS', label: 'BMS 切断/隔离', failProb: 0.3 },
+    ],
+    root: { kind: 'branch', feId: 'B_OFFGAS',
+      success: { kind: 'leaf', consequence: 'C1' },
+      failure: { kind: 'branch', feId: 'B_BMS',
+        success: { kind: 'leaf', consequence: 'C2' },
+        failure: { kind: 'leaf', consequence: 'C3' } } },
+  } as never
+  const scenarioLinked = {
+    fault_trees: [
+      { name: 'B_OFFGAS', top: 'B_OFFGAS', nodes: [
+        { id: 'B_OFFGAS_E', basic: true, param_ref: 'B_OFFGAS' },
+        { id: 'B_OFFGAS', op: 'null', args: ['B_OFFGAS_E'] }] },
+      { name: 'B_BMS', top: 'B_BMS', nodes: [
+        { id: 'B_BMS_E', basic: true, param_ref: 'B_BMS' },
+        { id: 'B_BMS', op: 'null', args: ['B_BMS_E'] }] },
+    ],
+    parameters: [
+      { id: 'B_OFFGAS', kind: 'probability', value: 0.01 },
+      { id: 'B_BMS', kind: 'probability', value: 0.1 },
+    ],
+  }
+
+  it('未挂载(linkFt 空):残留参数绝不进请求,fe 走手输 pfd——引擎与前端积式同源', () => {
+    const req = toEngineRequest(scenarioModel, scenarioLinked)
+    expect(req.functional_events).toEqual([
+      { id: 'B_OFFGAS', pfd: 0.7 }, { id: 'B_BMS', pfd: 0.3 }])
+    expect(req.fault_trees).toEqual({})
+    expect(req.parameters).toEqual({})                       // 影蔽源头清零
+  })
+
+  it('挂载的树:其引用参数照常转发(不误伤)', () => {
+    const m2 = { ...scenarioModel, functionalEvents: [
+      { id: 'B_OFFGAS', label: 'x', failProb: 0.7, linkFt: 'B_OFFGAS' },
+      { id: 'B_BMS', label: 'y', failProb: 0.3 },
+    ] } as never
+    const req = toEngineRequest(m2, scenarioLinked)
+    expect(req.functional_events[0]).toEqual({ id: 'B_OFFGAS', link_ft: 'B_OFFGAS' })
+    expect(req.parameters.B_OFFGAS).toBeDefined()            // 被纳入树引用 → 转发
+    expect(req.parameters.B_BMS).toBeUndefined()             // 未纳入树 → 不转发
+  })
+})
