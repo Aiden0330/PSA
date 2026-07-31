@@ -838,3 +838,19 @@ _eval_metrics 单代码路径(ST-6 的 per-product fmap 表达不了 member_cabi
 ④横幅增"同时多舱后果分布沿用单舱案例——低估方向"必含句 + 带通道注记 +
 V-3 成员集去重。锚点测试与数值零改动。裁决报告:
 docs/reviews/2026-07-30-station-ccf-v2-audit.md。banked 1+7 · station 28 绿。
+
+## 2026-07-30 · 量化闪变真根因:场景残留参数影蔽手输 PFD(双层修复)
+
+前一批的挂链假设被用户实锤推翻(存档 5d6520ef:linkFt 全空,failProb 手输
+0.7/0.3)。真根因:场景模板把同名树+参数(B_OFFGAS=0.01…)留在页签 fts;
+`toEngineRequest` 把 linked.parameters **无条件转发**;后端 builder 先按手输
+pfd 写入参数 {fe.id: 0.7},随后同 id 请求参数追加,ParameterLibrary **后写
+胜出** ⇒ 引擎算 0.01、UI 显 0.7——与 ie 块守卫(ed90116 F3)同族的静默影蔽。
+**修**:①前端只转发被纳入请求的树实际引用的参数(includedRefs 过滤);
+withIeFaultTree 共享判定同步按请求内树;②后端 builder 响亮守卫:未挂载 FE 的
+pfd 与同 id 请求参数相撞 → 400 点名。锁:fe 2 + py 2;F-2b 形状锁迁移(P1/X
+挂进 FT1 引用——守形状不守泄漏)。**端到端回归**:用户存档真树引擎序列与前端
+积式逐位一致(3e-4…2.1e-7);旧病请求 400。
+**工程事故记录**:16f5284 经长 && 链提交,tsc TS2698 报错却因链式异常仍然出门
+(ROADMAP 亦漏);本条为补救提交——教训:门禁命令分步跑,不与 heredoc 同链。
+py **705** · fe **499** · bundle 2.91MB。

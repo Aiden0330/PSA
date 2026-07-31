@@ -82,7 +82,7 @@ describe('参数影蔽修复(报障 2026-07-30:场景残留参数覆写手输 PF
       failure: { kind: 'branch', feId: 'B_BMS',
         success: { kind: 'leaf', consequence: 'C2' },
         failure: { kind: 'leaf', consequence: 'C3' } } },
-  } as never
+  } as unknown as Parameters<typeof toEngineRequest>[0]
   const scenarioLinked = {
     fault_trees: [
       { name: 'B_OFFGAS', top: 'B_OFFGAS', nodes: [
@@ -110,7 +110,7 @@ describe('参数影蔽修复(报障 2026-07-30:场景残留参数覆写手输 PF
     const m2 = { ...scenarioModel, functionalEvents: [
       { id: 'B_OFFGAS', label: 'x', failProb: 0.7, linkFt: 'B_OFFGAS' },
       { id: 'B_BMS', label: 'y', failProb: 0.3 },
-    ] } as never
+    ] } as unknown as Parameters<typeof toEngineRequest>[0]
     const req = toEngineRequest(m2, scenarioLinked)
     expect(req.functional_events[0]).toEqual({ id: 'B_OFFGAS', link_ft: 'B_OFFGAS' })
     expect(req.parameters.B_OFFGAS).toBeDefined()            // 被纳入树引用 → 转发

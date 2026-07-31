@@ -203,10 +203,15 @@ describe('branchFeOptions / setBranchFe', () => {
 })
 
 describe('typed params ride the engine request (F3 收口二轮 F-2b)', () => {
+  // 锁迁移 2026-07-30(影蔽修复):参数只随**被纳入请求的树引用**转发——本锁守的是
+  // 参数**形状**逐位,故把 P1/X 挂进 FT1 的引用;未被引用参数的"不转发"由
+  // buildRequest.test 影蔽锁把守。
   const linked = {
     fault_trees: [{ name: 'FT1', top: 'TOP', nodes: [
       { id: 'R1', basic: true },
-      { id: 'TOP', op: 'or', args: ['R1'], label: '中间事件' }] }],
+      { id: 'B_P1', basic: true, param_ref: 'P1' },
+      { id: 'B_X', basic: true, param_ref: 'X' },
+      { id: 'TOP', op: 'or', args: ['R1', 'B_P1', 'B_X'], label: '中间事件' }] }],
     parameters: [
       { id: 'R1', kind: 'rate', value: 1e-5, mttr: 24, note: '杂散注记不进请求' },
       { id: 'P1', kind: 'probability', value: 0.02 },
