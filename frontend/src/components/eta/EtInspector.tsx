@@ -210,9 +210,9 @@ export function EtInspector(
                 )}
                 <button title="上移" disabled={d === 0} onClick={() => onMoveFe(d, -1)} style={{ ...moveBtn, opacity: d === 0 ? 0.4 : 1 }}>↑</button>
                 <button title="下移" disabled={d === model.functionalEvents.length - 1} onClick={() => onMoveFe(d, 1)} style={{ ...moveBtn, opacity: d === model.functionalEvents.length - 1 ? 0.4 : 1 }}>↓</button>
-                <button title="删除屏障" onClick={() => {
+                <button title="删除屏障(下游屏障保留,直连上级)" onClick={() => {
                   const used = branchesUsingFe(model, fe.id)
-                  if (used === 0 || window.confirm(`将折叠 ${used} 个引用「${fe.label}」的分支为末态,继续?`)) onChange((prev) => delFe(prev, d))
+                  if (used === 0 || window.confirm(`移除屏障「${fe.label}」:其失效分支(下游屏障链)原值原样上提接入上级;${used} 处判定点的成功侧端态/子树将随屏障移除。继续?`)) onChange((prev) => delFe(prev, d))
                 }} style={{ color: 'var(--psa-danger)', border: 0, background: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, flexShrink: 0 }}>✕</button>
               </div>
             ))}

@@ -314,15 +314,6 @@ export function addBarrierFromLib(m: EventTreeModel, b: LibBarrier): EventTreeMo
   return { ...m, functionalEvents: [...m.functionalEvents, fe] }
 }
 
-/** CONSEQUENCES 升序;返回子树中最严重后果(无叶→'C1')。 */
-function mostSevere(m: EventTreeModel, n: EtNode): string {
-  let worst = -1
-  ;(function walk(x: EtNode) {
-    if (x.kind === 'leaf') { const r = CONSEQUENCES.indexOf(consLevel(m, x.consequence)); if (r > worst) worst = r }
-    else { walk(x.success); walk(x.failure) }
-  })(n)
-  return worst < 0 ? 'C1' : CONSEQUENCES[worst]
-}
 /** 统计树中判定该 feId 的分支数(供删除确认提示)。 */
 export function branchesUsingFe(m: EventTreeModel, feId: string): number {
   let c = 0
@@ -351,13 +342,16 @@ export function setBranchFe(m: EventTreeModel, path: string[], newFeId: string):
   return { ...m, root: replaceAt(m.root, path, (n) => (n.kind === 'branch' ? { ...n, feId: newFeId } : n)) }
 }
 
-/** 删除第 idx 个功能事件;凡判定它的分支折叠为单叶(后果=该子树最严重,保守)。 */
+/** 删除第 idx 个功能事件——**拼接语义**(报障 2026-07-30:旧的"折叠为最严重单叶"
+ *  会把下游整条链毁掉)。凡判定它的分支节点由其**失效子树**原值原样上提替换
+ *  (级联约定:失效侧即下游屏障链 ⇒ 下游全保留、直连上级);该屏障的成功侧端态/
+ *  子树随屏障移除(它是被删屏障自己的缓解出口)。确认文案在检视器点名成功侧损失。 */
 export function delFe(m: EventTreeModel, idx: number): EventTreeModel {
   const fe = m.functionalEvents[idx]
   if (!fe) return m
   function fix(n: EtNode): EtNode {
     if (n.kind === 'leaf') return n
-    if (n.feId === fe.id) return { kind: 'leaf', consequence: mostSevere(m, n) }
+    if (n.feId === fe.id) return fix(n.failure)
     return { ...n, success: fix(n.success), failure: fix(n.failure) }
   }
   return { ...m, functionalEvents: m.functionalEvents.filter((_, i) => i !== idx), root: fix(m.root) }

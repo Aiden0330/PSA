@@ -854,3 +854,33 @@ pfd 与同 id 请求参数相撞 → 400 点名。锁:fe 2 + py 2;F-2b 形状锁
 **工程事故记录**:16f5284 经长 && 链提交,tsc TS2698 报错却因链式异常仍然出门
 (ROADMAP 亦漏);本条为补救提交——教训:门禁命令分步跑,不与 heredoc 同链。
 py **705** · fe **499** · bundle 2.91MB。
+
+## 2026-08-12 IncidentWatch 独立立项并建成(S0–S15)
+
+BESS 事故情报站独立仓库 `~/Documents/projects/incidentwatch`(规格/计划在本仓
+`docs/superpowers/{specs,plans}/2026-08-12-incidentwatch*`;方向 B 态势地图为主页,
+D 案卷、C 管线+设置、A 台账页签;mockups 4 件已评审)。后端:FastAPI+SQLite,
+9 表含 raw_hits/incident_revisions 只增审计(DB 触发器),检索适配器(gnews 多语
+RSS/通用 RSS/手工)→ 规则去重聚类(灰带 LLM 仲裁)→ schema 强制 LLM 提取
+(注入对抗锁测)→ 置信门槛 → 人工逐字段审核唯一入库通道;供应商降级链
+(Anthropic→DeepSeek→OpenAI 兼容→Ollama,密钥卫生锁测);APScheduler 每日
+06:30+启动补跑+同日幂等。**与 PSA 接缝**:taxonomy v1(IE 5 码原样引用,双端
+快照锁测)+ evidence-package v1 导出契约(citation 必填、引文 ≤15 词、枚举锁
+定;PSA 侧未来"导入闸门"落用户层 grade D)。前端:React18+Vite5 钉版,d3-geo
+同步世界地图(隐藏 pane 兼容)。验证:py 68 · fe 35 · e2e 全链 HTTP 演练
+(触发→审核→归档→导出校验→幂等重跑)· 五页 :8100 种子库 DOM 断言零 console
+错。**PSA 本仓零代码变更**(仅文档/mockup/launch.json 预览项)。悬置:S16 首次
+真跑待 API key(种子库已含 6 起实证事故);新仓 GitHub 远程未建。执行偏离:
+S11–S14 子代理因宿主机休眠两轮孤儿化,存活文件保留、余量主会话按规格实现
+(教训:并行波次前 caffeinate)。
+
+## 2026-07-30 · 删屏障拼接语义(报障:删中间屏障毁掉整条下游链)
+
+旧 `delFe`:凡判定被删屏障的分支**折叠为最严重单叶**——下游全部屏障与端态被抹。
+新语义(用户预期):**拼接**——被删分支节点由其**失效子树原值原样上提**替换
+(级联约定失效侧即下游链 ⇒ 下游屏障全保留、直连上级);该屏障的成功侧端态/
+子树随屏障移除(它是被删屏障自己的缓解出口),确认框点名数量。孤儿助手
+`mostSevere` 删除(误剪 branchesUsingFe/branchFeOptions 一并吞,tsc 抓回,
+git diff 恢复)。锁 4:删中间(下游原值直连)/删首(根=失效子树)/删末/
+非级联成功侧子树随删。实机:6 屏障树删第 2 个,其余 5 个原值原样、链路重连。
+fe **503** · bundle 2.91MB。

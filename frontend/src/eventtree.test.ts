@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  withDerivedPfds,
+  delFe, withDerivedPfds,
   newBlankEta, normalizeEta, defaultConsequences, consEntries, consLevel, consText,
   addConsequence, updateConsequence, delConsequence, consequenceTotals, toEngineRequest,
   setInitFreqSource, setProduct, computeProductFreq, setConsequence,
@@ -255,5 +255,59 @@ describe('withDerivedPfds(闪变修复 2026-07-30)', () => {
     expect(out.functionalEvents[1].failProb).toBe(0.3)       // 未挂链 → 残值不覆写
     expect(withDerivedPfds(m, undefined)).toBe(m)            // 无侧表 → 原引用
     expect(withDerivedPfds(m, { FE1: 0.7 })).toBe(m)         // 同值 → 原引用(memo 友好)
+  })
+})
+
+
+describe('delFe 拼接语义(报障 2026-07-30:删中间屏障不得毁下游)', () => {
+  const leafC = (c: string) => ({ kind: 'leaf', consequence: c }) as const
+  // 级联 FE1→FE2→FE3(成功=末态,失效=下探,与画布约定一致)
+  const cascade = () => ({
+    initEvent: 'IE', initFreq: 1e-3,
+    functionalEvents: [
+      { id: 'FE1', label: '屏障一', failProb: 0.7 },
+      { id: 'FE2', label: '屏障二', failProb: 0.3 },
+      { id: 'FE3', label: '屏障三', failProb: 0.1 },
+    ],
+    root: { kind: 'branch', feId: 'FE1',
+      success: leafC('C1'),
+      failure: { kind: 'branch', feId: 'FE2',
+        success: leafC('C2'),
+        failure: { kind: 'branch', feId: 'FE3',
+          success: leafC('C3'), failure: leafC('C4') } } },
+  }) as never
+
+  it('删中间屏障:下游链原值原样上提接入上级(失效子树存活)', () => {
+    const m = delFe(cascade(), 1)
+    expect(m.functionalEvents.map((f: { id: string }) => f.id)).toEqual(['FE1', 'FE3'])
+    const r = m.root as never as { feId: string; success: unknown; failure: { feId: string; failProb?: number; success: { consequence: string }; failure: { consequence: string } } }
+    expect(r.feId).toBe('FE1')
+    expect(r.failure.feId).toBe('FE3')                     // FE2 节点被拼接掉,FE3 直连
+    expect(r.failure.success.consequence).toBe('C3')       // 下游端态原值原样
+    expect(r.failure.failure.consequence).toBe('C4')
+    expect((m.functionalEvents[1] as { failProb: number }).failProb).toBe(0.1)   // 概率不动
+  })
+
+  it('删第一个屏障:根被其失效子树整体替换', () => {
+    const m = delFe(cascade(), 0)
+    const r = m.root as never as { feId: string }
+    expect(r.feId).toBe('FE2')
+    expect(m.functionalEvents.map((f: { id: string }) => f.id)).toEqual(['FE2', 'FE3'])
+  })
+
+  it('删末屏障:上级失效侧落到其失效端态(不再折叠整棵为最严重叶)', () => {
+    const m = delFe(cascade(), 2)
+    const r = m.root as never as { failure: { feId: string; failure: { kind: string; consequence: string } } }
+    expect(r.failure.feId).toBe('FE2')
+    expect(r.failure.failure).toEqual({ kind: 'leaf', consequence: 'C4' })
+  })
+
+  it('成功侧为子树(非级联)时:随屏障移除,失效侧仍存活', () => {
+    const m0 = cascade() as never as { root: { failure: { success: unknown } } }
+    m0.root.failure.success = { kind: 'branch', feId: 'FE3',
+      success: leafC('C2'), failure: leafC('C3') }         // FE2 成功侧挂了子树
+    const m = delFe(m0 as never, 1)
+    const r = m.root as never as { failure: { feId: string } }
+    expect(r.failure.feId).toBe('FE3')                     // 失效子树上提;成功侧子树随删
   })
 })
