@@ -75,7 +75,7 @@ def test_priority_config_over_env_and_enabled_or(tmp_path, monkeypatch):
 
 def test_validation_and_audit_without_secret(tmp_path, monkeypatch):
     _cfg_path(tmp_path, monkeypatch)
-    assert client.put("/api/ai/config", json={"provider": "openai"}).status_code == 422
+    assert client.put("/api/ai/config", json={"provider": "foo"}).status_code == 422
     client.put("/api/ai/config", json={"api_key": "sk-ant-abcdefghijklmnop1234"})
     from backend import store
     with store._conn() as cx:

@@ -931,3 +931,20 @@ py **713** · fe **507** · bundle 2.92MB。
 审计详情可记 base_url(非密钥材料)。py 锁 +1(往返/清除/客户端优先级/400)、
 fe 锁扩展(回填 + PUT 载荷)。真机:URL/模型/密钥三字段齐。
 py **714** · fe **507** · bundle 2.92MB。
+
+## 2026-08-18 · AI 供应商扩至 OpenAI 兼容(GPT / DeepSeek / Gemini 直连)
+
+用户澄清:URL 不是中转,是要**直接换供应商**。落 `OpenAiCompatClient`
+(Chat Completions 协议),架构律:**管线消息恒为 Anthropic 规范形,翻译责任
+在客户端**——每次调用把全史翻成 CC 形(system 直传;图像块→image_url dataURL;
+tool_use→assistant.tool_calls,arguments JSON 串;tool_result→role:tool;工具
+规格→function calling),响应翻回 AiTurn(tool_calls 解析 + served_by)。接地
+工具环/修复环/截图转录**全链免改直通**。
+密钥纪律新增一条:openai 侧回退链为配置 > `PSA_LLM_API_KEY`,**绝不**回退
+`ANTHROPIC_API_KEY`(把 anthropic 密钥发给别家是配置事故,不替用户揽,有锁)。
+base_url 缺省 `https://api.openai.com/v1`;DeepSeek/Gemini 填各自(兼容)端点。
+UI:供应商三选(anthropic/openai 兼容/example),模型清单随供应商切换
+(openai 侧参考清单 gpt-5.1/gpt-4o/deepseek-chat/…,以供应商文档为准,自定义
+恒可用),URL 占位随切。锁迁移:原"openai 非法供应商"422 样本换 "foo"。
+py 锁 +3(翻译往返/密钥隔离/配置面),py **717** · fe **507** · bundle 2.92MB。
+真机:切 openai 后清单与占位联动。

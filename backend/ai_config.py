@@ -14,10 +14,13 @@ from typing import Any
 
 _PATH = os.path.join(os.path.dirname(__file__), "..", "data", "ai_config.json")
 
-ALLOWED_PROVIDERS = ("example", "anthropic")
+ALLOWED_PROVIDERS = ("example", "anthropic", "openai")
 # 模型清单与 docs/design/ai-model-strategy.md 同步(fable 主档,opus 服务端回退档)
 DEFAULT_MODELS = ["claude-fable-5", "claude-opus-4-8", "claude-sonnet-5",
                   "claude-haiku-4-5-20251001"]
+# OpenAI 兼容侧参考清单(以供应商文档为准;自定义输入永远可用)
+OPENAI_SUGGESTED_MODELS = ["gpt-5.1", "gpt-4o", "deepseek-chat", "deepseek-reasoner",
+                           "gemini-3-pro-preview", "gemini-2.5-pro"]
 
 
 def load() -> dict[str, Any]:

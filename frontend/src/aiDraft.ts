@@ -345,19 +345,20 @@ export function applyAiDraftToProject(input: ApplyAiDraftInput): ApplyAiDraftRes
 // ── 用户级 AI 配置(2026-08-17):密钥只写不读,GET 只有掩码提示 ──
 export interface AiConfig {
   enabled: boolean
-  provider: 'example' | 'anthropic' | 'cloud' | 'local'
+  provider: 'example' | 'anthropic' | 'openai' | 'cloud' | 'local'
   model: string
   api_key_set: boolean
   api_key_hint: string
-  base_url: string                                   // 配置的中转网关(空=官方默认/环境变量)
+  base_url: string                                   // 配置端点(空=该供应商官方默认/环境变量)
   models: string[]
+  models_openai: string[]                            // OpenAI 兼容侧参考清单(以供应商文档为准)
 }
 export async function getAiConfig(): Promise<AiConfig> {
   const r = await fetch('/api/ai/config')
   if (!r.ok) throw new Error(`ai config → ${r.status}`)
   return r.json()
 }
-export async function putAiConfig(patch: { enabled?: boolean; provider?: 'example' | 'anthropic'; model?: string; api_key?: string; base_url?: string }): Promise<AiConfig> {
+export async function putAiConfig(patch: { enabled?: boolean; provider?: 'example' | 'anthropic' | 'openai'; model?: string; api_key?: string; base_url?: string }): Promise<AiConfig> {
   const r = await fetch('/api/ai/config', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
   if (!r.ok) {

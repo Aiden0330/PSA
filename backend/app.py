@@ -1059,6 +1059,7 @@ def api_ai_config_get(_=Depends(require_authenticated)):
         "api_key_hint": ai_config.key_hint(key) or ("环境变量已设" if env_key else ""),
         "base_url": cfg.get("base_url") or "",
         "models": ai_config.DEFAULT_MODELS,
+        "models_openai": ai_config.OPENAI_SUGGESTED_MODELS,
     }
 
 
@@ -1105,7 +1106,8 @@ def api_ai_config_put(body: schemas.AiConfigIn, _=Depends(require_role(*ADMIN)))
             "model": cfg.get("model"), "api_key_set": bool(key) or env_key,
             "api_key_hint": ai_config.key_hint(key) or ("环境变量已设" if env_key else ""),
             "base_url": cfg.get("base_url") or "",
-            "models": ai_config.DEFAULT_MODELS}
+            "models": ai_config.DEFAULT_MODELS,
+            "models_openai": ai_config.OPENAI_SUGGESTED_MODELS}
 
 
 @app.post("/api/ai/draft-model", response_model=schemas.AiDraftResponse)

@@ -70,7 +70,7 @@ function AiConfigSection() {
   const [keyInput, setKeyInput] = useState('')
   const [modelSel, setModelSel] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
-  const [providerSel, setProviderSel] = useState<'example' | 'anthropic'>('anthropic')
+  const [providerSel, setProviderSel] = useState<'example' | 'anthropic' | 'openai'>('anthropic')
   const [enabledSel, setEnabledSel] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -78,7 +78,7 @@ function AiConfigSection() {
     try {
       const c = await getAiConfig()
       setCfg(c); setModelSel(c.model); setEnabledSel(c.enabled); setBaseUrl(c.base_url ?? '')
-      setProviderSel(c.provider === 'anthropic' ? 'anthropic' : 'example')
+      setProviderSel(c.provider === 'anthropic' || c.provider === 'openai' ? c.provider : 'example')
     } catch (e) { setMsg(String((e as Error)?.message ?? e)) }
   }
   const save = async () => {
@@ -106,15 +106,17 @@ function AiConfigSection() {
             启用 AI 草案(等效 PSA_AI_ENABLED=1)
           </label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>供应商
-            <select value={providerSel} onChange={(e) => setProviderSel(e.target.value as 'example' | 'anthropic')} style={{ fontSize: 12 }}>
-              <option value="anthropic">anthropic(真实生成,需 API key)</option>
+            <select value={providerSel} onChange={(e) => setProviderSel(e.target.value as 'example' | 'anthropic' | 'openai')} style={{ fontSize: 12 }}>
+              <option value="anthropic">anthropic(Claude,官方 API)</option>
+              <option value="openai">openai 兼容(GPT / DeepSeek / Gemini)</option>
               <option value="example">example(离线演示,忽略截图)</option>
             </select>
           </label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>模型
-            <select value={cfg?.models.includes(modelSel) ? modelSel : '__custom'}
-              onChange={(e) => { if (e.target.value !== '__custom') setModelSel(e.target.value) }} style={{ fontSize: 12 }}>
-              {(cfg?.models ?? []).map((m) => <option key={m} value={m}>{m}</option>)}
+            <select value={(providerSel === 'openai' ? cfg?.models_openai : cfg?.models)?.includes(modelSel) ? modelSel : '__custom'}
+              onChange={(e) => { if (e.target.value !== '__custom') setModelSel(e.target.value) }} style={{ fontSize: 12 }}
+              title={providerSel === 'openai' ? '参考清单(以供应商文档为准);自定义直接改右侧输入' : undefined}>
+              {((providerSel === 'openai' ? cfg?.models_openai : cfg?.models) ?? []).map((m) => <option key={m} value={m}>{m}</option>)}
               <option value="__custom">自定义…</option>
             </select>
             <input data-testid="ai-config-model" value={modelSel} onChange={(e) => setModelSel(e.target.value)}
@@ -122,8 +124,10 @@ function AiConfigSection() {
           </label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>接口 URL
             <input data-testid="ai-config-url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="默认 https://api.anthropic.com(可填中转网关)"
-              title="API key 会发送到此地址——只填你信任的网关;留空 = 官方默认/环境变量"
+              placeholder={providerSel === 'openai'
+                ? '如 https://api.deepseek.com/v1 · https://api.openai.com/v1 · Gemini 的 openai 兼容端点'
+                : '默认 https://api.anthropic.com'}
+              title="API key 会发送到此地址——只填官方或你信任的端点;留空 = 该供应商官方默认"
               style={{ flex: 1, minWidth: 200, fontSize: 12 }} autoComplete="off" />
           </label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>API key

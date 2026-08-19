@@ -154,7 +154,7 @@ class AiConfigIn(BaseModel):
     """AI 配置写入(2026-08-17)。api_key 语义:缺省=不动,""=清除,串=设置。
     密钥只写不读——响应与审计永不含原文。"""
     enabled: Optional[bool] = None
-    provider: Optional[Literal["example", "anthropic"]] = None
+    provider: Optional[Literal["example", "anthropic", "openai"]] = None
     model: Optional[str] = None
     api_key: Optional[str] = None
     base_url: Optional[str] = None                   # 中转网关;""=清除(回退环境/默认)

@@ -214,7 +214,8 @@ describe('AI 设置区(2026-08-17)', () => {
       return new Response(JSON.stringify({
         enabled: false, provider: 'anthropic', model: 'claude-fable-5',
         api_key_set: true, api_key_hint: 'sk-an…1234', base_url: 'https://relay.example.cn',
-        models: ['claude-fable-5', 'claude-sonnet-5'] }), { status: 200 })
+        models: ['claude-fable-5', 'claude-sonnet-5'],
+        models_openai: ['gpt-5.1', 'deepseek-chat'] }), { status: 200 })
     }))
     const el = render(<AiDraftPanel {...baseProps()} />)
     expect(calls.length).toBe(0)                               // 懒:未展开零请求

@@ -11,6 +11,8 @@ import json
 import os
 from typing import Any, Protocol
 
+import httpx
+
 # ── 常量(评测门与提示词变更时必须 bump;记入 ai_drafts 溯源)──
 PROMPT_VERSION = "2026-08-17-p2"   # p2:截图转录附则(带图请求)
 DRAFT_MODEL = "claude-fable-5"
@@ -107,7 +109,6 @@ class AnthropicClient:
                      or os.getenv("PSA_ANTHROPIC_BASE_URL", "https://api.anthropic.com")).rstrip("/")
 
     def complete(self, messages: list[dict], tools: list[dict] | None = None) -> AiTurn:
-        import httpx
         system = "\n".join(m["content"] for m in messages if m["role"] == "system")
         body: dict[str, Any] = {
             "model": self.model_id,
@@ -128,6 +129,93 @@ class AnthropicClient:
                  for b in data.get("content", []) if b.get("type") == "tool_use"]
         text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
         return AiTurn(content=text or None, tool_calls=calls, served_by=served)
+
+
+# ── OpenAI 兼容供应商(GPT / DeepSeek / Gemini openai 兼容端点;2026-08-18)──
+# 架构律:管线消息恒为 Anthropic 规范形,翻译责任在客户端(双向)。
+
+def _openai_messages(messages: list[dict]) -> list[dict]:
+    """Anthropic 规范形 → Chat Completions:图像块→image_url dataURL;
+    assistant tool_use→tool_calls(arguments JSON 串);user tool_result→role:tool。"""
+    out: list[dict] = []
+    for m in messages:
+        role, content = m["role"], m["content"]
+        if isinstance(content, str):
+            out.append({"role": role, "content": content})
+            continue
+        tool_uses = [b for b in content if b.get("type") == "tool_use"]
+        tool_results = [b for b in content if b.get("type") == "tool_result"]
+        if tool_uses:
+            out.append({"role": "assistant", "content": None, "tool_calls": [
+                {"id": b.get("id"), "type": "function", "function": {
+                    "name": b.get("name"),
+                    "arguments": json.dumps(b.get("input") or {}, ensure_ascii=False)}}
+                for b in tool_uses]})
+            continue
+        if tool_results:
+            for b in tool_results:
+                out.append({"role": "tool", "tool_call_id": b.get("tool_use_id"),
+                            "content": b.get("content") if isinstance(b.get("content"), str)
+                            else json.dumps(b.get("content"), ensure_ascii=False)})
+            continue
+        blocks = []
+        for b in content:
+            if b.get("type") == "image":
+                src = b.get("source") or {}
+                blocks.append({"type": "image_url", "image_url": {
+                    "url": f"data:{src.get('media_type')};base64,{src.get('data')}"}})
+            elif b.get("type") == "text":
+                blocks.append({"type": "text", "text": b.get("text", "")})
+        out.append({"role": role, "content": blocks})
+    return out
+
+
+def _openai_tools(tools: list[dict] | None) -> list[dict] | None:
+    if not tools:
+        return None
+    return [{"type": "function", "function": {
+        "name": t["name"], "description": t.get("description", ""),
+        "parameters": t.get("input_schema") or {"type": "object", "properties": {}}}}
+        for t in tools]
+
+
+class OpenAiCompatClient:
+    """Chat Completions 协议直连(GPT/DeepSeek/Gemini 兼容端点)。
+    密钥:配置优先,回退 PSA_LLM_API_KEY——**绝不**回退 ANTHROPIC_API_KEY
+    (把 anthropic 密钥发给别家是配置事故,不替用户揽)。"""
+    supports_tools = True
+    supports_repair = True
+
+    def __init__(self, model: str | None = None, api_key: str | None = None):
+        from backend import ai_config
+        cfg = ai_config.load()
+        self.model_id = model or cfg.get("model") or os.getenv("PSA_LLM_MODEL") or "gpt-4o"
+        self.api_key = api_key if api_key is not None else (
+            cfg.get("api_key") or os.getenv("PSA_LLM_API_KEY", ""))
+        self.base = (cfg.get("base_url") or os.getenv("PSA_LLM_BASE_URL")
+                     or "https://api.openai.com/v1").rstrip("/")
+
+    def complete(self, messages: list[dict], tools: list[dict] | None = None) -> AiTurn:
+        body: dict[str, Any] = {"model": self.model_id, "max_tokens": 8192,
+                                "messages": _openai_messages(messages)}
+        t = _openai_tools(tools)
+        if t:
+            body["tools"] = t
+        headers = {"Authorization": f"Bearer {self.api_key}", "content-type": "application/json"}
+        r = httpx.post(f"{self.base}/chat/completions", headers=headers, json=body, timeout=120)
+        r.raise_for_status()
+        data = r.json()
+        msg = ((data.get("choices") or [{}])[0].get("message")) or {}
+        calls = []
+        for c in msg.get("tool_calls") or []:
+            fn = c.get("function") or {}
+            try:
+                args = json.loads(fn.get("arguments") or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            calls.append({"id": c.get("id"), "name": fn.get("name"), "arguments": args})
+        return AiTurn(content=msg.get("content") or None, tool_calls=calls,
+                      served_by=data.get("model"))
 
 
 class LegacySingleShotClient:
@@ -151,6 +239,8 @@ def resolve_client(req: Any) -> AiClient:
     provider = ai_config.provider() or os.getenv("PSA_LLM_PROVIDER", "cloud")
     if provider == "anthropic":
         return AnthropicClient()
+    if provider == "openai":
+        return OpenAiCompatClient()
     return LegacySingleShotClient(req)
 
 
