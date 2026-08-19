@@ -349,6 +349,7 @@ export interface AiConfig {
   model: string
   api_key_set: boolean
   api_key_hint: string
+  base_url: string                                   // 配置的中转网关(空=官方默认/环境变量)
   models: string[]
 }
 export async function getAiConfig(): Promise<AiConfig> {
@@ -356,7 +357,7 @@ export async function getAiConfig(): Promise<AiConfig> {
   if (!r.ok) throw new Error(`ai config → ${r.status}`)
   return r.json()
 }
-export async function putAiConfig(patch: { enabled?: boolean; provider?: 'example' | 'anthropic'; model?: string; api_key?: string }): Promise<AiConfig> {
+export async function putAiConfig(patch: { enabled?: boolean; provider?: 'example' | 'anthropic'; model?: string; api_key?: string; base_url?: string }): Promise<AiConfig> {
   const r = await fetch('/api/ai/config', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
   if (!r.ok) {

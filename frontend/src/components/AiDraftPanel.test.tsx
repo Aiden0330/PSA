@@ -213,7 +213,7 @@ describe('AI 设置区(2026-08-17)', () => {
       calls.push({ url, init })
       return new Response(JSON.stringify({
         enabled: false, provider: 'anthropic', model: 'claude-fable-5',
-        api_key_set: true, api_key_hint: 'sk-an…1234',
+        api_key_set: true, api_key_hint: 'sk-an…1234', base_url: 'https://relay.example.cn',
         models: ['claude-fable-5', 'claude-sonnet-5'] }), { status: 200 })
     }))
     const el = render(<AiDraftPanel {...baseProps()} />)
@@ -227,9 +227,13 @@ describe('AI 设置区(2026-08-17)', () => {
     // 不输 key 直接保存 → PUT 载荷不含 api_key(缺省=不动)
     ;(el.querySelector('[data-testid="ai-config-save"]') as HTMLButtonElement).click()
     await new Promise((r) => setTimeout(r, 30))
+    const url = el.querySelector('[data-testid="ai-config-url"]') as HTMLInputElement
+    expect(url.value).toBe('https://relay.example.cn')          // URL 非密钥,回填配置值
     const put = calls.find((c) => c.init?.method === 'PUT')
     expect(put).toBeTruthy()
-    expect(JSON.parse(String(put!.init!.body))).not.toHaveProperty('api_key')
+    const body = JSON.parse(String(put!.init!.body))
+    expect(body).not.toHaveProperty('api_key')
+    expect(body.base_url).toBe('https://relay.example.cn')
     vi.unstubAllGlobals()
   })
 })

@@ -69,6 +69,7 @@ function AiConfigSection() {
   const [cfg, setCfg] = useState<AiConfig | null>(null)
   const [keyInput, setKeyInput] = useState('')
   const [modelSel, setModelSel] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
   const [providerSel, setProviderSel] = useState<'example' | 'anthropic'>('anthropic')
   const [enabledSel, setEnabledSel] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -76,7 +77,7 @@ function AiConfigSection() {
   const load = async () => {
     try {
       const c = await getAiConfig()
-      setCfg(c); setModelSel(c.model); setEnabledSel(c.enabled)
+      setCfg(c); setModelSel(c.model); setEnabledSel(c.enabled); setBaseUrl(c.base_url ?? '')
       setProviderSel(c.provider === 'anthropic' ? 'anthropic' : 'example')
     } catch (e) { setMsg(String((e as Error)?.message ?? e)) }
   }
@@ -85,6 +86,7 @@ function AiConfigSection() {
     try {
       const c = await putAiConfig({
         enabled: enabledSel, provider: providerSel, model: modelSel,
+        base_url: baseUrl.trim(),                    // "" = 清除(回退官方默认/环境变量)
         ...(keyInput.trim() ? { api_key: keyInput.trim() } : {}) })
       setCfg(c); setKeyInput('')
       setMsg('已保存(密钥落本地 0600 文件,不入库不回显)')
@@ -117,6 +119,12 @@ function AiConfigSection() {
             </select>
             <input data-testid="ai-config-model" value={modelSel} onChange={(e) => setModelSel(e.target.value)}
               style={{ width: 170, fontSize: 12 }} title="模型 id(下拉即填;可手改)" />
+          </label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>接口 URL
+            <input data-testid="ai-config-url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="默认 https://api.anthropic.com(可填中转网关)"
+              title="API key 会发送到此地址——只填你信任的网关;留空 = 官方默认/环境变量"
+              style={{ flex: 1, minWidth: 200, fontSize: 12 }} autoComplete="off" />
           </label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>API key
             <input data-testid="ai-config-key" type="password" value={keyInput} onChange={(e) => setKeyInput(e.target.value)}

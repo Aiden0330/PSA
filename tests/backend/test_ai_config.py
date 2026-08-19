@@ -82,3 +82,24 @@ def test_validation_and_audit_without_secret(tmp_path, monkeypatch):
         rows = cx.execute("SELECT details_json FROM audit_log WHERE action='ai.config'").fetchall()
     assert rows, "配置变更必须留审计"
     assert all("sk-ant" not in r["details_json"] for r in rows)  # 审计不含密钥
+
+
+def test_base_url_roundtrip_clear_and_client_priority(tmp_path, monkeypatch):
+    _cfg_path(tmp_path, monkeypatch)
+    monkeypatch.setenv("PSA_ANTHROPIC_BASE_URL", "https://env.example.com")
+    # 设置(尾斜杠归一)
+    r = client.put("/api/ai/config", json={"base_url": "https://relay.example.cn/v1x/"})
+    assert r.status_code == 200, r.text
+    assert r.json()["base_url"] == "https://relay.example.cn/v1x"
+    from backend.ai_pipeline import AnthropicClient
+    assert AnthropicClient().base == "https://relay.example.cn/v1x"   # 配置压过环境
+    # 校验:非 http(s) 响亮 400
+    assert client.put("/api/ai/config", json={"base_url": "ftp://x"}).status_code == 400
+    assert client.put("/api/ai/config", json={"base_url": "not-a-url"}).status_code == 400
+    # "" = 清除 → 回退环境变量;GET 显示配置值为空
+    r = client.put("/api/ai/config", json={"base_url": ""})
+    assert r.json()["base_url"] == ""
+    assert AnthropicClient().base == "https://env.example.com"
+    # 环境也清掉 → 官方默认
+    monkeypatch.delenv("PSA_ANTHROPIC_BASE_URL")
+    assert AnthropicClient().base == "https://api.anthropic.com"

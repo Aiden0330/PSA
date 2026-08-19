@@ -103,7 +103,8 @@ class AnthropicClient:
         # 优先级(2026-08-17):显式实参 > 用户配置 > 环境变量 > 默认
         self.model_id = model or ai_config.model() or os.getenv("PSA_LLM_MODEL") or DRAFT_MODEL
         self.api_key = api_key or ai_config.api_key()
-        self.base = os.getenv("PSA_ANTHROPIC_BASE_URL", "https://api.anthropic.com").rstrip("/")
+        self.base = (ai_config.base_url()
+                     or os.getenv("PSA_ANTHROPIC_BASE_URL", "https://api.anthropic.com")).rstrip("/")
 
     def complete(self, messages: list[dict], tools: list[dict] | None = None) -> AiTurn:
         import httpx

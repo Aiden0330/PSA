@@ -157,6 +157,7 @@ class AiConfigIn(BaseModel):
     provider: Optional[Literal["example", "anthropic"]] = None
     model: Optional[str] = None
     api_key: Optional[str] = None
+    base_url: Optional[str] = None                   # 中转网关;""=清除(回退环境/默认)
 
 class AiDraftAppliedRequest(BaseModel):
     status: Literal["applied", "rejected"] = "applied"

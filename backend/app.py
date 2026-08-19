@@ -1057,6 +1057,7 @@ def api_ai_config_get(_=Depends(require_authenticated)):
         "model": cfg.get("model") or os.getenv("PSA_LLM_MODEL") or DRAFT_MODEL,
         "api_key_set": bool(key) or env_key,
         "api_key_hint": ai_config.key_hint(key) or ("环境变量已设" if env_key else ""),
+        "base_url": cfg.get("base_url") or "",
         "models": ai_config.DEFAULT_MODELS,
     }
 
@@ -1081,12 +1082,21 @@ def api_ai_config_put(body: schemas.AiConfigIn, _=Depends(require_role(*ADMIN)))
             cfg.pop("api_key", None)                 # "" = 清除
         else:
             cfg["api_key"] = body.api_key
+    if body.base_url is not None:
+        u = body.base_url.strip().rstrip("/")
+        if u == "":
+            cfg.pop("base_url", None)                # "" = 清除(回退环境/官方默认)
+        elif not (u.startswith("http://") or u.startswith("https://")) or len(u) > 256:
+            raise HTTPException(400, f"base_url 须为 http(s) 地址(≤256):{body.base_url!r}")
+        else:
+            cfg["base_url"] = u
     ai_config.save(cfg)
     try:
         with store._conn() as cx:
             store.record_audit(cx, "ai.config", details={
                 "enabled": cfg.get("enabled", False), "provider": cfg.get("provider"),
-                "model": cfg.get("model"), "api_key_set": bool(cfg.get("api_key"))})
+                "model": cfg.get("model"), "base_url": cfg.get("base_url"),
+                "api_key_set": bool(cfg.get("api_key"))})
     except Exception:
         pass                                          # 审计失败不阻断配置生效
     key = cfg.get("api_key") or ""
@@ -1094,6 +1104,7 @@ def api_ai_config_put(body: schemas.AiConfigIn, _=Depends(require_role(*ADMIN)))
     return {"enabled": ai_draft.is_enabled(), "provider": cfg.get("provider"),
             "model": cfg.get("model"), "api_key_set": bool(key) or env_key,
             "api_key_hint": ai_config.key_hint(key) or ("环境变量已设" if env_key else ""),
+            "base_url": cfg.get("base_url") or "",
             "models": ai_config.DEFAULT_MODELS}
 
 

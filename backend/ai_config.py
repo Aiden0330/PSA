@@ -48,6 +48,12 @@ def model() -> str | None:
     return load().get("model") or None
 
 
+def base_url() -> str | None:
+    """中转网关/代理端点(配置 > PSA_ANTHROPIC_BASE_URL 环境变量;None=官方默认)。
+    注意:API key 会发送到该地址——UI 侧有"只填你信任的网关"提示。"""
+    return load().get("base_url") or None
+
+
 def api_key() -> str:
     """配置密钥优先;回退环境变量(部署级)。"""
     return (load().get("api_key")
