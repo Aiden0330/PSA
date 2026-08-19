@@ -204,3 +204,32 @@ describe('截图转录 UI(2026-08-17)', () => {
     expect(el.querySelector('[data-testid="ai-image-input"]')).toBeNull()
   })
 })
+
+
+describe('AI 设置区(2026-08-17)', () => {
+  it('默认折叠零 fetch;展开 → 读配置(掩码)→ 保存只发输入的 key', async () => {
+    const calls: { url: string; init?: RequestInit }[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init })
+      return new Response(JSON.stringify({
+        enabled: false, provider: 'anthropic', model: 'claude-fable-5',
+        api_key_set: true, api_key_hint: 'sk-an…1234',
+        models: ['claude-fable-5', 'claude-sonnet-5'] }), { status: 200 })
+    }))
+    const el = render(<AiDraftPanel {...baseProps()} />)
+    expect(calls.length).toBe(0)                               // 懒:未展开零请求
+    ;(el.querySelector('[data-testid="ai-config-toggle"]') as HTMLButtonElement).click()
+    await new Promise((r) => setTimeout(r, 30))
+    expect(calls[0]?.url).toBe('/api/ai/config')
+    const key = el.querySelector('[data-testid="ai-config-key"]') as HTMLInputElement
+    expect(key.value).toBe('')                                 // 永不回填原文
+    expect(key.placeholder).toContain('sk-an…1234')
+    // 不输 key 直接保存 → PUT 载荷不含 api_key(缺省=不动)
+    ;(el.querySelector('[data-testid="ai-config-save"]') as HTMLButtonElement).click()
+    await new Promise((r) => setTimeout(r, 30))
+    const put = calls.find((c) => c.init?.method === 'PUT')
+    expect(put).toBeTruthy()
+    expect(JSON.parse(String(put!.init!.body))).not.toHaveProperty('api_key')
+    vi.unstubAllGlobals()
+  })
+})

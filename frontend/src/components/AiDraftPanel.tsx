@@ -1,3 +1,6 @@
+import { getAiConfig, putAiConfig } from '../aiDraft'
+import type { AiConfig } from '../aiDraft'
+import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { AiApplyMode, AiDraftResponse, DraftElement } from '../aiDraft'
 import type { FuncEvent } from '../eventtree'
@@ -57,6 +60,80 @@ function ftNamesFromDraft(draft: AiDraftResponse): string[] {
 
 function firstName(names: string[], fallback: string): string {
   return names[0] || fallback
+}
+
+/** AI 设置区(2026-08-17):供应商/模型/API key。懒展开(点开才 fetch);
+ *  密钥输入永不回填原文(placeholder 显掩码提示),保存后即清空输入框。 */
+function AiConfigSection() {
+  const [open, setOpen] = useState(false)
+  const [cfg, setCfg] = useState<AiConfig | null>(null)
+  const [keyInput, setKeyInput] = useState('')
+  const [modelSel, setModelSel] = useState('')
+  const [providerSel, setProviderSel] = useState<'example' | 'anthropic'>('anthropic')
+  const [enabledSel, setEnabledSel] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const load = async () => {
+    try {
+      const c = await getAiConfig()
+      setCfg(c); setModelSel(c.model); setEnabledSel(c.enabled)
+      setProviderSel(c.provider === 'anthropic' ? 'anthropic' : 'example')
+    } catch (e) { setMsg(String((e as Error)?.message ?? e)) }
+  }
+  const save = async () => {
+    setBusy(true); setMsg(null)
+    try {
+      const c = await putAiConfig({
+        enabled: enabledSel, provider: providerSel, model: modelSel,
+        ...(keyInput.trim() ? { api_key: keyInput.trim() } : {}) })
+      setCfg(c); setKeyInput('')
+      setMsg('已保存(密钥落本地 0600 文件,不入库不回显)')
+    } catch (e) { setMsg(String((e as Error)?.message ?? e)) }
+    finally { setBusy(false) }
+  }
+  return (
+    <div style={{ borderTop: '1px solid var(--psa-line-2)', marginTop: 10, paddingTop: 8 }}>
+      <button data-testid="ai-config-toggle" className="psa-btn" style={{ fontSize: 11.5 }}
+        onClick={() => { const n = !open; setOpen(n); if (n && !cfg) void load() }}>
+        ⚙ AI 设置{cfg ? `(${providerSel} · ${modelSel}${cfg.api_key_set ? ' · 密钥已设' : ' · 无密钥'})` : ''}
+      </button>
+      {open && (
+        <div data-testid="ai-config-body" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, fontSize: 12 }}>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input type="checkbox" checked={enabledSel} onChange={(e) => setEnabledSel(e.target.checked)} />
+            启用 AI 草案(等效 PSA_AI_ENABLED=1)
+          </label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>供应商
+            <select value={providerSel} onChange={(e) => setProviderSel(e.target.value as 'example' | 'anthropic')} style={{ fontSize: 12 }}>
+              <option value="anthropic">anthropic(真实生成,需 API key)</option>
+              <option value="example">example(离线演示,忽略截图)</option>
+            </select>
+          </label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>模型
+            <select value={cfg?.models.includes(modelSel) ? modelSel : '__custom'}
+              onChange={(e) => { if (e.target.value !== '__custom') setModelSel(e.target.value) }} style={{ fontSize: 12 }}>
+              {(cfg?.models ?? []).map((m) => <option key={m} value={m}>{m}</option>)}
+              <option value="__custom">自定义…</option>
+            </select>
+            <input data-testid="ai-config-model" value={modelSel} onChange={(e) => setModelSel(e.target.value)}
+              style={{ width: 170, fontSize: 12 }} title="模型 id(下拉即填;可手改)" />
+          </label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>API key
+            <input data-testid="ai-config-key" type="password" value={keyInput} onChange={(e) => setKeyInput(e.target.value)}
+              placeholder={cfg?.api_key_set ? `${cfg.api_key_hint || '已设置'}(输入以更换,留空不动)` : '未设置——粘贴 sk-ant-…'}
+              style={{ flex: 1, minWidth: 160, fontSize: 12 }} autoComplete="off" />
+          </label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button data-testid="ai-config-save" className="psa-btn psa-btn--dark" disabled={busy} onClick={() => void save()}>保存</button>
+            {msg && <span style={{ fontSize: 11, color: 'var(--psa-faint)' }}>{msg}</span>}
+          </div>
+          <div style={{ fontSize: 10.5, color: 'var(--psa-faint)' }}>
+            密钥存本地 data/ai_config.json(0600,已 gitignore),不入版本库/审计,界面永不回显原文。
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function AiDraftPanel({
@@ -180,6 +257,7 @@ export function AiDraftPanel({
             </button>
             {error && <span style={errorText}>{error}</span>}
           </div>
+          <AiConfigSection />
         </div>
 
         <div style={right}>

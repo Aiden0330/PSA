@@ -19,7 +19,9 @@ EXAMPLE_DRAFT_PATH = Path(__file__).resolve().parents[1] / "examples" / "ai_eta_
 
 
 def is_enabled() -> bool:
-    return os.getenv("PSA_AI_ENABLED") == "1"
+    # 用户配置(UI 知情开启)与部署环境变量任一即启用(2026-08-17)
+    from backend import ai_config
+    return os.getenv("PSA_AI_ENABLED") == "1" or ai_config.enabled()
 
 
 def _request_payload(req: schemas.AiDraftRequest | dict[str, Any]) -> dict[str, Any]:
@@ -94,7 +96,8 @@ def _example_fta_draft(req: dict[str, Any]) -> dict[str, Any]:
 
 
 def call_provider(req: schemas.AiDraftRequest | dict[str, Any]) -> Any:
-    provider = os.getenv("PSA_LLM_PROVIDER", "cloud")
+    from backend import ai_config
+    provider = ai_config.provider() or os.getenv("PSA_LLM_PROVIDER", "cloud")
     if provider == "example":
         payload = _request_payload(req)
         if payload.get("target") == "fta":

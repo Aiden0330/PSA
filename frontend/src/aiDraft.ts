@@ -340,3 +340,29 @@ export function applyAiDraftToProject(input: ApplyAiDraftInput): ApplyAiDraftRes
     userFts: mergeAiDraftFts(userFts, input.draft.fts),
   }
 }
+
+
+// ── 用户级 AI 配置(2026-08-17):密钥只写不读,GET 只有掩码提示 ──
+export interface AiConfig {
+  enabled: boolean
+  provider: 'example' | 'anthropic' | 'cloud' | 'local'
+  model: string
+  api_key_set: boolean
+  api_key_hint: string
+  models: string[]
+}
+export async function getAiConfig(): Promise<AiConfig> {
+  const r = await fetch('/api/ai/config')
+  if (!r.ok) throw new Error(`ai config → ${r.status}`)
+  return r.json()
+}
+export async function putAiConfig(patch: { enabled?: boolean; provider?: 'example' | 'anthropic'; model?: string; api_key?: string }): Promise<AiConfig> {
+  const r = await fetch('/api/ai/config', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
+  if (!r.ok) {
+    let detail = ''
+    try { const d = await r.json(); detail = typeof d?.detail === 'string' ? d.detail : '' } catch { /* 非 JSON 错误体 */ }
+    throw new Error(detail || `ai config → ${r.status}`)
+  }
+  return r.json()
+}

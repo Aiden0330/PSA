@@ -150,6 +150,14 @@ class AiDraftRequest(BaseModel):
     project_uuid: Optional[str] = None               # 4b2:有项目上下文时生成即落 ai_drafts + 审计
     images: list[AiImage] = []                       # 截图转录:任意工具的 ETA/FTA 截图
 
+class AiConfigIn(BaseModel):
+    """AI 配置写入(2026-08-17)。api_key 语义:缺省=不动,""=清除,串=设置。
+    密钥只写不读——响应与审计永不含原文。"""
+    enabled: Optional[bool] = None
+    provider: Optional[Literal["example", "anthropic"]] = None
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+
 class AiDraftAppliedRequest(BaseModel):
     status: Literal["applied", "rejected"] = "applied"
     accepted: dict[str, Any] = {}                    # 逐元素接受清单(D7 ghost-diff)

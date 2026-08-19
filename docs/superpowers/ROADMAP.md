@@ -902,3 +902,23 @@ base64**——token 炸弹);AnthropicClient 透传零改动;无图请求**逐字
 **待解锁**:真实截图解析需 `ANTHROPIC_API_KEY` + `PSA_LLM_PROVIDER=anthropic`
 + `PSA_AI_ENABLED=1`(runbook 既有);example 供应商忽略图像(管线/UI 全链已备)。
 py **709** · fe **506** · bundle 2.91MB。
+
+## 2026-08-18 · AI 配置界面化:用户配 API key / 模型 / 供应商
+
+**语义**:AI 首跑不再依赖环境变量——界面 ⚙「AI 设置」直接配。优先级:**用户
+配置 > 环境变量 > 默认**;`enabled` 与 `PSA_AI_ENABLED=1` 任一即启用(UI 配置
+即知情开启)。
+**密钥纪律**(全链锁死):落本地 `data/ai_config.json`(**0600**,data/ 已
+gitignore)——绝不进 projects.db(库随备份走,密钥不得随行);GET/PUT 响应只有
+掩码提示(`sk-an…1234`),**永不回显原文**;审计 `ai.config` 只记"是否已设",
+不含密钥材料;api_key 语义:缺省=不动,`""`=清除,串=设置。
+**后端**:新模块 `ai_config.py`;`is_enabled`/`resolve_client`/`AnthropicClient`
+三接入点读配置优先;GET/PUT `/api/ai/config`(off 模式单用户直通,server 模式
+仅 admin);模型清单与 ai-model-strategy 同步(fable 主档)。py 锁 4(掩码往返
++0600 / 缺省-清除语义 / 配置压过环境 + enabled OR / 422 + 审计无密钥)。
+**前端**:AI 面板底部 ⚙ 设置区(懒展开,零请求直到点开——旧用法零扰动):启用
+开关/供应商/模型下拉+自定义/密钥密文输入(占位显掩码,永不回填,保存即清空)。
+fe 锁 1(懒 + 掩码 + 缺省不发 key)。真机:设置区展开、摘要行、占位文案全通。
+py **713** · fe **507** · bundle 2.92MB。
+**用法**:⚙ AI 设置 → 勾启用 → anthropic → 粘贴 key → 保存;截图转录与文字
+草案即走真实模型。

@@ -1043,6 +1043,60 @@ def api_project_document_schema():
     from backend.canonical import ProjectDocument
     return ProjectDocument.model_json_schema()
 
+@app.get("/api/ai/config")
+def api_ai_config_get(_=Depends(require_authenticated)):
+    """AI 配置读取:密钥永不回显(掩码提示 + 是否已设);模型清单供下拉。"""
+    from backend import ai_config, ai_draft
+    from backend.ai_pipeline import DRAFT_MODEL
+    cfg = ai_config.load()
+    key = cfg.get("api_key") or ""
+    env_key = bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("PSA_LLM_API_KEY"))
+    return {
+        "enabled": ai_draft.is_enabled(),
+        "provider": cfg.get("provider") or os.getenv("PSA_LLM_PROVIDER", "cloud"),
+        "model": cfg.get("model") or os.getenv("PSA_LLM_MODEL") or DRAFT_MODEL,
+        "api_key_set": bool(key) or env_key,
+        "api_key_hint": ai_config.key_hint(key) or ("环境变量已设" if env_key else ""),
+        "models": ai_config.DEFAULT_MODELS,
+    }
+
+
+@app.put("/api/ai/config")
+def api_ai_config_put(body: schemas.AiConfigIn, _=Depends(require_role(*ADMIN))):
+    """AI 配置写入(off 模式单用户直通;server 模式仅 admin)。密钥落 0600 本地
+    文件(data/ 已 gitignore),绝不进库;审计只记"是否已设",不含密钥材料。"""
+    from backend import ai_config, ai_draft, store
+    cfg = ai_config.load()
+    if body.enabled is not None:
+        cfg["enabled"] = bool(body.enabled)
+    if body.provider is not None:
+        cfg["provider"] = body.provider
+    if body.model is not None:
+        m = body.model.strip()
+        if not m or len(m) > 128:
+            raise HTTPException(400, "model 须为非空字符串(≤128)")
+        cfg["model"] = m
+    if body.api_key is not None:
+        if body.api_key == "":
+            cfg.pop("api_key", None)                 # "" = 清除
+        else:
+            cfg["api_key"] = body.api_key
+    ai_config.save(cfg)
+    try:
+        with store._conn() as cx:
+            store.record_audit(cx, "ai.config", details={
+                "enabled": cfg.get("enabled", False), "provider": cfg.get("provider"),
+                "model": cfg.get("model"), "api_key_set": bool(cfg.get("api_key"))})
+    except Exception:
+        pass                                          # 审计失败不阻断配置生效
+    key = cfg.get("api_key") or ""
+    env_key = bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("PSA_LLM_API_KEY"))
+    return {"enabled": ai_draft.is_enabled(), "provider": cfg.get("provider"),
+            "model": cfg.get("model"), "api_key_set": bool(key) or env_key,
+            "api_key_hint": ai_config.key_hint(key) or ("环境变量已设" if env_key else ""),
+            "models": ai_config.DEFAULT_MODELS}
+
+
 @app.post("/api/ai/draft-model", response_model=schemas.AiDraftResponse)
 def api_ai_draft_model(req: schemas.AiDraftRequest, _=Depends(require_role(*ANALYST))):
     """LLM 生成 ETA/FTA 草案。只返回待审核草案;不直接写入项目。

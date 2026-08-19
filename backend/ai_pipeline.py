@@ -99,8 +99,10 @@ class AnthropicClient:
     supports_repair = True
 
     def __init__(self, model: str | None = None, api_key: str | None = None):
-        self.model_id = model or os.getenv("PSA_LLM_MODEL") or DRAFT_MODEL
-        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY") or os.getenv("PSA_LLM_API_KEY", "")
+        from backend import ai_config
+        # 优先级(2026-08-17):显式实参 > 用户配置 > 环境变量 > 默认
+        self.model_id = model or ai_config.model() or os.getenv("PSA_LLM_MODEL") or DRAFT_MODEL
+        self.api_key = api_key or ai_config.api_key()
         self.base = os.getenv("PSA_ANTHROPIC_BASE_URL", "https://api.anthropic.com").rstrip("/")
 
     def complete(self, messages: list[dict], tools: list[dict] | None = None) -> AiTurn:
@@ -144,7 +146,8 @@ class LegacySingleShotClient:
 
 
 def resolve_client(req: Any) -> AiClient:
-    provider = os.getenv("PSA_LLM_PROVIDER", "cloud")
+    from backend import ai_config
+    provider = ai_config.provider() or os.getenv("PSA_LLM_PROVIDER", "cloud")
     if provider == "anthropic":
         return AnthropicClient()
     return LegacySingleShotClient(req)
