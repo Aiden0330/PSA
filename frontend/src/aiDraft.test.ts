@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyAiDraftToProject } from './aiDraft'
+import { dataUrlToAiImage, applyAiDraftToProject } from './aiDraft'
 import type { AiDraftResponse } from './aiDraft'
 import type { ProjectEta } from './project'
 import type { ModelJson } from './model'
@@ -218,5 +218,14 @@ describe('D7 逐元素接受', () => {
     })
     expect(res.etaTabs).toHaveLength(2)
     expect((res.etaTabs[1].model as any).functionalEvents.map((f: any) => f.id)).toEqual(['B1'])
+  })
+})
+
+
+describe('dataUrlToAiImage(截图转录)', () => {
+  it('白名单类型解析;畸形/越界类型返回 null(响亮提示,不静默吞图)', () => {
+    expect(dataUrlToAiImage('data:image/png;base64,AAAA')).toEqual({ media_type: 'image/png', data: 'AAAA' })
+    expect(dataUrlToAiImage('data:image/tiff;base64,AAAA')).toBeNull()
+    expect(dataUrlToAiImage('not-a-data-url')).toBeNull()
   })
 })

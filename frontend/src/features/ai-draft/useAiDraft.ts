@@ -3,8 +3,8 @@ import { draftAiModel, reportAiDraftApplied } from '../../api'
 import type { LibraryData } from '../../api'
 import { flushPending, flushReceipt, pendingReceipts, stageReceipt } from './aiOutbox'
 import type { AiReceipt } from './aiOutbox'
-import { applyAiDraftToProject, draftElements } from '../../aiDraft'
-import type { AiApplyMode, AiDraftResponse, AiDraftTarget, DraftElement } from '../../aiDraft'
+import { dataUrlToAiImage, applyAiDraftToProject, draftElements } from '../../aiDraft'
+import type { AiDraftImage, AiApplyMode, AiDraftResponse, AiDraftTarget, DraftElement } from '../../aiDraft'
 import type { ProjectEta, ProjectPayload } from '../../project'
 import { etaDisplayName, useActiveEta } from '../../stores/useActiveEta'
 import { useProjectStore } from '../../stores/projectStore'
@@ -54,6 +54,23 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
   const [aiGoal, setAiGoal] = useState('电池舱液冷泄漏导致外短')
   const [aiMode, setAiMode] = useState<AiApplyMode>('new_eta')
   const [aiTargetFeId, setAiTargetFeId] = useState('')
+  // 截图转录(2026-08-17):≤3 张;超限响亮提示,不静默丢图
+  const [aiImages, setAiImages] = useState<{ name: string; media_type: string; data: string }[]>([])
+  const addAiImages = (files: File[]) => {
+    for (const f of files) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const img = typeof reader.result === 'string' ? dataUrlToAiImage(reader.result) : null
+        if (!img) { setAiError(`不支持的图片类型:${f.name}(仅 png/jpeg/webp/gif)`); return }
+        setAiImages((prev) => {
+          if (prev.length >= 3) { setAiError('截图最多 3 张'); return prev }
+          return [...prev, { name: f.name || `截图${prev.length + 1}`, ...img }]
+        })
+      }
+      reader.readAsDataURL(f)
+    }
+  }
+  const removeAiImage = (i: number) => setAiImages((prev) => prev.filter((_, j) => j !== i))
   const [aiDraft, setAiDraft] = useState<AiDraftResponse | null>(null)
   const [aiDraftContext, setAiDraftContext] = useState<AiDraftContext | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
@@ -127,6 +144,8 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
           target_fe_label: aiMode === 'fta_for_barrier' ? (targetFe?.label ?? aiTargetFeId) : undefined,
           library: compactLibraryContext(lib),
         },
+        // 截图转录:仅带 media_type+base64(name 是本地 UI 态,不进请求)
+        images: aiImages.length ? aiImages.map(({ media_type, data }) => ({ media_type, data })) as AiDraftImage[] : undefined,
       })
       if (useProjectStore.getState().workspaceId !== wid) return   // 迟到的草案不落入别的项目
       setAiDraft(draft)
@@ -236,6 +255,7 @@ export function useAiDraft(lib: LibraryData | null, buildPayload: () => ProjectP
 
   return {
     aiOpen, setAiOpen, aiGoal, setAiGoal, aiMode, setAiMode, aiTargetFeId, setAiTargetFeId,
+    aiImages, addAiImages, removeAiImage,            // 截图转录
     aiDraft, setAiDraft, aiDraftContext, setAiDraftContext, aiBusy, aiError, setAiError, aiNotice,
     aiAppliedResult, onGenerateAiDraft, onApplyAiDraft, openAiAppliedResult,
     elements, acceptedIds, toggleElement,            // D7 ghost-diff

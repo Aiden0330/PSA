@@ -135,6 +135,12 @@ class ReportRequest(EtUncertaintyRequest):
     project_uuid: Optional[str] = None
     project_payload: Optional[dict[str, Any]] = None
 
+class AiImage(BaseModel):
+    """截图转录(2026-08-17):base64 图像。类型白名单在 schema 层响亮 422;
+    数量/大小/base64 合法性在路由层显式校验(400 点名)。"""
+    media_type: Literal["image/png", "image/jpeg", "image/webp", "image/gif"]
+    data: str
+
 class AiDraftRequest(BaseModel):
     goal: str
     target: Literal["eta", "fta", "eta_with_fta"]
@@ -142,6 +148,7 @@ class AiDraftRequest(BaseModel):
     active_eta_key: Optional[str] = None
     user_context: dict[str, Any] = {}
     project_uuid: Optional[str] = None               # 4b2:有项目上下文时生成即落 ai_drafts + 审计
+    images: list[AiImage] = []                       # 截图转录:任意工具的 ETA/FTA 截图
 
 class AiDraftAppliedRequest(BaseModel):
     status: Literal["applied", "rejected"] = "applied"

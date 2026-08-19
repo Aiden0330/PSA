@@ -17,6 +17,10 @@ interface AiDraftPanelProps {
   onModeChange: (mode: AiApplyMode) => void
   onTargetFeIdChange: (id: string) => void
   onGenerate: () => void
+  /** 截图转录(2026-08-17):≤3 张任意工具的 ETA/FTA 截图 */
+  images?: { name: string; media_type: string; data: string }[]
+  onAddImages?: (files: File[]) => void
+  onRemoveImage?: (i: number) => void
   onApply: () => void
   onClose: () => void
   /** D7 ghost-diff:草案元素清单 + 接受集(缺省 = 不渲染逐元素区) */
@@ -71,6 +75,9 @@ export function AiDraftPanel({
   onGenerate,
   onApply,
   onClose,
+  images = [],
+  onAddImages,
+  onRemoveImage,
   elements = [],
   acceptedIds = [],
   onToggleElement,
@@ -131,12 +138,40 @@ export function AiDraftPanel({
             </select>
           )}
           <textarea
+            onPaste={(e) => {
+              if (!onAddImages) return
+              const files = [...e.clipboardData.items].filter((it) => it.type.startsWith('image/'))
+                .map((it) => it.getAsFile()).filter((f): f is File => !!f)
+              if (files.length) { e.preventDefault(); onAddImages(files) }
+            }}
             value={goal}
             onChange={(e) => onGoalChange(e.target.value)}
             placeholder="例如: 电池舱液冷泄漏导致外短"
             style={textarea}
           />
+          {images.length > 0 && (
+            <div data-testid="ai-image-thumbs" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '6px 0' }}>
+              {images.map((im, i) => (
+                <span key={i} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 4, border: '1px solid var(--psa-line)', borderRadius: 6, padding: 3 }}>
+                  <img src={`data:${im.media_type};base64,${im.data}`} alt={im.name} style={{ height: 44, borderRadius: 4, display: 'block' }} />
+                  <span style={{ fontSize: 10, color: 'var(--psa-faint)', maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{im.name}</span>
+                  {onRemoveImage && (
+                    <button data-testid={`ai-image-rm-${i}`} onClick={() => onRemoveImage(i)} title="移除"
+                      style={{ border: 0, background: 'none', color: 'var(--psa-danger)', cursor: 'pointer', fontSize: 13, lineHeight: 1 }}>✕</button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {onAddImages && (
+              <label className="psa-btn" style={{ cursor: 'pointer' }} title="上传 ETA/FTA 截图(任意工具的图,≤3 张)——AI 转录为可编辑模型;数值照抄,看不清不编造。也可直接粘贴到目标输入框。">
+                ＋截图(可选)
+                <input data-testid="ai-image-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple
+                  style={{ display: 'none' }}
+                  onChange={(e) => { const fs = [...(e.target.files ?? [])]; if (fs.length) onAddImages(fs); e.currentTarget.value = '' }} />
+              </label>
+            )}
             <button className="psa-btn psa-btn--primary" onClick={onGenerate} disabled={busy || !goal.trim()}>
               <Icon name="bolt" size={14} />{busy ? '生成中...' : '生成草案'}
             </button>

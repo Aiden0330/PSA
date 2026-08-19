@@ -185,3 +185,22 @@ describe('AiDraftPanel', () => {
     expect(review.style.overflowY).toBe('auto')
   })
 })
+
+
+describe('截图转录 UI(2026-08-17)', () => {
+  const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNgYGD4DwABBAEAX+XyJgAAAABJRU5ErkJggg=='
+  it('缩略图渲染 + 移除回调 + 文件入口在场', () => {
+    const onRemove = vi.fn()
+    const el = render(<AiDraftPanel {...baseProps()}
+      images={[{ name: 'rs-eta.png', media_type: 'image/png', data: PNG }]}
+      onAddImages={() => {}} onRemoveImage={onRemove} />)
+    expect(el.querySelector('[data-testid="ai-image-thumbs"]')?.textContent).toContain('rs-eta.png')
+    expect(el.querySelector('[data-testid="ai-image-input"]')).toBeTruthy()
+    ;(el.querySelector('[data-testid="ai-image-rm-0"]') as HTMLButtonElement).click()
+    expect(onRemove).toHaveBeenCalledWith(0)
+  })
+  it('未接线(无 onAddImages)时零渲染——旧用法零扰动', () => {
+    const el = render(<AiDraftPanel {...baseProps()} />)
+    expect(el.querySelector('[data-testid="ai-image-input"]')).toBeNull()
+  })
+})

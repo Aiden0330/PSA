@@ -35,6 +35,11 @@ export interface AiDraftResponse {
   ai_draft_id?: number                               // 4b2:溯源行 id(应用回执)
 }
 
+export interface AiDraftImage {
+  media_type: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
+  data: string                                       // 纯 base64(不含 dataURL 前缀)
+}
+
 export interface AiDraftRequest {
   goal: string
   target: AiDraftTarget
@@ -42,6 +47,13 @@ export interface AiDraftRequest {
   active_eta_key?: string
   user_context?: Record<string, unknown>
   project_uuid?: string                              // 4b2:生成即落库 + 审计
+  images?: AiDraftImage[]                            // 截图转录:任意工具的 ETA/FTA 截图(≤3 张)
+}
+
+/** dataURL → AiDraftImage;非白名单类型/畸形 dataURL 返回 null(调用方提示,不静默吞图)。 */
+export function dataUrlToAiImage(dataUrl: string): AiDraftImage | null {
+  const m = /^data:(image\/(?:png|jpeg|webp|gif));base64,(.+)$/.exec(dataUrl)
+  return m ? { media_type: m[1] as AiDraftImage['media_type'], data: m[2] } : null
 }
 
 // ── D7 ghost-diff:草案元素清单 + 逐元素接受 ──

@@ -884,3 +884,21 @@ S11–S14 子代理因宿主机休眠两轮孤儿化,存活文件保留、余量
 git diff 恢复)。锁 4:删中间(下游原值直连)/删首(根=失效子树)/删末/
 非级联成功侧子树随删。实机:6 屏障树删第 2 个,其余 5 个原值原样、链路重连。
 fe **503** · bundle 2.91MB。
+
+## 2026-08-17 · 截图转录:上传任意工具的 ETA/FTA 截图 → AI 生成同构模型
+
+**语义**:复用完整 ADR-3 链(草案 → schema/lint/引擎试运行 → ghost-diff 逐元素
+接受 → 溯源/审计),只新增**图像入口**。转录铁律入系统提示附则(仅带图时):
+结构/名称/数值逐一照抄;看不清一律留空写 warnings **绝不编造**;照抄数值仍按
+参考库检索标 grounded/ungrounded。PROMPT_VERSION → 2026-08-17-p2。
+**后端**:AiDraftRequest.images(≤3 张,png/jpeg/webp/gif 白名单 422,base64/
+5MB 显式 400 点名);管线带图时用户消息变内容块列表(图像块在前,**文本载荷剥离
+base64**——token 炸弹);AnthropicClient 透传零改动;无图请求**逐字节不变**(锁)。
+溯源:ai_drafts 新列 images_json(sha256+尺寸元数据锚定确切图像,绝不落 base64
+大团);store 首个**幂等加列迁移**(PRAGMA 守卫 ALTER,存量库自动升)。py 锁 4。
+**前端**:AI 面板「＋截图(可选)」上传 + 粘贴直入(目标输入框 onPaste)+ 缩略图
+/逐张移除;`dataUrlToAiImage` 纯助手(白名单外响亮提示不静默吞图);未接线旧用法
+零渲染。fe 锁 3。真机:面板入口/提示在场。
+**待解锁**:真实截图解析需 `ANTHROPIC_API_KEY` + `PSA_LLM_PROVIDER=anthropic`
++ `PSA_AI_ENABLED=1`(runbook 既有);example 供应商忽略图像(管线/UI 全链已备)。
+py **709** · fe **506** · bundle 2.91MB。

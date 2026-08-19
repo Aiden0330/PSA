@@ -12,7 +12,7 @@ import os
 from typing import Any, Protocol
 
 # ── 常量(评测门与提示词变更时必须 bump;记入 ai_drafts 溯源)──
-PROMPT_VERSION = "2026-07-09-p1"
+PROMPT_VERSION = "2026-08-17-p2"   # p2:截图转录附则(带图请求)
 DRAFT_MODEL = "claude-fable-5"
 FALLBACK_MODELS = ["claude-opus-4-8"]
 FALLBACK_BETAS = ["server-side-fallback-2026-06-01"]
@@ -231,9 +231,28 @@ def generate_draft(req_payload: dict, client: AiClient) -> tuple[dict | None, di
 
     tool_trace: list[dict] = []
     served_by = None
+    # 截图转录(2026-08-17):带图请求 → 用户消息为内容块列表(图像块在前,文本载荷
+    # 剥离 base64——否则 JSON 文本里再嵌一份是 token 炸弹);无图请求逐字节不变(锁)。
+    images = req_payload.get("images") or []
+    payload_wo_images = {k: v for k, v in req_payload.items() if k != "images"}
+    system_prompt = _draft_system_prompt()
+    if images:
+        system_prompt += (
+            "用户附带了事件树/故障树截图(可能来自其它工具):请把截图**转录**为等价模型——"
+            "分支结构、屏障/事件名称、概率/频率数值逐一照抄;看不清或被截断的内容一律留空"
+            "并写入 warnings,**绝不编造**;照抄的数值仍按参考库检索规则标注,检索不到即 ungrounded。")
+    user_content: Any
+    if images:
+        user_content = [
+            *({"type": "image", "source": {"type": "base64",
+               "media_type": im["media_type"], "data": im["data"]}} for im in images),
+            {"type": "text", "text": json.dumps(payload_wo_images, ensure_ascii=False)},
+        ]
+    else:
+        user_content = json.dumps(req_payload, ensure_ascii=False)
     messages: list[dict] = [
-        {"role": "system", "content": _draft_system_prompt()},
-        {"role": "user", "content": json.dumps(req_payload, ensure_ascii=False)},
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_content},
     ]
 
     def one_turn() -> str | None:

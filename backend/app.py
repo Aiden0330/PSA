@@ -1050,12 +1050,32 @@ def api_ai_draft_model(req: schemas.AiDraftRequest, _=Depends(require_role(*ANAL
     from backend import ai_draft, store
     if not ai_draft.is_enabled():
         raise HTTPException(503, "AI draft model is disabled; set PSA_AI_ENABLED=1 to enable it.")
+    # 截图转录(2026-08-17):数量/大小/base64 显式校验(400 点名);溯源表以
+    # sha256+尺寸元数据代替 base64 大团(哈希锚定确切图像,不膨胀 ai_drafts)。
+    img_meta: list[dict] = []
+    if req.images:
+        import base64 as _b64
+        import hashlib as _hl
+        if len(req.images) > 3:
+            raise HTTPException(400, f"截图最多 3 张,实得 {len(req.images)}")
+        for i, im in enumerate(req.images):
+            try:
+                raw = _b64.b64decode(im.data, validate=True)
+            except Exception:
+                raise HTTPException(400, f"images[{i}] 非法 base64")
+            if len(raw) > 5 * 1024 * 1024:
+                raise HTTPException(400, f"images[{i}] 超过 5MB(实得 {len(raw)} 字节)")
+            img_meta.append({"media_type": im.media_type,
+                             "sha256": _hl.sha256(raw).hexdigest(), "bytes": len(raw)})
     try:
         resp = ai_draft.create_draft(req)
     except ai_draft.ProviderError as e:
         raise HTTPException(502, str(e))
     try:
-        resp["ai_draft_id"] = store.record_ai_draft(resp, req.model_dump(), req.project_uuid)
+        req_dump = req.model_dump()
+        if img_meta:
+            req_dump["images"] = img_meta
+        resp["ai_draft_id"] = store.record_ai_draft(resp, req_dump, req.project_uuid)
     except Exception:
         pass                                          # 溯源落库失败不阻断草案返回(草案本身无副作用)
     return resp

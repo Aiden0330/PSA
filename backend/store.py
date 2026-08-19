@@ -83,7 +83,8 @@ CREATE TABLE IF NOT EXISTS ai_drafts(
   repair_trace_json TEXT NOT NULL DEFAULT '[]',
   draft_json TEXT NOT NULL, validation_json TEXT NOT NULL DEFAULT '{}',
   status TEXT NOT NULL DEFAULT 'generated' CHECK(status IN ('generated','applied','rejected')),
-  applied_json TEXT, created_at TEXT NOT NULL, applied_at TEXT, actor TEXT NOT NULL);
+  applied_json TEXT, created_at TEXT NOT NULL, applied_at TEXT, actor TEXT NOT NULL,
+  images_json TEXT);
 CREATE TABLE IF NOT EXISTS reviews(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   project_uuid TEXT NOT NULL REFERENCES projects(uuid),
@@ -139,6 +140,11 @@ def _conn() -> sqlite3.Connection:
     # 并发转换的仲裁交给条件 UPDATE 的 rowcount,不靠碰运气的锁失败。
     cx.execute("PRAGMA busy_timeout=5000")
     cx.executescript(_DDL)
+    # 加列迁移(幂等;CREATE IF NOT EXISTS 不会给存量表加新列)。首例:截图转录
+    # 2026-08-17 的 ai_drafts.images_json(sha256+尺寸元数据,绝不落 base64 大团)。
+    cols = {r[1] for r in cx.execute("PRAGMA table_info(ai_drafts)")}
+    if "images_json" not in cols:
+        cx.execute("ALTER TABLE ai_drafts ADD COLUMN images_json TEXT")
     return cx
 
 
@@ -1014,7 +1020,7 @@ def record_ai_draft(response: dict, req: dict, project_uuid: str | None = None) 
         cur = cx.execute(
             "INSERT INTO ai_drafts(draft_id, project_uuid, goal, mode, target, model_id, served_by,"
             " prompt_version, rounds, tool_trace_json, repair_trace_json, draft_json, validation_json,"
-            " created_at, actor) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " created_at, actor, images_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (response.get("draft_id", ""), project_uuid, req.get("goal"),
              (req.get("user_context") or {}).get("mode"), req.get("target"),
              prov.get("model_id"), prov.get("served_by"), prov.get("prompt_version"),
@@ -1022,7 +1028,9 @@ def record_ai_draft(response: dict, req: dict, project_uuid: str | None = None) 
              json.dumps(prov.get("repair_trace", []), ensure_ascii=False),
              json.dumps(response, ensure_ascii=False),
              json.dumps(response.get("validation", {}), ensure_ascii=False),
-             _now(), actor()))
+             _now(), actor(),
+             # 截图转录:哈希+尺寸元数据锚定确切图像(证据链),不落 base64
+             json.dumps(req.get("images"), ensure_ascii=False) if req.get("images") else None))
         rid = int(cur.lastrowid)
         if project_uuid:
             record_audit(cx, "ai.draft", project_uuid=project_uuid,

@@ -277,6 +277,7 @@ export function EtaWorkbench(
 
       {ai.aiOpen && (
         <AiDraftPanel
+          images={ai.aiImages} onAddImages={ai.addAiImages} onRemoveImage={ai.removeAiImage}
           goal={ai.aiGoal}
           mode={ai.aiMode}
           targetEtaName={ai.aiDraftContext?.etaName ?? activeName}
